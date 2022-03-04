@@ -1,7 +1,7 @@
 <!--
  * @Author: jianzhnie
  * @Date: 2022-01-17 09:31:54
- * @LastEditTime: 2022-01-20 11:01:39
+ * @LastEditTime: 2022-03-04 20:01:01
  * @LastEditors: jianzhnie
  * @Description:
  *
@@ -18,7 +18,7 @@ ELMO 这个名称既可以代表得到词向量的模型，也可以是得出的
 ## 2. ELMo整体模型结构
 对于ELMo的模型结构，其实论文中并没有给出具体的图（这点对于笔者这种想象力极差的人来说很痛苦），笔者通过整合论文里面的蛛丝马迹以及PyTorch的源码，得出它大概是下面这么个东西.
 
-<img src="docs/elmo.png" alt="PLMfamily" style="zoom:200%;" />
+<img src="./imgs/elmo.png" alt="PLMfamily" style="zoom:200%;" />
 
 ```python
 BiLM(
@@ -94,7 +94,7 @@ BiLM(
 
 ## 4. biLMs
 
-<img src="docs/elmo_2.png" alt="PLMfamily" style="zoom:200%;" />
+<img src="./imgs/elmo_2.png" alt="PLMfamily" style="zoom:200%;" />
 
 
 这里的 h 表示LSTM单元的hidden_size，可能会比较大，比如D=512,h=4096这样。所以在每一层结束后还需要一个Linear层将维度从 h 映射为 D，而后再输入到下一层中。最后的输出是将每一层的所有输出以及embedding的输出，进行stack，每一层的输出里面又是对每个timestep的正向和反向的输出进行concat，因而最后的输出维度为(L+1)∗B∗W∗2D，这里的 L+1 中的 +1 就代表着那一层embedding输出，其会复制成两份，以与biLMs每层的输出维度保持一致。
