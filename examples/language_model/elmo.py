@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-01-19 17:15:05
-LastEditTime: 2022-01-20 09:50:56
+LastEditTime: 2022-03-04 18:30:51
 LastEditors: jianzhnie
 Description:
 
@@ -20,7 +20,7 @@ from tqdm.auto import tqdm
 from nlptoolkit.data.datasets.elmodataset import BiLMDataset, load_corpus
 from nlptoolkit.data.utils.utils import PAD_TOKEN, get_loader
 from nlptoolkit.data.vocab import save_vocab
-from nlptoolkit.models.elmo.elmo_model import BiLM
+from nlptoolkit.models.modules.elmo.elmo_model import BiLM
 
 sys.path.append('../../')
 
