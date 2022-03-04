@@ -1,3 +1,11 @@
+'''
+Author: jianzhnie
+Date: 2022-01-04 15:43:10
+LastEditTime: 2022-03-04 18:37:47
+LastEditors: jianzhnie
+Description:
+
+'''
 # Defined in Section 7.4.5.2
 
 import numpy as np
@@ -5,10 +13,6 @@ from datasets import load_dataset, load_metric
 from transformers import (BertForTokenClassification, BertTokenizerFast,
                           DataCollatorForTokenClassification, Trainer,
                           TrainingArguments)
-
-# 加载CoNLL-2003数据集、分词器
-dataset = load_dataset('conll2003')
-tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
 
 
 # 将训练集转换为可训练的特征形式
@@ -38,20 +42,6 @@ def tokenize_and_align_labels(examples):
     return tokenized_inputs
 
 
-tokenized_datasets = dataset.map(tokenize_and_align_labels,
-                                 batched=True,
-                                 load_from_cache_file=False)
-
-# 获取标签列表，并加载预训练模型
-label_list = dataset['train'].features['ner_tags'].feature.names
-model = BertForTokenClassification.from_pretrained('bert-base-cased',
-                                                   num_labels=len(label_list))
-
-# 定义data_collator，并使用seqeval进行评价
-data_collator = DataCollatorForTokenClassification(tokenizer)
-metric = load_metric('seqeval')
-
-
 # 定义评价指标
 def compute_metrics(p):
     predictions, labels = p
@@ -75,23 +65,41 @@ def compute_metrics(p):
     }
 
 
-# 定义训练参数TrainingArguments和Trainer
-args = TrainingArguments(
-    'ft-conll2003',  # 输出路径，存放检查点和其他输出文件
-    evaluation_strategy='epoch',  # 定义每轮结束后进行评价
-    learning_rate=2e-5,  # 定义初始学习率
-    per_device_train_batch_size=16,  # 定义训练批次大小
-    per_device_eval_batch_size=16,  # 定义测试批次大小
-    num_train_epochs=3,  # 定义训练轮数
-)
+if __name__ == '__main__':
+    # 加载CoNLL-2003数据集、分词器
+    dataset = load_dataset('conll2003')
+    tokenizer = BertTokenizerFast.from_pretrained('bert-base-cased')
 
-trainer = Trainer(model,
-                  args,
-                  train_dataset=tokenized_datasets['train'],
-                  eval_dataset=tokenized_datasets['validation'],
-                  data_collator=data_collator,
-                  tokenizer=tokenizer,
-                  compute_metrics=compute_metrics)
+    tokenized_datasets = dataset.map(tokenize_and_align_labels,
+                                     batched=True,
+                                     load_from_cache_file=False)
 
-# 开始训练！（主流GPU上耗时约几分钟）
-trainer.train()
+    # 获取标签列表，并加载预训练模型
+    label_list = dataset['train'].features['ner_tags'].feature.names
+    model = BertForTokenClassification.from_pretrained(
+        'bert-base-cased', num_labels=len(label_list))
+
+    # 定义data_collator，并使用seqeval进行评价
+    data_collator = DataCollatorForTokenClassification(tokenizer)
+    metric = load_metric('seqeval')
+
+    # 定义训练参数TrainingArguments和Trainer
+    args = TrainingArguments(
+        'ft-conll2003',  # 输出路径，存放检查点和其他输出文件
+        evaluation_strategy='epoch',  # 定义每轮结束后进行评价
+        learning_rate=2e-5,  # 定义初始学习率
+        per_device_train_batch_size=16,  # 定义训练批次大小
+        per_device_eval_batch_size=16,  # 定义测试批次大小
+        num_train_epochs=3,  # 定义训练轮数
+    )
+
+    trainer = Trainer(model,
+                      args,
+                      train_dataset=tokenized_datasets['train'],
+                      eval_dataset=tokenized_datasets['validation'],
+                      data_collator=data_collator,
+                      tokenizer=tokenizer,
+                      compute_metrics=compute_metrics)
+
+    # 开始训练！（主流GPU上耗时约几分钟）
+    trainer.train()
