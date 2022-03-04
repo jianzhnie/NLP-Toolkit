@@ -11,6 +11,7 @@ import os
 import re
 
 import torch
+
 from nlptoolkit.data.processors.bert_processor import get_tokens_and_segments
 from nlptoolkit.data.vocab import Vocab, tokenize, truncate_pad
 

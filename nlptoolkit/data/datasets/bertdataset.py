@@ -9,11 +9,12 @@ Description:
 import os
 import random
 
+from torch.utils.data import Dataset
+
 from nlptoolkit.data.utils.bert_processor import (get_mlm_data_from_tokens,
                                                   get_nsp_data_from_paragraph,
                                                   pad_bert_inputs)
 from nlptoolkit.data.vocab import Vocab, tokenize
-from torch.utils.data import Dataset
 
 
 class BertDataSet(Dataset):

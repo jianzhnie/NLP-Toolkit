@@ -1,7 +1,6 @@
-import tqdm
-
 import torch
 import torch.nn as nn
+import tqdm
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 

@@ -2,6 +2,7 @@ import sys
 
 import torch
 import torch.nn as nn
+
 from nlptoolkit.models.attention.attention import AdditiveAttention
 
 sys.path.append('../../')

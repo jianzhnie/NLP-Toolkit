@@ -11,12 +11,13 @@ import copy
 import sys
 
 import torch
-from nlptoolkit.models.layers.attention import MultiHeadAttention
-from nlptoolkit.models.layers.layers import FeedForwardNetwork
 from torch import Tensor
 from torch import nn as nn
 from torch.nn import ModuleList
 from torch.nn.init import xavier_uniform_
+
+from nlptoolkit.models.layers.attention import MultiHeadAttention
+from nlptoolkit.models.layers.layers import FeedForwardNetwork
 
 sys.path.append('../../../../')
 

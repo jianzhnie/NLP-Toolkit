@@ -12,12 +12,13 @@ import math
 import d2l.torch as d2l
 import torch
 import torch.nn as nn
+from torch import Tensor
+from torch.nn import Transformer
+
 from nlptoolkit.models.embeddings.pos_encding import (PositionalEncoding,
                                                       TokenEmbedding)
 from nlptoolkit.models.layers.layers import PositionWiseFFN
 from nlptoolkit.models.seq2seq import Encoder
-from torch import Tensor
-from torch.nn import Transformer
 
 
 class AddNorm(nn.Module):

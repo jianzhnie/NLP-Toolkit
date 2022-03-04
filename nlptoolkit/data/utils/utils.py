@@ -10,8 +10,9 @@ import random
 import sys
 
 import torch
-from nlptoolkit.data.vocab import Vocab
 from torch.utils.data import DataLoader
+
+from nlptoolkit.data.vocab import Vocab
 
 sys.path.append('../../../')
 

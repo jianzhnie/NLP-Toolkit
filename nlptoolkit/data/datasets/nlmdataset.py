@@ -8,12 +8,12 @@ Description:
 '''
 from collections import defaultdict
 
-from tqdm.auto import tqdm
-
 import torch
-from nlptoolkit.data.utils.utils import BOS_TOKEN, EOS_TOKEN, PAD_TOKEN
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
+from tqdm.auto import tqdm
+
+from nlptoolkit.data.utils.utils import BOS_TOKEN, EOS_TOKEN, PAD_TOKEN
 
 
 class RNNlmDataset(Dataset):

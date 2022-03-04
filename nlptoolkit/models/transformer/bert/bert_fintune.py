@@ -12,6 +12,7 @@ import os
 import torch
 import torch.nn as nn
 from d2l.torch import download_extract
+
 from nlptoolkit.data.vocab import Vocab
 
 from .bert_model import BERTModel

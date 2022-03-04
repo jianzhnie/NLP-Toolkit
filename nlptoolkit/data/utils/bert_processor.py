@@ -12,6 +12,7 @@ import random
 import sys
 
 import torch
+
 from nlptoolkit.data.vocab import Vocab, tokenize
 
 sys.path.append('../../../')

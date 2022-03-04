@@ -9,6 +9,7 @@ Description:
 
 import torch
 import torch.nn as nn
+
 from nlptoolkit.models.transformer.common import EncoderBlock
 
 
