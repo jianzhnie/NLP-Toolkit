@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 
 import torch
 import torch.nn as nn
@@ -51,22 +52,22 @@ class CausalSelfAttention(nn.Module):
         self.key_linear = nn.Linear(d_model, d_model)
         self.value_linear = nn.Linear(d_model, d_model)
         # regularization
-        self.resid_dropout = nn.Dropout(dropout)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
         # output projection
         self.output_linear = nn.Linear(d_model, d_model)
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        self.register_buffer(
-            'mask',
-            torch.tril(torch.ones(block_size,
-                                  block_size)).view(1, 1, block_size,
-                                                    block_size))
-
+        self.mask = self.generate_square_subsequent_mask(block_size)
         self.attention = Attention(dropout=dropout)
-
         self.n_head = n_head
 
+    def generate_square_subsequent_mask(self, sz: int) -> Tensor:
+        mask = (torch.tril(torch.ones(sz, sz)) == 1)
+        mask = mask.view(1, 1, sz, sz)
+        return mask
+
     def forward(self, query, key, value, mask=None):
-        nbatches = query.size(0)
+        nbatches, seq_len, d_k = query.size()
         if mask is not None:
             self.mask = mask
         # 1) Do all the linear projections in batch from d_model => h x d_k
@@ -85,13 +86,18 @@ class CausalSelfAttention(nn.Module):
 
         # 2) Apply attention on all the projected vectors in batch.
         x, self_attn = self.attention(query, key, value, mask=self.mask)
+        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+        scores = scores.masked_fill(mask[:, :, :seq_len, :seq_len] == 0, -1e9)
+        p_attn = F.softmax(scores, dim=-1)
+        p_attn = self.dropout1(p_attn)
+        x = torch.matmul(p_attn, value)
 
         # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1,
                                                 self.n_head * self.d_k)
         # 4) linear proj output
         x = self.output_linear(x)
-        output = self.resid_dropout(x)
+        output = self.dropout2(x)
         return output, self_attn
 
 
