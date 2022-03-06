@@ -8,9 +8,6 @@ from torch import Tensor
 from torch.nn import ModuleList
 from torch.nn import functional as F
 
-from nlptoolkit.models.attention.multihead_attn import (Attention,
-                                                        MultiHeadAttention)
-
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +28,7 @@ class GPTConfig:
             setattr(self, k, v)
 
 
-class CausalSelfAttention(nn.Module):
+class CustomSelfAttention(nn.Module):
     def __init__(self, d_model, n_head, block_size, dropout=0.1):
         super().__init__()
         # We assume d_v always equals d_k
@@ -48,7 +45,6 @@ class CausalSelfAttention(nn.Module):
         self.output_linear = nn.Linear(d_model, d_model)
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.mask = self.generate_square_subsequent_mask(block_size)
-        self.attention = Attention(dropout=dropout)
         self.n_head = n_head
 
     def generate_square_subsequent_mask(self, sz: int) -> Tensor:
@@ -77,7 +73,8 @@ class CausalSelfAttention(nn.Module):
         # 2) Apply attention on all the projected vectors in batch.
         x, self_attn = self.attention(query, key, value, mask=self.mask)
         scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
-        scores = scores.masked_fill(mask[:, :, :seq_len, :seq_len] == 0, -1e9)
+        scores = scores.masked_fill(mask[:, :, :seq_len, :seq_len] == 0,
+                                    float('-inf'))
         p_attn = F.softmax(scores, dim=-1)
         p_attn = self.dropout1(p_attn)
         x = torch.matmul(p_attn, value)
@@ -96,7 +93,10 @@ class DecoderLayer(nn.Module):
         super().__init__()
         self.layer_norm1 = nn.LayerNorm(d_model)
         self.layer_norm2 = nn.LayerNorm(d_model)
-        self.attn = MultiHeadAttention(d_model, n_head, dropout=dropout)
+        self.attn = CustomSelfAttention(d_model,
+                                        n_head,
+                                        block_size,
+                                        dropout=dropout)
         self.mlp = nn.Sequential(
             nn.Linear(d_model, 4 * d_model),
             nn.GELU(),
@@ -131,7 +131,10 @@ class GPTModel(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # transformers
-        self.decoder_layer = DecoderLayer(d_model, n_head, dropout=dropout)
+        self.decoder_layer = DecoderLayer(d_model,
+                                          n_head,
+                                          block_size,
+                                          dropout=dropout)
         self.decoder = _get_clones(self.decoder_layer, num_layers)
 
         # decoder head
