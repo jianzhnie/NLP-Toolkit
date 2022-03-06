@@ -17,9 +17,10 @@ def _get_clones(module, N):
 
 class GPTConfig:
     """base GPT config, params common to all GPT versions."""
-    embd_dropout = 0.1
-    resid_dropout = 0.1
-    attn_dropout = 0.1
+    n_layer = 12
+    n_head = 12
+    n_embd = 768
+    dropout = 0.1
 
     def __init__(self, vocab_size, block_size, **kwargs):
         self.vocab_size = vocab_size
