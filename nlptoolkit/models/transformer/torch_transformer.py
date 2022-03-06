@@ -13,7 +13,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
-from nlptoolkit.models.layers.pos_encding import PositionalEncoding
+from nlptoolkit.models.embeddings.pos_encding import PositionalEncoding
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
