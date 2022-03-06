@@ -7,13 +7,10 @@ Description:
 
 '''
 
-import copy
 import math
-from sqlalchemy import outparam
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from nlptoolkit.models.losses.mask_softmax import masked_softmax
 
