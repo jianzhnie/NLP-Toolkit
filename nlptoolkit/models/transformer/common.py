@@ -18,7 +18,7 @@ from torch.nn import Transformer
 from nlptoolkit.models.embeddings.pos_encding import (PositionalEncoding,
                                                       TokenEmbedding)
 from nlptoolkit.models.layers.layers import PositionWiseFFN
-from nlptoolkit.models.seq2seq import Encoder
+from nlptoolkit.models.seq2seq.seq2seq import Encoder
 
 
 class AddNorm(nn.Module):
