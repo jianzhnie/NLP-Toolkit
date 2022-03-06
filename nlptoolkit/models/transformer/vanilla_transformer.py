@@ -54,7 +54,7 @@ class Transformer(Module):
                  num_decoder_layers: int = 6,
                  dim_feedforward: int = 2048,
                  dropout: float = 0.1,
-                 activation: str = "relu",
+                 activation: str = 'relu',
                  custom_encoder: Optional[Any] = None,
                  custom_decoder: Optional[Any] = None) -> None:
         super(Transformer, self).__init__()
@@ -119,7 +119,7 @@ class Transformer(Module):
             positions. If a ByteTensor is provided, the non-zero positions are not allowed to attend
             while the zero positions will be unchanged. If a BoolTensor is provided, positions with ``True``
             are not allowed to attend while ``False`` values will be unchanged. If a FloatTensor
-            is provided, it will be added to the attention weight. 
+            is provided, it will be added to the attention weight.
             [src/tgt/memory]_key_padding_mask provides specified elements in the key to be ignored by
             the attention. If a ByteTensor is provided, the non-zero positions will be ignored while the zero
             positions will be unchanged. If a BoolTensor is provided, the positions with the
@@ -139,11 +139,11 @@ class Transformer(Module):
         """
 
         if src.size(1) != tgt.size(1):
-            raise RuntimeError("the batch number of src and tgt must be equal")
+            raise RuntimeError('the batch number of src and tgt must be equal')
 
         if src.size(2) != self.d_model or tgt.size(2) != self.d_model:
             raise RuntimeError(
-                "the feature number of src and tgt must be equal to d_model")
+                'the feature number of src and tgt must be equal to d_model')
 
         memory = self.encoder(src,
                               mask=src_mask,
@@ -306,7 +306,7 @@ class TransformerEncoderLayer(Module):
                  nhead,
                  dim_feedforward=2048,
                  dropout=0.1,
-                 activation="relu"):
+                 activation='relu'):
         super(TransformerEncoderLayer, self).__init__()
         self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
@@ -379,7 +379,7 @@ class TransformerDecoderLayer(Module):
                  nhead,
                  dim_feedforward=2048,
                  dropout=0.1,
-                 activation="relu"):
+                 activation='relu'):
         super(TransformerDecoderLayer, self).__init__()
         self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
         self.multihead_attn = MultiheadAttention(d_model,
@@ -449,13 +449,13 @@ def _get_clones(module, N):
 
 
 def _get_activation_fn(activation):
-    if activation == "relu":
+    if activation == 'relu':
         return F.relu
-    elif activation == "gelu":
+    elif activation == 'gelu':
         return F.gelu
 
     raise RuntimeError(
-        "activation should be relu/gelu, not {}".format(activation))
+        'activation should be relu/gelu, not {}'.format(activation))
 
 
 if __name__ == '__main__':
