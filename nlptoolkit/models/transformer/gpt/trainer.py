@@ -10,8 +10,6 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 
-from .utils import configure_optimizers
-
 logger = logging.getLogger(__name__)
 
 
@@ -37,10 +35,11 @@ class Trainer:
 
     def train(self):
         model, config = self.model, self.config
-        optimizer = configure_optimizers(model=config.model,
-                                         learning_rate=config.learning_rate,
-                                         weight_decay=config.weight_decay,
-                                         betas=config.betas)
+        raw_model = model.module if hasattr(self.model, 'module') else model
+        optimizer = raw_model.configure_optimizers(
+            learning_rate=config.learning_rate,
+            weight_decay=config.weight_decay,
+            betas=config.betas)
 
         def run_epoch(split):
             is_train = split == 'train'
