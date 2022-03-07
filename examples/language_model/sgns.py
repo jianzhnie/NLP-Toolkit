@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-01-05 15:38:29
-LastEditTime: 2022-01-05 16:13:30
+LastEditTime: 2022-03-07 16:17:04
 LastEditors: jianzhnie
 Description:
 
@@ -18,7 +18,8 @@ from nlptoolkit.data.datasets.nlmdataset import \
     NegativeSampleingSkipGramDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.word2vec import SGNSModel
+from nlptoolkit.models.modules.word2vec.word2vec import \
+    SkipGramNegativeSamplingModel
 
 sys.path.append('../../')
 
@@ -59,7 +60,7 @@ if __name__ == '__main__':
     data_loader = get_loader(dataset, batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = SGNSModel(len(vocab), embedding_dim)
+    model = SkipGramNegativeSamplingModel(len(vocab), embedding_dim)
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 

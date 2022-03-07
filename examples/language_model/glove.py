@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-01-05 16:21:54
-LastEditTime: 2022-01-05 17:53:46
+LastEditTime: 2022-03-07 16:16:06
 LastEditors: jianzhnie
 Description:
 
@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 from nlptoolkit.data.datasets.nlmdataset import GloveDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.word2vec.glove import GloveModel
+from nlptoolkit.models.modules.word2vec.glove import GloveModel
 
 sys.path.append('../../')
 

@@ -1,3 +1,11 @@
+'''
+Author: jianzhnie
+Date: 2022-03-04 18:19:57
+LastEditTime: 2022-03-07 16:16:48
+LastEditors: jianzhnie
+Description:
+
+'''
 # Defined in Section 5.1.3.3
 
 import torch
@@ -6,7 +14,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.datasets.nlmdataset import RnnlmDataset
+from nlptoolkit.data.datasets.nlmdataset import RNNlmDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
 
@@ -39,7 +47,7 @@ if __name__ == '__main__':
 
     # 读取文本数据，构建FFNNLM训练数据集（n-grams）
     corpus, vocab = load_reuters()
-    dataset = RnnlmDataset(corpus, vocab)
+    dataset = RNNlmDataset(corpus, vocab)
     data_loader = get_loader(dataset, batch_size)
 
     # 负对数似然损失函数，忽略pad_token处的损失

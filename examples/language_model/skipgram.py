@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-01-05 15:25:53
-LastEditTime: 2022-01-05 15:33:42
+LastEditTime: 2022-03-07 16:17:53
 LastEditors: jianzhnie
 Description:
 
@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 from nlptoolkit.data.datasets.nlmdataset import SkipGramDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.word2vec import SkipGramModel
+from nlptoolkit.models.modules.word2vec import SkipGramModel
 
 sys.path.append('../../')
 

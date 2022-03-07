@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-01-05 15:00:30
-LastEditTime: 2022-01-05 15:33:48
+LastEditTime: 2022-03-07 16:15:05
 LastEditors: jianzhnie
 Description:
 
@@ -17,7 +17,7 @@ from tqdm.auto import tqdm
 from nlptoolkit.data.datasets.nlmdataset import CbowDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.word2vec.word2vec import CBOWLanguageModel
+from nlptoolkit.models.modules.word2vec.word2vec import CBOWLanguageModel
 
 sys.path.append('../../')
 
