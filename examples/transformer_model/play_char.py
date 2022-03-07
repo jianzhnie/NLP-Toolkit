@@ -1,11 +1,13 @@
 '''
 Author: jianzhnie
 Date: 2022-03-07 17:23:31
-LastEditTime: 2022-03-07 17:38:50
+LastEditTime: 2022-03-07 18:17:54
 LastEditors: jianzhnie
 Description:
 
 '''
+import sys
+
 import torch
 from torch.utils.data import Dataset
 
@@ -14,6 +16,8 @@ from nlptoolkit.models.transformer.gpt.config_gpt import (GPTConfig,
 from nlptoolkit.models.transformer.gpt.model_gpt import GPTModel
 from nlptoolkit.models.transformer.gpt.trainer import Trainer
 from nlptoolkit.models.transformer.gpt.utils import sample
+
+sys.path.append('../../')
 
 
 class CharDataset(Dataset):
@@ -87,10 +91,11 @@ if __name__ == '__main__':
                              train_dataset.block_size,
                              n_layer=2,
                              n_head=8,
-                             n_embd=512)
+                             d_model=512)
     model = GPTModel(model_config.vocab_size, model_config.d_model,
                      model_config.n_head, model_config.n_layer,
                      model_config.block_size)
+    print(model)
     train_config = TrainerConfig(max_epochs=2,
                                  batch_size=32,
                                  learning_rate=6e-4,
