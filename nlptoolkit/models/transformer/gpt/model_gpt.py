@@ -34,7 +34,6 @@ class CustomSelfAttention(nn.Module):
         super().__init__()
         # We assume d_v always equals d_k
         self.d_k = d_model // n_head
-        self.nhead = n_head
         # key, query, value projections for all heads
         self.query_linear = nn.Linear(d_model, d_model)
         self.key_linear = nn.Linear(d_model, d_model)
@@ -67,14 +66,11 @@ class CustomSelfAttention(nn.Module):
                                               self.d_k).transpose(1, 2)
         key = self.key_linear(key).view(nbatches, -1, self.n_head,
                                         self.d_k).transpose(1, 2)
-        value = self.value_linear(value).view(nbatches, -1,
-                                              self.n_head, self.d_k).transpose(
-                                                  1, 2).transpose(1, 2)
-
+        value = self.value_linear(value).view(nbatches, -1, self.n_head,
+                                              self.d_k).transpose(1, 2)
         # 2) Apply attention on all the projected vectors in batch.
-        x, self_attn = self.attention(query, key, value, mask=self.mask)
         scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
-        scores = scores.masked_fill(mask[:, :, :seq_len, :seq_len] == 0,
+        scores = scores.masked_fill(self.mask[:, :, :seq_len, :seq_len] == 0,
                                     float('-inf'))
         p_attn = F.softmax(scores, dim=-1)
         p_attn = self.dropout1(p_attn)
@@ -86,7 +82,7 @@ class CustomSelfAttention(nn.Module):
         # 4) linear proj output
         x = self.output_linear(x)
         output = self.dropout2(x)
-        return output, self_attn
+        return output
 
 
 class DecoderLayer(nn.Module):
@@ -107,7 +103,7 @@ class DecoderLayer(nn.Module):
 
     def forward(self, src, src_mask=None):
         src2 = self.layer_norm1(src)
-        src2 = self.attn(src2, src2, src2, mask=src_mask)[0]
+        src2 = self.attn(src2, src2, src2, mask=src_mask)
         src = src + src2
 
         src2 = self.layer_norm2(src)
@@ -117,6 +113,7 @@ class DecoderLayer(nn.Module):
 
 
 class GPTModel(nn.Module):
+    """the full GPT language model, with a context size of block_size."""
     def __init__(self,
                  vocab_size,
                  d_model,
@@ -144,6 +141,8 @@ class GPTModel(nn.Module):
 
         self.block_size = block_size
         self.apply(self._init_weights)
+        logger.info('number of parameters: %e',
+                    sum(p.numel() for p in self.parameters()))
 
     def get_block_size(self):
         return self.block_size
