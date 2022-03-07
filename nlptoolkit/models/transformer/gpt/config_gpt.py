@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-07 16:56:31
-LastEditTime: 2022-03-07 17:14:13
+LastEditTime: 2022-03-07 17:33:39
 LastEditors: jianzhnie
 Description:
 
@@ -12,7 +12,7 @@ class GPTConfig:
     """base GPT config, params common to all GPT versions."""
     n_layer = 12
     n_head = 12
-    n_embd = 768
+    d_model = 768
     dropout = 0.1
 
     def __init__(self, vocab_size, block_size, **kwargs):
