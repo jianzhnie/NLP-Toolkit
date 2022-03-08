@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-07 17:23:31
-LastEditTime: 2022-03-07 18:17:54
+LastEditTime: 2022-03-08 10:15:37
 LastEditors: jianzhnie
 Description:
 
@@ -17,7 +17,7 @@ from nlptoolkit.models.transformer.gpt.model_gpt import GPTModel
 from nlptoolkit.models.transformer.gpt.trainer import Trainer
 from nlptoolkit.models.transformer.gpt.utils import sample
 
-sys.path.append('../../')
+sys.path.append('../../../')
 
 
 class CharDataset(Dataset):
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     trainer = Trainer(model, train_dataset, None, train_config)
     trainer.train()
 
-    context = 'O God, O God!'
+    context = 'the time machine'
     x = torch.tensor([train_dataset.stoi[s] for s in context],
                      dtype=torch.long)[None, ...].to(trainer.device)
     y = sample(model, x, 2000, temperature=1.0, sample=True, top_k=10)[0]
