@@ -1,12 +1,18 @@
+import copy
 import logging
 import math
 
 import torch
 import torch.nn as nn
 from torch import Tensor
+from torch.nn import ModuleList
 from torch.nn import functional as F
 
 logger = logging.getLogger(__name__)
+
+
+def _get_clones(module, N):
+    return ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
 class CustomSelfAttention(nn.Module):
@@ -114,8 +120,7 @@ class GPTModel(nn.Module):
                                           n_head,
                                           block_size,
                                           dropout=dropout)
-        self.decoder = nn.Sequential(
-            *[self.decoder_layer for i in range(num_layers)])
+        self.decoder = _get_clones(self.decoder_layer, num_layers)
 
         # decoder head
         self.layer_norm = nn.LayerNorm(d_model)
@@ -147,10 +152,12 @@ class GPTModel(nn.Module):
         token_embeddings = self.token_embedder(tokens)
         position_embeddings = self.pos_embedder[:, :seq_len, :]
         # each position maps to a (learnable) vector
-        x = self.dropout(token_embeddings + position_embeddings)
-        x = self.decoder(x)
-        x = self.layer_norm(x)
-        logits = self.head(x)
+        output = self.dropout(token_embeddings + position_embeddings)
+        for layer in self.decoder:
+            output = layer(output)
+
+        output = self.layer_norm(output)
+        logits = self.head(output)
 
         # if we are given some desired targets also calculate the loss
         loss = None
@@ -211,10 +218,10 @@ class GPTModel(nn.Module):
                 'params': [param_dict[pn] for pn in sorted(list(decay))],
                 'weight_decay': weight_decay
             },
-            # {
-            #     'params': [param_dict[pn] for pn in sorted(list(no_decay))],
-            #     'weight_decay': 0.0
-            # },
+            {
+                'params': [param_dict[pn] for pn in sorted(list(no_decay))],
+                'weight_decay': 0.0
+            },
         ]
         optimizer = torch.optim.AdamW(optim_groups,
                                       lr=learning_rate,
