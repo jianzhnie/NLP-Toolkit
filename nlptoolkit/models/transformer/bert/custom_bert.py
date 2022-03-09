@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2021-12-28 11:57:58
-LastEditTime: 2022-01-05 10:19:52
+LastEditTime: 2022-03-08 17:07:11
 LastEditors: jianzhnie
 Description:
 
@@ -50,7 +50,7 @@ class BertEmbedding(nn.Module):
         self,
         vocab_size,
         hidden_size=512,
-        max_len=1000,
+        max_position_embeddings=1000,
         type_vocab_size=2,
         dropout_prob=0.1,
         pad_token_id=0,
@@ -62,10 +62,20 @@ class BertEmbedding(nn.Module):
         self.word_embeddings = nn.Embedding(vocab_size,
                                             hidden_size,
                                             padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_len, hidden_size)
+        self.position_embeddings = nn.Embedding(max_position_embeddings,
+                                                hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.LayerNorm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(dropout_prob)
+        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
+        self.register_buffer(
+            'position_ids',
+            torch.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer(
+            'token_type_ids',
+            torch.zeros(self.position_ids.size(), dtype=torch.long),
+            persistent=False,
+        )
 
     def forward(self, tokens=None, segments=None):
         seq_len = tokens.size(1)
