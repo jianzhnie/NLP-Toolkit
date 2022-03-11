@@ -1,4 +1,4 @@
-# **Tokenizer**
+# Tokenizer
 
 1. 背景与基础
 
@@ -12,8 +12,6 @@ tokenize有三种粒度：**word/subword/char**
 - **char/字符,** 也就是说，我们的词汇表里只有最基本的字符。而一般来讲，字符的数量是少量有限的。这样做的问题是，由于字符数量太小，我们在为每个字符学习嵌入向量的时候，每个向量就容纳了太多的语义在内，学习起来非常困难。
 - **subword子词级**，它介于字符和单词之间。比如说Transformers可能会被分成Transform和ers两个部分。**这个方案平衡了词汇量和语义独立性，是相对较优的方案**。它的处理原则是，**常用词应该保持原状，生僻词应该拆分成子词以共享token压缩空间**。
 
-
-
 ## Subword tokenization
 
 Subword tokenization的核心思想是：“**频繁出现了词不应该被切分成更小的单位，但不常出现的词应该被切分成更小的单位**”。
@@ -22,7 +20,19 @@ Subword tokenization的核心思想是：“**频繁出现了词不应该被切�
 
 这样分词的好处在于，大大节省了词表空间，还能够解决 OOV 问题。因为我们很多使用的词语，都是由更简单的词语或者词缀构成的，我们不用去保存那些“小词”各种排列组合形成的千变万化的“大词”，而用较少的词汇，去覆盖各种各样的词语表示。同时，相比与直接使用最基础的“字”作为词表，sub-word的语义表示能力也更强。
 
-常见的 subword tokenization方法有：
+### 与传统空格分隔tokenization技术的对比
+
+- 传统词表示方法无法很好的处理未知或罕见的词汇（OOV问题）
+
+- 传统词tokenization方法不利于模型学习词缀之间的关系
+
+- - E.g. 模型学到的“old”, “older”, and “oldest”之间的关系无法泛化到“smart”, “smarter”, and “smartest”。
+
+- Character embedding作为OOV的解决方法粒度太细
+
+- Subword粒度在词与字符之间，能够较好的平衡OOV问题
+
+### 常见的 subword tokenization方法有：
 
 - BPE
 - WordPiece
@@ -47,6 +57,14 @@ BPE  — a frequency-based model
 - Byte Pair Encoding uses the frequency of subword patterns to shortlist them for merging.
 - The drawback of using frequency as the driving factor is that you can end up having ambiguous final encodings that might not be useful for the new input text.
 - It still has the scope of improvement in terms of generating unambiguous tokens.
+
+- 优点
+
+- - 可以有效地平衡词汇表大小和步数(编码句子所需的token数量)。
+
+- 缺点
+
+- - 基于贪婪和确定的符号替换，不能提供带概率的多个分片结果。
 
 #### **Step1：首先，我们需要对语料进行一个预分词（pre-tokenization）：**
 
