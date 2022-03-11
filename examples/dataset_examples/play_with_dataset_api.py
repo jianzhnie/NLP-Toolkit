@@ -1,23 +1,19 @@
+'''
+Author: jianzhnie
+Date: 2022-03-11 11:15:41
+LastEditTime: 2022-03-11 12:08:31
+LastEditors: jianzhnie
+Description:
+
+'''
 from pprint import pprint
 
 from datasets import load_dataset
 
 if __name__ == '__main__':
-    # datasets = list_datasets()
-    # print("Number of datasets in the Datasets library: ", len(datasets),
-    #       "\n\n")
-
-    # # 数据集列表
-    # # pprint(datasets, compact=True)
-
-    # # 数据集属性
-    # imdb = list_datasets(with_details=True)[datasets.index('imdb')]
-
-    # # 调用python数据类
-    # pprint(imdb.__dict__)
-
     # 加载数据集
-    imdb_dataset = load_dataset('imdb')
+    imdb_dataset = load_dataset('examples/dataset_examples/imdb.py')
+    # imdb_dataset = load_dataset('imdb')
     # 从Hugging Face GitHub 仓库或AWS bucket（如果尚未存储在库中）下载并在库中导入了imdb python处理脚本。
     # 运行imdb脚本以下载数据集。
     # 根据用户请求的拆分返回数据集。默认情况下，它返回整个数据集。
