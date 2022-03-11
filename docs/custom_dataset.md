@@ -382,188 +382,15 @@ from datasets import load_dataset
 dataset = load_dataset('PATH/TO/MY/SCRIPT.py', 'my_configuration',  data_files={'train': 'my_train_file.txt', 'validation': 'my_validation_file.txt'})
 ```
 
-
-
 ## 数据集参考脚本(Dataset scripts of reference)
 
 数据集共享相同的格式是很常见的。因此，可能已经存在一个数据集脚本，您可以从中获得一些灵感来帮助您编写自己的数据集脚本。
 
 这是一个在本地上的数据集，它的一个示例为：
 
-```
-webqa_data = json.loads(open('./data/WebQA.json', encoding='utf8').read())
-```
-
-```
-webqa_data[0]
-----------------------
-{'passages': [{'answer': '', 'passage': '商王朝最后一个君王叫纣，最早以亳为都城。'},
-  {'answer': '', 'passage': '纣：中国商代最后一位君主。'},
-  {'answer': '纣王',
-   'passage': '商王朝最后一个君王叫帝辛，也就是纣王，商王朝都成在殷商，商王朝灭亡的一场战役是牧野之战，商王朝灭了，建立了周朝。'},
-  {'answer': '',
-   'passage': '答：第一个是秦始皇，首称“朕”、并六国、统度量衡、焚书坑儒、造长城等、是一个暴君也是一个雄才伟略的大作为君王。最后一个是清朝宣统帝，爱新觉罗．溥仪，为日本人控制建立伪满政权，写了本自传。'},
-  {'answer': '', 'passage': '鸣条一战，夏师败绩，夏桀奔南巢而死，成汤则成为商代的第一位君王。'},
-  {'answer': '', 'passage': '最后一个君王叫杰朝都在殷商战役不知道商灭亡后建立周朝'},
-  {'answer': '', 'passage': '他在位期间致力于修明政治，统一中国北方，政绩显著，是十六国时期许多封建帝王中最杰出君王。'},
-  {'answer': '',
-   'passage': '中国皇帝（君王）包括正统朝代和少数民族建立的政权，还有一些政变、夺权所建立的政权，再加上农民起义建立的政权，中国皇帝共有１０００多位呢！附：南越、东越、闽越、东瓯、匈奴、突厥、回纥（回鹘）、吐蕃、高昌、于阗、柔然、吐谷浑、渤海国（大震）、南诏（大蒙、大礼、大封民）、大长和、大天兴、大义宁、大理国（前理汉武帝刘彻、后理）、大中、东夏（大真）（以上不包括十六国时期和五代十国时期的少数民族政权）其中云南列朝自世隆以下【南诏（大蒙、大礼、大封民）、大长和、大天兴、大义宁、大理国（前理、后理）、大中】和东夏（大真）的君主称皇帝；南越（吕后时）、于阗（五代时）的君主一度称皇帝；南越、东越、闽越、东瓯、高昌、于阗、吐谷浑、渤海国（大震）作为中原王朝的藩属国，君主称王；匈奴的君主称单于；回纥（回鹘）、柔然的君主称可汗；吐蕃的君主称赞普。'},
-  {'answer': '', 'passage': '中国第一个有记载有国号的王朝是夏，最后一个国王是桀。'},
-  {'answer': '', 'passage': '周朝是中国第三个也是最后一个世袭分封制王朝'},
-  {'answer': '', 'passage': '仲壬亦称中壬、燕壬、工壬、其壬、南壬，姓子名庸，是中国商朝的一位君王。'},
-  {'answer': '',
-   'passage': '在中国汉代的历史学家司马迁的着作《史记》中记载，商代最后一个国王纣的兄弟箕子在周武王伐纣后，带着商代的礼仪和制度到了朝鲜半岛北部，被那里的人民推举为国君，并得到周朝的承认。'},
-  {'answer': '', 'passage': '君王已成了历史名词，中国再不会有皇帝，留下大量史料让后人去挖掘。'},
-  {'answer': '',
-   'passage': '后人称他在贞观年间的统治为“贞观之治”。【丰功伟绩】1、他不拘一格（敌人、穷人、坏人）的用人，对人材的使用及领导达到了极高的境遇；2、他独具慧眼，看到了个人力量的不足，充分认识到君王如石、良臣如匠，方有美玉问世，对大臣的各项进步之言豁达的予以采纳；3、不独断专行、初步确立了三权分立、互相监督的政治管理制度，规定法令甚至包括自己（影响国家政策的那一部份）旨意需门下省审查副署后方可生效发布，保证了政策的可行性、及时发现并纠正/杜绝了不良政策对国家及人民的违害与影响；4、认识到人命至重、不可妄杀的法政政策，规定死刑需三复奏（外地五复奏）复审批准后方可行刑，这就不难认人们想起贞观四年（630年---中国的丰年）全国叛死刑才29人、贞观六年（632年）全国死刑犯290人，太宗审查时令全部290人回家团年、待来年秋收后回来复刑，结果290人均准时到来、无一人逃亡（现在有人说那是太宗广布法网，那290人是跑不掉才回来受死的，我说这人真是不动脑子，想想那时的法网严还是现在的法网严，那现在逃狱是不是100%呢，那又是为什么呢！！！）。5、太宗朝武功之盛，除太高丽战争上没有取得战略胜利外都取得了辉煌的胜利（突厥、吐谷浑、高昌、安西四镇、漠北薛延陀等），这与当时的国力、军队战斗力、整体战略、用人选将与配合默契、过程协调一致等重要因素是分不开的，因此在中华历史上的名将名相中，贞观朝占有相当的比例，在中华军事史上，贞观朝的战例也多被引用；6、气吞天下的“天可汗”气质，李世民多次以少吓多，经典之役就是在渭水单骑吓退突厥10万精骑，就对比宋真宗在寇准一在坚持和请求下才免强在大军护卫下到达澶州南城，而又要战战兢兢的马上要回去是何等的天壤之别啊！7、胸怀大局、四海一统的民族和外交政策，太宗朝的民族和外交政策取得了辉煌的胜利，四海之内只要知道中国的均努力内附，以唐为荣，乐不思蜀，他们不但同唐人一样可以自由自在的生存，还可以做官，著名的少数民族将领阿史那社尔、执思失力、契毕何力乃至后世的高仙芝、李光弼等都为唐朝做出了杰出贡献，在他们身上正好反映出李世民民族政策的光辉，现在的唐人、唐人街也正时那时繁荣富强、威甲四海、文礼之邦的生动写照；8、完善科举制度、大力兴办学校、重视教育活动、普及官吏选聘、当时的国子学、太学之盛、地方也有不少学校，如此才不难想起当时的教化呢，同时当时的科举也规范化、考选公平，以进士科最为杰出，如此才有太宗见新科进士鱼贯而出，喜言“天下英雄'},
-  {'answer': '',
-   'passage': '中国皇帝（君王）包括正统朝代和少数民族建立的政权，还有一些政变、夺权所建立的政权，再加上农民起义建立的政权，中国皇帝共有１０００多位呢！'},
-  {'answer': '',
-   'passage': '答：中国皇帝（君王）包括正统朝代和少数民族建立的政权，还有一些政变、夺权所建立的政权，再加上农民起义建立的政权，中国皇帝共有１０００多位呢！附：南越、东越、闽越、东瓯、匈奴、突厥、回纥（回鹘）、吐蕃、高昌、于阗、柔然、吐谷浑、渤海...'},
-  {'answer': '',
-   'passage': '中国经历的漫长封建社会自公元前221年秦王赢政称"皇帝"始,至1912年最后一个封建皇帝溥仪在辛亥革命的炮火中宣布退位止.长达2132年.在这期间,封建皇帝总数为494人,在位时间最长的皇帝是清康熙帝和乾隆帝,在位时间最短的是金末帝完颜承麟,从即位到被杀,不足半日.'},
-  {'answer': '',
-   'passage': '皇朝的终结中国最后一个君主专制政府——清朝在1911年的辛亥革命中被推翻，取而代之的是共和政体中华民国（正式成立于1912年1月1日）。'},
-  {'answer': '', 'passage': '桀：桀是夏朝最后一个国王，名履癸，是中国历史上有名的暴虐、荒淫的国君之一。'},
-  {'answer': '', 'passage': '中国第一个王朝是夏，夏的最后一个皇帝是桀。'}],
- 'question': '中国商代最后一个君王是谁?',
- 'id': 'Q_IR_VAL_000000#TEST'}
-
-```
-
-先是一个列表(list)，列表中每个元素是一个字典，每个字典中有[‘passages’, ‘question’, ‘id’]三个关键字。
-
-```
-webqa_data[1].keys()
-----------------------------------
-dict_keys(['passages', 'question', 'id'])
-```
-
-passages中对应的是一个列表，列表中的元素是dict_keys([‘answer’, ‘passage’])
-
-然后我自己写了一个脚本
-
-为了增加可读性，把许可证和描述的关键字设置为空
-
-```
-from __future__ import absolute_import, division, print_function
-
-import csv
-import json
-import os
-
-import datasets
-_CITATION =  “”    # 来自论文或arxiv
-_DESCRIPTION = “”    # 任务描述
-_HOMEPAGE = ”“    # 链接
-_LICENSE = ”“    # 链接
-
-_URLs = {    # 本地文件的路径
-    'train': "./data/qatrain.json",
-    'dev': "./data/qavalid.json"
-}
-
-```
-
-下面是在模板中填写自己的数据集：
-
-class Webqa(datasets.GeneratorBasedBuilder):
-    """TODO: Short description of my dataset."""
-
-    VERSION = datasets.Version("1.1.0")
-    BUILDER_CONFIGS = [
-        datasets.BuilderConfig(name="Plain_text", version=VERSION, description="Plain text"),
-    ]    # 对数据集的概述
-
-    def _info(self):
-        return datasets.DatasetInfo(
-            # 这是将出现在“数据集”页面上的描述。
-            description=_DESCRIPTION,
-            # 这定义了数据集的不同列及其类型
-            features=datasets.Features(
-                {
-                    "id": datasets.Value("string"),
-                    "question": datasets.Value("string"),
-                    "passage": datasets.Value("string"),
-                    "answer": datasets.Value("string"),
-                }
-            ),     # 这一部分定义了输出关键字的类型，和要输出的关键字
-            supervised_keys=None,
-            homepage=_HOMEPAGE,
-            license=_LICENSE,
-            citation=_CITATION,
-        )
-
-    def _split_generators(self, dl_manager):
-        """Returns SplitGenerators."""
-        # 这个方法用来下载/提取数据，依据configurations分割数据
-        # 如果可能有几种配置(在BUILDER_CONFIGS中列出)，则用户选择的配置在self.config.name中
-
-        # dl_manager is a datasets.download.DownloadManager 用来下载和抽取url
-        # 它可以接受任何类型或嵌套的list/dict，并将返回相同的结构，也可以将url替换为本地文件的路径。
-        # 默认情况下，将提取归档文件，并返回到提取归档文件的缓存文件夹的路径，而不是归档文件
-        data_dir = dl_manager.download_and_extract(_URLs)
-        print(data_dir)
-        return [
-            datasets.SplitGenerator(
-                name=datasets.Split.TRAIN,
-                # These kwargs will be passed to _generate_examples kwargs将会传参给_generate_examples
-                gen_kwargs={
-                    "filepath": os.path.join(data_dir["train"]),
-                    "split": "train",
-                },
-            ),
-            datasets.SplitGenerator(
-                name=datasets.Split.VALIDATION,
-                # These kwargs will be passed to _generate_examples
-                gen_kwargs={
-                    "filepath": os.path.join(data_dir["dev"]),
-                    "split": "dev",
-                },
-            ),
-        ]
-
-    def _generate_examples(self, filepath, split):
-        """ Yields examples. """
-        # 这个方法将接收在前面的' _split_generators '方法中定义的' gen_kwargs '作为参数。
-        # It is in charge of opening the given file and yielding (key, example) tuples from the dataset
-        # The key is not important, it's more here for legacy reason (legacy from tfds)
-        # 它负责打开给定的文件并从数据集生成元组(键，示例)
-        # key是不重要的，更多的是为了传承
-
-        # 这里就是根据自己的数据集来整理
-        with open(filepath, encoding="utf-8") as f:
-            data = json.loads(f)
-            for questions in data:    # 读列表中的其中第一个字典
-                id_ = questions['id'].strip()
-                question = questions['question'].strip()
-                passages = questions['passages']
-                for passage_n in passages:
-                    answer = passage_n['answer'].strip()
-                    passage = passage_n['passage'].strip()
-
-                    yield id_, {
-                        "id": id_,
-                        "question": question,
-                        "passage": passage,
-                        "answer":answer
-                    }
-
-## 结果演示
-
-然后我们来演示这个读的效果
-
-```python
-from datasets import load_dataset
-dataset = load_dataset("./qascript.py", data_files='./data/qatrain.json')
-```
-
-可以看到，在经过一番周折后，效果还是不错的。
-
 ```python
 import datasets
 from datasets.tasks import TextClassification
-
 
 _DESCRIPTION = """\
 Large Movie Review Dataset.
@@ -589,6 +416,11 @@ _CITATION = """\
 
 _DOWNLOAD_URL = "http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
 
+_URLs = {    # 本地文件的路径
+    'train': "./data/train/",
+    'val': "./data/val/"
+    'unsupervised: ./data/unsupervised/'
+} 
 
 class IMDBReviewsConfig(datasets.BuilderConfig):
     """BuilderConfig for IMDBReviews."""
@@ -656,3 +488,14 @@ class Imdb(datasets.GeneratorBasedBuilder):
                         yield path, {"text": f.read().decode("utf-8"), "label": -1}
 
 ```
+## 结果演示
+
+然后我们来演示这个读的效果
+
+```python
+from datasets import load_dataset
+dataset = load_dataset("./imdb.py", data_files='')
+```
+
+可以看到，在经过一番周折后，效果还是不错的。
+
