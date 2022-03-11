@@ -15,6 +15,8 @@
 # Lint as: python3
 """IMDB movie reviews dataset."""
 
+import os
+
 import datasets
 from datasets.tasks import TextClassification
 
@@ -39,8 +41,6 @@ _CITATION = """\
   url       = {http://www.aclweb.org/anthology/P11-1015}
 }
 """
-
-_DOWNLOAD_URL = '/home/robin/jianzh/nlp-toolkit/examples/dataset_examples/aclImdb'
 
 
 class IMDBReviewsConfig(datasets.BuilderConfig):
@@ -83,48 +83,48 @@ class Imdb(datasets.GeneratorBasedBuilder):
         )
 
     def _split_generators(self, dl_manager):
-        archive = dl_manager.download(_DOWNLOAD_URL)
+        data_dir = self.config.data_dir
         return [
             datasets.SplitGenerator(name=datasets.Split.TRAIN,
                                     gen_kwargs={
-                                        'files':
-                                        dl_manager.iter_archive(archive),
+                                        'data_dir': data_dir,
                                         'split': 'train'
                                     }),
             datasets.SplitGenerator(name=datasets.Split.TEST,
                                     gen_kwargs={
-                                        'files':
-                                        dl_manager.iter_archive(archive),
+                                        'data_dir': data_dir,
                                         'split': 'test'
                                     }),
-            datasets.SplitGenerator(
-                name=datasets.Split('unsupervised'),
-                gen_kwargs={
-                    'files': dl_manager.iter_archive(archive),
-                    'split': 'train',
-                    'labeled': False
-                },
-            ),
+            datasets.SplitGenerator(name=datasets.Split('unsupervised'),
+                                    gen_kwargs={
+                                        'data_dir': data_dir,
+                                        'split': 'train',
+                                        'labeled': False
+                                    }),
         ]
 
-    def _generate_examples(self, files, split, labeled=True):
+    def _generate_examples(self, data_dir, split, labeled=True):
         """Generate aclImdb examples."""
         # For labeled examples, extract the label from the path.
         if labeled:
             label_mapping = {'pos': 1, 'neg': 0}
-            for path, f in files:
-                if path.startswith(f'aclImdb/{split}'):
-                    label = label_mapping.get(path.split('/')[2])
-                    if label is not None:
-                        yield path, {
-                            'text': f.read().decode('utf-8'),
-                            'label': label
-                        }
+            for curDir, dirs, files in os.walk(data_dir):
+                for file in files:
+                    if file.endswith('.txt') and curDir.startswith(
+                            f'{data_dir}{split}'):
+                        path = os.path.join(curDir, file)
+                        label = label_mapping.get(path.split('/')[-2])
+                        with open(path, encoding='utf-8') as f:
+                            text = f.read().strip()
+                        if label is not None:
+                            yield path, {'text': text, 'label': label}
         else:
-            for path, f in files:
-                if path.startswith(f'aclImdb/{split}'):
-                    if path.split('/')[2] == 'unsup':
-                        yield path, {
-                            'text': f.read().decode('utf-8'),
-                            'label': -1
-                        }
+            for curDir, dirs, files in os.walk(data_dir):
+                for file in files:
+                    if file.endswith('.txt') and curDir.startswith(
+                            f'{data_dir}{split}'):
+                        path = os.path.join(curDir, file)
+                        if path.split('/')[-2] == 'unsup':
+                            with open(path, encoding='utf-8') as f:
+                                text = f.read().strip()
+                            yield path, {'text': text, 'label': -1}
