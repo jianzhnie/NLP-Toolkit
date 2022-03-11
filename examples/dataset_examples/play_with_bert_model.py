@@ -1,3 +1,4 @@
+import torch
 from datasets import load_dataset
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import (BertForSequenceClassification, BertTokenizerFast,
@@ -39,8 +40,14 @@ if __name__ == '__main__':
     imdb_dataset = imdb_dataset.map(
         lambda examples: {'labels': examples['label']}, batched=True)
     tokenized_datasets = imdb_dataset.map(tokenize_function, batched=True)
+    tokenized_datasets.set_format(
+        type='torch',
+        columns=['input_ids', 'token_type_ids', 'attention_mask', 'label'])
     train_dataset = tokenized_datasets['train'].shuffle(seed=42)
     eval_dataset = tokenized_datasets['test'].shuffle(seed=42)
+    dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32)
+    next(iter(dataloader))
+
     print(train_dataset.features)
     model = BertForSequenceClassification.from_pretrained('bert-base-cased')
     training_args = TrainingArguments(
