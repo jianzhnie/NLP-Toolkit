@@ -43,8 +43,10 @@ if __name__ == '__main__':
     tokenized_datasets.set_format(
         type='torch',
         columns=['input_ids', 'token_type_ids', 'attention_mask', 'label'])
-    train_dataset = tokenized_datasets['train'].shuffle(seed=42)
-    eval_dataset = tokenized_datasets['test'].shuffle(seed=42)
+    train_dataset = tokenized_datasets['train'].shuffle(seed=42).select(
+        range(100))
+    eval_dataset = tokenized_datasets['test'].shuffle(seed=42).select(
+        range(100))
     dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32)
     next(iter(dataloader))
 
