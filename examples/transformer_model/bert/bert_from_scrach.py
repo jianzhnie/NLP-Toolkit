@@ -53,7 +53,10 @@ if __name__ == '__main__':
         layer_norm_eps=1e-12,
     )
 
-    tokenizer = BertTokenizerFast.from_pretrained('./tokenizer', max_len=512)
+    tokenizer = BertTokenizerFast.from_pretrained('./tokenizer',
+                                                  padding=True,
+                                                  truncation=True,
+                                                  max_len=512)
     model = AlbertForMaskedLM(config=config)
     model.num_parameters()
     dataset = LineByLineTextDataset(
