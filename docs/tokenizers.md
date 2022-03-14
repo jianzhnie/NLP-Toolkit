@@ -12,6 +12,11 @@ tokenize有三种粒度：**word/subword/char**
 - **char/字符,** 也就是说，我们的词汇表里只有最基本的字符。而一般来讲，字符的数量是少量有限的。这样做的问题是，由于字符数量太小，我们在为每个字符学习嵌入向量的时候，每个向量就容纳了太多的语义在内，学习起来非常困难。
 - **subword子词级**，它介于字符和单词之间。比如说Transformers可能会被分成Transform和ers两个部分。**这个方案平衡了词汇量和语义独立性，是相对较优的方案**。它的处理原则是，**常用词应该保持原状，生僻词应该拆分成子词以共享token压缩空间**。
 
+- AppleCare = Apple  + Care
+- iphone12 = iphone + 12
+
+
+
 ## Subword tokenization
 
 Subword tokenization的核心思想是：“**频繁出现了词不应该被切分成更小的单位，但不常出现的词应该被切分成更小的单位**”。
@@ -26,13 +31,13 @@ Subword tokenization的核心思想是：“**频繁出现了词不应该被切�
 
 - 传统词tokenization方法不利于模型学习词缀之间的关系
 
-- - E.g. 模型学到的“old”, “older”, and “oldest”之间的关系无法泛化到“smart”, “smarter”, and “smartest”。
+  - - E.g. 模型学到的“old”, “older”, and “oldest”之间的关系无法泛化到“smart”, “smarter”, and “smartest”。
 
 - Character embedding作为OOV的解决方法粒度太细
 
 - Subword粒度在词与字符之间，能够较好的平衡OOV问题
 
-### 常见的 subword tokenization方法有：
+### 常见的 subword tokenization方法有
 
 - BPE
 - WordPiece
@@ -60,11 +65,11 @@ BPE  — a frequency-based model
 
 - 优点
 
-- - 可以有效地平衡词汇表大小和步数(编码句子所需的token数量)。
+  - - 可以有效地平衡词汇表大小和步数(编码句子所需的token数量)。
 
 - 缺点
 
-- - 基于贪婪和确定的符号替换，不能提供带概率的多个分片结果。
+  - - 基于贪婪和确定的符号替换，不能提供带概率的多个分片结果。
 
 #### **Step1：首先，我们需要对语料进行一个预分词（pre-tokenization）：**
 
@@ -180,8 +185,6 @@ SentencePiece，顾名思义，它是把一个句子看作一个整体，再拆�
 
 目前，Tokenizers库中，所有使用了SentencePiece的都是与Unigram算法联合使用的，比如ALBERT、XLNet、Marian和T5.
 
-
-
 ## 切分实例与代码分析
 
 下面，我们就直接使用Tokenizer来进行分词：
@@ -278,4 +281,3 @@ tokenizer.decode([101, 2052, 1110, 170, 1363, 1285, 1106, 3858, 11303, 1468, 102
 它们分别是 `[CLS]` 和 `[SEP]`。这两个token的出现，是因为我们调用的模型，在pre-train阶段使用了它们，所以tokenizer也会使用。
 
 不同的模型使用的special tokens不一定相同，所以一定要让tokenizer跟model保持一致！
-
