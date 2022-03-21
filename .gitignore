@@ -132,6 +132,14 @@ dmypy.json
 *.tokens
 examples/data/
 work_dir/
+*.txt
+*.zip
+*.json
+*.jsonl
+*.gz
+*.pth
+*.vocab
+*.feat
 wandb/
 results/
 logs/

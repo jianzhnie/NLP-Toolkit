@@ -1,7 +1,7 @@
 <!--
  * @Author: jianzhnie
  * @Date: 2021-12-30 13:26:04
- * @LastEditTime: 2022-01-05 18:52:56
+ * @LastEditTime: 2022-03-08 14:36:13
  * @LastEditors: jianzhnie
  * @Description:
  *
@@ -52,6 +52,7 @@ Supported Transformer Models:
 - [x] [GPT2]()
 - [x] [RoBERTa]()
 - [x] [T5]()
+- [x] [Reformer]()
 - [x] [GPT-3]()
 - [x] [BART]()
 
