@@ -140,3 +140,6 @@ work_dir/
 *.pth
 *.vocab
 *.feat
+wandb/
+results/
+logs/

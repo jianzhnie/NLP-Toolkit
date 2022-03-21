@@ -420,7 +420,7 @@ _URLs = {    # 本地文件的路径
     'train': "./data/train/",
     'val': "./data/val/"
     'unsupervised: ./data/unsupervised/'
-} 
+}
 
 class IMDBReviewsConfig(datasets.BuilderConfig):
     """BuilderConfig for IMDBReviews."""
@@ -498,4 +498,3 @@ dataset = load_dataset("./imdb.py", data_files='')
 ```
 
 可以看到，在经过一番周折后，效果还是不错的。
-
