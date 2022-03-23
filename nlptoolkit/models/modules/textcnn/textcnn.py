@@ -74,3 +74,70 @@ class TextCNN(nn.Module):
                              dim=1)
         outputs = self.decoder(self.dropout(encoding))
         return outputs
+
+
+class CNNEncoder(nn.Module):
+    def __init__(self,
+                 vocab_size,
+                 embedding_dim,
+                 num_filter,
+                 ngram_filter_sizes=(2, 3, 4, 5),
+                 conv_layer_activation=nn.Tanh(),
+                 output_dim=None,
+                 **kwargs):
+        super().__init__()
+
+        self.vocab_size = vocab_size
+        self.embedding_dim = embedding_dim
+        self.num_filter = num_filter
+        self.ngram_filter_sizes = ngram_filter_sizes
+        self.activation = conv_layer_activation
+        self.output_dim = output_dim
+
+        self.convs = nn.ModuleList([
+            nn.Conv1d(in_channels=embedding_dim,
+                      out_channels=self.num_filter,
+                      kernel_size=(i, self.embedding_dim),
+                      **kwargs) for i in self.ngram_filter_sizes
+        ])
+
+        maxpool_output_dim = self.num_filter * len(self.ngram_filter_sizes)
+        if self.output_dim:
+            self.projection_layer = nn.Linear(maxpool_output_dim,
+                                              self.output_dim)
+        else:
+            self.projection_layer = None
+            self.output_dim = maxpool_output_dim
+
+    def get_input_dim(self):
+        r"""
+        Returns the dimension of the vector input for each element in the sequence input
+        to a `CNNEncoder`. This is not the shape of the input tensor, but the
+        last element of that shape.
+        """
+        return self.embedding_dim
+
+    def get_output_dim(self):
+        r"""
+        Returns the dimension of the final vector output by this `CNNEncoder`.  This is not
+        the shape of the returned tensor, but the last element of that shape.
+        """
+        return self.output_dim
+
+    def forward(self, inputs, mask=None):
+        if mask is not None:
+            inputs = inputs * mask
+
+        embedding = self.embedding(inputs)
+        embedding = embedding.permute(0, 2, 1)
+        # If output_dim is None, result shape of (batch_size, len(ngram_filter_sizes) * num_filter));
+        # else, result shape of (batch_size, output_dim).
+        convs_out = [self.activation(conv(inputs)) for conv in self.convs]
+        maxpool_out = [
+            F.adaptive_max_pool1d(t, output_size=1) for t in convs_out
+        ]
+        result = torch.concat(maxpool_out, axis=1)
+
+        if self.projection_layer is not None:
+            result = self.projection_layer(result)
+        return result
