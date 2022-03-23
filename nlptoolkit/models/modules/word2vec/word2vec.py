@@ -51,7 +51,9 @@ class CBOWLanguageModel(nn.Module):
         self.activate = nn.ReLU(inplace=True)
         self.init_weights()
 
-    def forward(self, inputs):
+    def forward(self, inputs, mask=None):
+        if mask is not None:
+            inputs = inputs * mask
         embeds = self.embeddings(inputs)
         # 计算隐含层：对上下文词向量求平均
         hidden = embeds.mean(dim=1)
