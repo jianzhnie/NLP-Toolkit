@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-24 12:30:41
-LastEditTime: 2022-03-24 14:26:14
+LastEditTime: 2022-03-24 17:31:01
 LastEditors: jianzhnie
 Description:
 
@@ -95,7 +95,7 @@ class RNNEncoder(nn.Module):
         else:
             return self.hidden_size
 
-    def forward(self, inputs, sequence_length):
+    def forward(self, inputs):
         r"""
         RNNEncoder takes the a sequence of vectors and and returns a
         single vector, which is a combination of multiple RNN layers.
@@ -114,31 +114,30 @@ class RNNEncoder(nn.Module):
             Its data type is `float` and its shape is `[batch_size, hidden_size]`.
 
         """
-        encoded_text, last_hidden = self.rnn_layer(
-            inputs, sequence_length=sequence_length)
-        if not self._pooling_type:
+        encoded_text, last_hidden = self.rnn_layer(inputs)
+        if not self.pooling_type:
             # We exploit the `last_hidden` (the hidden state at the last time step for every layer)
             # to create a single vector.
             # If rnn is not bidirection, then output is the hidden state of the last time step
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
             # If rnn is bidirection, then output is concatenation of the forward and backward hidden state
             # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
-            if self.bidirectional:
+            if not self.bidirectional:
                 output = last_hidden[-1, :, :]
             else:
-                output = torch.concat(
-                    (last_hidden[-2, :, :], last_hidden[-1, :, :]), axis=1)
+                output = torch.cat(
+                    (last_hidden[-2, :, :], last_hidden[-1, :, :]), dim=1)
         else:
             # We exploit the `encoded_text` (the hidden state at the every time step for last layer)
             # to create a single vector. We perform pooling on the encoded text.
             # The output shape is `(batch_size, hidden_size * 2)` if use bidirectional RNN,
             # otherwise the output shape is `(batch_size, hidden_size * 2)`.
             if self.pooling_type == 'sum':
-                output = torch.sum(encoded_text, axis=1)
+                output = torch.sum(encoded_text, dim=1)
             elif self.pooling_type == 'max':
-                output = torch.max(encoded_text, axis=1)
+                output = torch.max(encoded_text, dim=1)
             elif self.pooling_type == 'mean':
-                output = torch.mean(encoded_text, axis=1)
+                output = torch.mean(encoded_text, dim=1)
             else:
                 raise RuntimeError(
                     'Unexpected pooling type %s .'
@@ -172,13 +171,13 @@ class RNNModel(nn.Module):
         self.fc = nn.Linear(self.rnn_encoder.get_output_dim(), fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
 
-    def forward(self, text, seq_len):
+    def forward(self, text):
         # Shape: (batch_size, num_tokens, embedding_dim)
         embedded_text = self.embedder(text)
         # Shape: (batch_size, num_tokens, num_directions*rnn_hidden_size)
         # num_directions = 2 if direction is 'bidirect'
         # if not, num_directions = 1
-        text_repr = self.rnn_encoder(embedded_text, sequence_length=seq_len)
+        text_repr = self.rnn_encoder(embedded_text)
         # Shape: (batch_size, fc_hidden_size)
         fc_out = torch.tanh(self.fc(text_repr))
         # Shape: (batch_size, num_classes)

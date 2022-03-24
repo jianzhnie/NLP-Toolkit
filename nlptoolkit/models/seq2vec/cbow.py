@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-24 12:14:17
-LastEditTime: 2022-03-24 12:27:01
+LastEditTime: 2022-03-24 17:44:52
 LastEditors: jianzhnie
 Description:
 
@@ -26,7 +26,7 @@ class BoWEncoder(nn.Module):
     """
     def __init__(self, emb_dim):
         super().__init__()
-        self._emb_dim = emb_dim
+        self.emb_dim = emb_dim
 
     def get_input_dim(self):
         r"""
@@ -34,14 +34,14 @@ class BoWEncoder(nn.Module):
         to a `BoWEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
         """
-        return self._emb_dim
+        return self.emb_dim
 
     def get_output_dim(self):
         r"""
         Returns the dimension of the final vector output by this `BoWEncoder`.  This is not
         the shape of the returned tensor, but the last element of that shape.
         """
-        return self._emb_dim
+        return self.emb_dim
 
     def forward(self, inputs, mask=None):
         r"""
