@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-24 12:30:41
-LastEditTime: 2022-03-24 13:26:32
+LastEditTime: 2022-03-24 14:26:14
 LastEditors: jianzhnie
 Description:
 
@@ -123,7 +123,7 @@ class RNNEncoder(nn.Module):
             # at last layer. Output is shape of `(batch_size, hidden_size)`.
             # If rnn is bidirection, then output is concatenation of the forward and backward hidden state
             # of the last time step at last layer. Output is shape of `(batch_size, hidden_size * 2)`.
-            if self._direction != 'bidirect':
+            if self.bidirectional:
                 output = last_hidden[-1, :, :]
             else:
                 output = torch.concat(
@@ -145,3 +145,42 @@ class RNNEncoder(nn.Module):
                     'Pooling type must be one of sum, max and mean.' %
                     self.pooling_type)
         return output
+
+
+class RNNModel(nn.Module):
+    def __init__(self,
+                 vocab_size,
+                 num_classes,
+                 emb_dim=128,
+                 padding_idx=0,
+                 rnn_hidden_size=198,
+                 bidirectional=False,
+                 rnn_layers=1,
+                 dropout_rate=0.0,
+                 pooling_type=None,
+                 fc_hidden_size=96):
+        super().__init__()
+        self.embedder = nn.Embedding(num_embeddings=vocab_size,
+                                     embedding_dim=emb_dim,
+                                     padding_idx=padding_idx)
+        self.rnn_encoder = RNNEncoder(emb_dim,
+                                      rnn_hidden_size,
+                                      num_layers=rnn_layers,
+                                      bidirectional=bidirectional,
+                                      dropout=dropout_rate,
+                                      pooling_type=pooling_type)
+        self.fc = nn.Linear(self.rnn_encoder.get_output_dim(), fc_hidden_size)
+        self.output_layer = nn.Linear(fc_hidden_size, num_classes)
+
+    def forward(self, text, seq_len):
+        # Shape: (batch_size, num_tokens, embedding_dim)
+        embedded_text = self.embedder(text)
+        # Shape: (batch_size, num_tokens, num_directions*rnn_hidden_size)
+        # num_directions = 2 if direction is 'bidirect'
+        # if not, num_directions = 1
+        text_repr = self.rnn_encoder(embedded_text, sequence_length=seq_len)
+        # Shape: (batch_size, fc_hidden_size)
+        fc_out = torch.tanh(self.fc(text_repr))
+        # Shape: (batch_size, num_classes)
+        logits = self.output_layer(fc_out)
+        return logits

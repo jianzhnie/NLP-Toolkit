@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2021-12-17 11:44:03
-LastEditTime: 2022-01-05 15:46:28
+LastEditTime: 2022-03-24 11:16:41
 LastEditors: jianzhnie
 Description:
 
@@ -42,20 +42,28 @@ class NGramLanguageModel(nn.Module):
 
 
 class CBOWLanguageModel(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim):
-        super(CBOWLanguageModel, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
+    def __init__(self,
+                 vocab_size,
+                 num_classes=None,
+                 embedding_dim=128,
+                 hidden_dim=128,
+                 padding_idx=0):
+        super().__init__()
+        self.embeddings = nn.Embedding(vocab_size,
+                                       embedding_dim,
+                                       padding_idx=padding_idx)
+        self.num_classes = num_classes if num_classes else vocab_size
         self.linear1 = nn.Linear(embedding_dim, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, vocab_size)
+        self.linear2 = nn.Linear(hidden_dim, self.num_classes)
         # 使用ReLU激活函数
         self.activate = nn.ReLU(inplace=True)
         self.init_weights()
 
-    def forward(self, inputs, mask=None):
-        if mask is not None:
-            inputs = inputs * mask
+    def forward(self, inputs):
+        # Shape: (batch_size, seq_len, embedding_dim)
         embeds = self.embeddings(inputs)
         # 计算隐含层：对上下文词向量求平均
+        # Shape: (batch_size, hidden_size)
         hidden = embeds.mean(dim=1)
         out = self.activate(self.linear1(hidden))
         out = self.linear2(out)
