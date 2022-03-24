@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2021-12-30 18:21:26
-LastEditTime: 2021-12-30 18:52:08
+LastEditTime: 2022-03-24 10:50:09
 LastEditors: jianzhnie
 Description:
 
@@ -13,7 +13,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
-from nlptoolkit.embeddings.pos_encding import PositionalEncoding
+from nlptoolkit.data.embeddings.pos_encding import PositionalEncoding
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:

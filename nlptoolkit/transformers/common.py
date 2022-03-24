@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2021-12-21 18:32:22
-LastEditTime: 2022-03-04 17:47:29
+LastEditTime: 2022-03-24 10:49:15
 LastEditors: jianzhnie
 Description:
 
@@ -15,9 +15,9 @@ import torch.nn as nn
 from torch import Tensor
 from torch.nn import Transformer
 
-from nlptoolkit.embeddings.pos_encding import (PositionalEncoding,
-                                               TokenEmbedding)
-from nlptoolkit.models.layers.layers import PositionWiseFFN
+from nlptoolkit.data.embeddings.pos_encding import (PositionalEncoding,
+                                                    TokenEmbedding)
+from nlptoolkit.layers.layers import PositionWiseFFN
 from nlptoolkit.transformers.seq2seq import Encoder
 
 
