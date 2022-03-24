@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-01-05 09:40:22
-LastEditTime: 2022-03-07 16:16:16
+LastEditTime: 2022-03-24 17:36:18
 LastEditors: jianzhnie
 Description:
 
@@ -13,10 +13,10 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.datasets.nlmdataset import NGramDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.modules.word2vec.word2vec import NGramLanguageModel
+from nlptoolkit.datasets.nlmdataset import NGramDataset
+from nlptoolkit.models.language_model.word2vec import NGramLanguageModel
 
 sys.path.append('../../')
 

@@ -1,49 +1,32 @@
 '''
 Author: jianzhnie
 Date: 2022-03-04 18:19:57
-LastEditTime: 2022-03-07 16:16:48
+LastEditTime: 2022-03-24 18:27:12
 LastEditors: jianzhnie
 Description:
 
 '''
-# Defined in Section 5.1.3.3
+
+import sys
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.datasets.nlmdataset import RNNlmDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
+from nlptoolkit.datasets.nlmdataset import RNNlmDataset
+from nlptoolkit.models.language_model.word2vec import RNNLM
 
-
-class RNNLM(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim):
-        super(RNNLM, self).__init__()
-        # 词嵌入层
-        self.embeddings = nn.Embedding(vocab_size, embedding_dim)
-        # 循环神经网络：这里使用LSTM
-        self.rnn = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
-        # 输出层
-        self.linear = nn.Linear(hidden_dim, vocab_size)
-
-    def forward(self, inputs):
-        embeds = self.embeddings(inputs)
-        # 计算每一时刻的隐含层表示
-        output, _ = self.rnn(embeds)
-        output = self.linear(output)
-        log_probs = F.log_softmax(output, dim=2)
-        return log_probs
-
+sys.path.append('../../')
 
 if __name__ == '__main__':
-    embedding_dim = 64
+    embedding_dim = 32
     context_size = 2
-    hidden_dim = 128
-    batch_size = 1024
-    num_epoch = 10
+    hidden_dim = 64
+    batch_size = 8
+    num_epoch = 1
 
     # 读取文本数据，构建FFNNLM训练数据集（n-grams）
     corpus, vocab = load_reuters()
@@ -73,4 +56,4 @@ if __name__ == '__main__':
             total_loss += loss.item()
         print(f'Loss: {total_loss:.2f}')
 
-    save_pretrained(vocab, model.embeddings.weight.data, 'rnnlm.vec')
+    save_pretrained(vocab, model.embedder.weight.data, 'rnnlm.vec')
