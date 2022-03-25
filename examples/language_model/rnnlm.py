@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-04 18:19:57
-LastEditTime: 2022-03-24 18:27:12
+LastEditTime: 2022-03-25 17:32:28
 LastEditors: jianzhnie
 Description:
 
@@ -17,7 +17,7 @@ from tqdm.auto import tqdm
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
 from nlptoolkit.datasets.nlmdataset import RNNlmDataset
-from nlptoolkit.models.language_model.word2vec import RNNLM
+from nlptoolkit.models.lm.word2vec import RNNLM
 
 sys.path.append('../../')
 

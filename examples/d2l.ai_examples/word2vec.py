@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2021-12-22 14:36:16
-LastEditTime: 2022-03-24 17:36:09
+LastEditTime: 2022-03-25 17:32:20
 LastEditors: jianzhnie
 Description:
 
@@ -11,7 +11,7 @@ import torch
 from d2l import torch as d2l
 from torch import nn
 
-from nlptoolkit.models.language_model import SkipGramModel
+from nlptoolkit.models.lm import SkipGramModel
 
 
 class SigmoidBCELoss(nn.Module):
