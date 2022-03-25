@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2021-12-16 15:54:45
-LastEditTime: 2021-12-30 17:46:17
+LastEditTime: 2022-03-25 17:48:34
 LastEditors: jianzhnie
 Description:
 
@@ -72,17 +72,6 @@ class PositionalEncodingD2L(nn.Module):
         return self.dropout(X)
 
 
-# helper Module to convert tensor of input indices into corresponding tensor of token embeddings
-class TokenEmbedding(nn.Module):
-    def __init__(self, vocab_size: int, emb_size: int):
-        super(TokenEmbedding, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_size)
-        self.emb_size = emb_size
-
-    def forward(self, tokens: Tensor):
-        return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
-
-
 if __name__ == '__main__':
     import numpy as np
     import matplotlib.pyplot as plt
@@ -96,8 +85,6 @@ if __name__ == '__main__':
     pe = PositionalEncoding(emb_size=d_model, dropout=drop_out)
     x = torch.from_numpy(
         np.random.randint(1, vocab_size, size=(batch_size, seq_len)))
-    token = TokenEmbedding(vocab_size=vocab_size, emb_size=d_model)
-    x = token(x).transpose(0, 1)
     print(x.shape)
     y = pe.forward(x)
     print(y.shape)
