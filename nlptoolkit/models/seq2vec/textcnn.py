@@ -1,7 +1,7 @@
 '''
 Author: jianzhnie
 Date: 2022-03-24 12:31:11
-LastEditTime: 2022-03-24 13:13:08
+LastEditTime: 2022-03-24 18:40:21
 LastEditors: jianzhnie
 Description:
 
@@ -86,7 +86,7 @@ class CNNEncoder(nn.Module):
         to a `CNNEncoder`. This is not the shape of the input tensor, but the
         last element of that shape.
         """
-        return self._emb_dim
+        return self.emb_dim
 
     def get_output_dim(self):
         r"""
