@@ -10,6 +10,7 @@ Description:
 import math
 
 import torch
+import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
@@ -78,7 +79,7 @@ class TransformerModel(nn.Module):
     Args:
         src_vocab_size (int):
             The size of source vocabulary.
-        trg_vocab_size (int):
+        tgt_vocab_size (int):
             The size of target vocabulary.
         max_length (int):
             The maximum length of input sequences.
@@ -105,7 +106,7 @@ class TransformerModel(nn.Module):
     """
     def __init__(self,
                  src_vocab_size: int = None,
-                 trg_vocab_size: int = None,
+                 tgt_vocab_size: int = None,
                  max_length: int = 512,
                  num_encoder_layers: int = 6,
                  num_decoder_layers: int = 6,
@@ -113,11 +114,10 @@ class TransformerModel(nn.Module):
                  n_head: int = 8,
                  dim_feedforward: int = 2048,
                  dropout: float = 0.1,
-                 weight_sharing: bool = False,
                  bos_id: int = 0,
                  eos_id: int = 1):
         super(TransformerModel, self).__init__()
-        self.trg_vocab_size = trg_vocab_size
+        self.tgt_vocab_size = tgt_vocab_size
         self.dim_feedforward = dim_feedforward
         self.emb_dim = d_model
         self.bos_id = bos_id
@@ -129,18 +129,12 @@ class TransformerModel(nn.Module):
                                                 bos_id=self.bos_id)
         self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
                                                      max_length=max_length)
-        if weight_sharing:
-            assert src_vocab_size == trg_vocab_size, (
-                'Vocabularies in source and target should be same for weight sharing.'
-            )
-            self.trg_word_embedding = self.src_word_embedding
-            self.trg_pos_embedding = self.src_pos_embedding
-        else:
-            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size,
-                                                    emb_dim=d_model,
-                                                    bos_id=self.bos_id)
-            self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model,
-                                                         max_length=max_length)
+
+        self.tgt_word_embedding = WordEmbedding(vocab_size=tgt_vocab_size,
+                                                emb_dim=d_model,
+                                                bos_id=self.bos_id)
+        self.tgt_pos_embedding = PositionalEmbedding(emb_dim=d_model,
+                                                     max_length=max_length)
 
         self.transformer = nn.Transformer(
             d_model=d_model,
@@ -151,12 +145,67 @@ class TransformerModel(nn.Module):
             dropout=dropout,
             activation='relu')
 
-        if weight_sharing:
-            self.linear = lambda x: torch.matmul(x=x,
-                                                 y=self.trg_word_embedding.
-                                                 word_embedding.weight,
-                                                 transpose_y=True)
-        else:
-            self.linear = nn.Linear(in_features=d_model,
-                                    out_features=trg_vocab_size,
-                                    bias_attr=False)
+        self.linear = nn.Linear(d_model, tgt_vocab_size, bias=False)
+
+    def forward(self, src_word, tgt_word):
+        r"""
+        The Transformer forward methods. The input are source/target sequences, and
+        returns logits.
+
+        Args:
+            src_word (Tensor):
+                The ids of source sequences words. It is a tensor with shape
+                `[batch_size, source_sequence_length]` and its data type can be
+                int or int64.
+            tgt_word (Tensor):
+                The ids of target sequences words. It is a tensor with shape
+                `[batch_size, target_sequence_length]` and its data type can be
+                int or int64.
+
+        Returns:
+            Tensor:
+                Output tensor of the final layer of the model whose data
+                type can be float32 or float64 with shape
+                `[batch_size, sequence_length, vocab_size]`.
+        """
+        src_max_len = src_word.shape[-1]
+        tgt_max_len = tgt_word.shape[-1]
+        src_slf_attn_mask = torch.cast(
+            src_word == self.bos_id,
+            dtype=torch.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        src_slf_attn_mask.stop_gradient = True
+        tgt_slf_attn_mask = self.transformer.generate_square_subsequent_mask(
+            tgt_max_len)
+        tgt_slf_attn_mask.stop_gradient = True
+        tgt_src_attn_bias = src_slf_attn_mask
+
+        src_pos = torch.cast(
+            src_word != self.bos_id, dtype=src_word.dtype) * torch.arange(
+                start=0, end=src_max_len, dtype=src_word.dtype)
+        tgt_pos = torch.cast(
+            tgt_word != self.bos_id, dtype=src_word.dtype) * torch.arange(
+                start=0, end=tgt_max_len, dtype=tgt_word.dtype)
+
+        src_word_emb = self.src_word_embedding(src_word)
+        src_pos_emb = self.src_pos_embedding(src_pos)
+        src_emb = src_word_emb + src_pos_emb
+        enc_input = F.dropout(
+            src_emb, p=self.dropout,
+            training=self.training) if self.dropout else src_emb
+
+        tgt_word_emb = self.tgt_word_embedding(tgt_word)
+        tgt_pos_emb = self.tgt_pos_embedding(tgt_pos)
+        tgt_emb = tgt_word_emb + tgt_pos_emb
+        dec_input = F.dropout(
+            tgt_emb, p=self.dropout,
+            training=self.training) if self.dropout else tgt_emb
+
+        dec_output = self.transformer(enc_input,
+                                      dec_input,
+                                      src_mask=src_slf_attn_mask,
+                                      tgt_mask=tgt_slf_attn_mask,
+                                      memory_mask=tgt_src_attn_bias)
+
+        predict = self.linear(dec_output)
+
+        return predict
