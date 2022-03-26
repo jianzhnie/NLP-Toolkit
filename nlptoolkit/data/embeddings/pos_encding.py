@@ -28,28 +28,33 @@ class PositionalEncoding(nn.Module):
         self.emb_size = emb_size
         self.dropout = nn.Dropout(p=dropout)
 
+        # torch.Size([max_len, 1])
         position = torch.arange(max_len).unsqueeze(1)
+        # torch.Size([emb_size//2])
         div_term = torch.exp(
-            torch.arange(0, emb_size, 2, dtype=torch.float) *
-            (-math.log(10000.0) / emb_size))
+            torch.arange(0, emb_size, 2) * (-math.log(10000.0) / emb_size))
+
+        # torch.Size([max_len, emb_size])
         pos_embedding = torch.zeros(max_len, emb_size)
         # 偶数位置编码
         pos_embedding[:, 0::2] = torch.sin(position * div_term)
         # 奇数位置编码
         pos_embedding[:, 1::2] = torch.cos(position * div_term)
+        # [max_len, emb_size] ===> [max_len, 1, emb_size]
         pos_embedding = pos_embedding.unsqueeze(0).transpose(0, 1)
         # 不对位置编码求梯度
         self.register_buffer('pos_embedding', pos_embedding)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, token_embedding: Tensor) -> Tensor:
         """
         Args:
-            x: Tensor, shape  [seq_len, batch_size, embedding_dim]
+            token_embedding: Tensor, shape  [seq_len, batch_size, embedding_dim]
         """
-        x = x * math.sqrt(self.emb_size)
+        token_embedding = token_embedding * math.sqrt(self.emb_size)
         # 输入的词向量与位置编码相加
-        x = x + self.pos_embedding[:x.size(0), :]
-        return self.dropout(x)
+        pos_embed = token_embedding + self.pos_embedding[:token_embedding.
+                                                         size(0), :]
+        return self.dropout(pos_embed)
 
 
 class PositionalEncodingD2L(nn.Module):
@@ -78,16 +83,15 @@ if __name__ == '__main__':
     plt.figure(figsize=(15, 10))
     vocab_size = 1000
     batch_size = 32
-    seq_len = 32
+    seq_len = 512
     d_model = 128
     drop_out = 0
     max_len = 5000
     pe = PositionalEncoding(emb_size=d_model, dropout=drop_out)
     x = torch.from_numpy(
-        np.random.randint(1, vocab_size, size=(batch_size, seq_len)))
+        np.random.randint(1, vocab_size, size=(batch_size, seq_len, d_model)))
+    print(x.shape)
+    x = x.transpose(0, 1)
     print(x.shape)
     y = pe.forward(x)
     print(y.shape)
-    plt.plot(np.arange(32), y[:, 0, 4:8].data.numpy())
-    plt.legend(['dim %d' % p for p in list(range(4, 8))])
-    plt.savefig('PositionalEncoding4.png')
