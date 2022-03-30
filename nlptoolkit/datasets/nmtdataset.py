@@ -10,7 +10,7 @@ sys.path.append('../../')
 class NMTDatasets():
     """Defined in :numref:`sec_machine_translation`"""
     def __init__(self,
-                 root='../data',
+                 root='data',
                  batch_size=32,
                  num_steps=10,
                  num_train=1000,
@@ -22,7 +22,7 @@ class NMTDatasets():
         self.num_train = num_train
         self.num_val = num_val
 
-        self.arrays, self.src_vocab, self.tgt_vocab = self._build_arrays(
+        self.src_tokens, self.tgt_tokens, self.src_vocab, self.tgt_vocab = self._build_tokens(
             self._read_data())
 
     def _read_data(self):
@@ -71,43 +71,34 @@ class NMTDatasets():
         if vocab is None:
             vocab = Vocab(tokens,
                           min_freq=2,
-                          reserved_tokens=['<pad>', '<bos>', '<eos>'])
+                          reserved_tokens=['<unk>', '<pad>', '<bos>', '<eos>'])
 
         text_tokens = [vocab[token] for token in tokens]
-        text_tokens = [token + [vocab['<eos>']] for token in text_tokens]
-        data_array = torch.tensor([
-            self.truncate_pad(l, num_steps, vocab['<pad>'])
+        text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
+                       for token in text_tokens]
+        text_tokens = [
+            self._truncate_pad(l, num_steps, vocab['<pad>'])
             for l in text_tokens
-        ])
-        return data_array, vocab
+        ]
+        return text_tokens, vocab
 
-    def _build_arrays(self, raw_text, src_vocab=None, tgt_vocab=None):
+    def _build_tokens(self, raw_text, src_vocab=None, tgt_vocab=None):
         """Defined in :numref:`sec_machine_translation`"""
         src, tgt = self._tokenize(self._preprocess(raw_text),
                                   self.num_train + self.num_val)
-        src_array, src_vocab = self._bulid_array_nmt(src, src_vocab)
-        tgt_array, tgt_vocab = self._bulid_array_nmt(tgt, tgt_vocab)
-        return (src_array, tgt_array), src_vocab, tgt_vocab
+        src_tokens, src_vocab = self._bulid_array_nmt(src, src_vocab)
+        tgt_tokens, tgt_vocab = self._bulid_array_nmt(tgt, tgt_vocab)
+        return src_tokens, tgt_tokens, src_vocab, tgt_vocab
 
-    def get_dataloader(self, train):
-        """Defined in :numref:`sec_machine_translation`"""
-        idx = slice(0, self.num_train) if train else slice(
-            self.num_train, None)
-        return self.get_tensorloader(self.arrays, train, idx)
-
-    def get_train_dataloader(self):
-        return self.get_dataloader(train=True)
-
-    def get_val_dataloader(self):
-        return self.get_dataloader(train=False)
-
-    def get_tensorloader(self, tensors, train, indices=slice(0, None)):
-        """Defined in :numref:`sec_synthetic-regression-data`"""
-        tensors = tuple(a[indices] for a in tensors)
-        dataset = torch.utils.data.TensorDataset(*tensors)
-        return torch.utils.data.DataLoader(dataset,
-                                           self.batch_size,
-                                           shuffle=train)
+    def get_tensor_tokens(self, src_tokens, tgt_tokens):
+        data = []
+        for (src_token, tgt_token) in zip(src_tokens, tgt_tokens):
+            src_tensor_ = torch.tensor([token for token in src_token],
+                                       dtype=torch.long)
+            tgt_tensor_ = torch.tensor([token for token in tgt_token],
+                                       dtype=torch.long)
+            data.append((src_tensor_, tgt_tensor_))
+        return data
 
 
 if __name__ == '__main__':
@@ -120,7 +111,8 @@ if __name__ == '__main__':
     data2 = nmtdataset._preprocess(data1)
     src, tgt = nmtdataset._tokenize(data2)
     # print(src, tgt)
-    train_array = nmtdataset.get_dataloader(train=True)
-    test_array = nmtdataset.get_dataloader(train=False)
-    print(train_array)
-    print(test_array)
+    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset._build_tokens(
+        data1)
+    data = nmtdataset.get_tensor_tokens(src_tokens, tgt_tokens)
+    print(src_tokens[0], tgt_tokens[0])
+    print(data[0])
