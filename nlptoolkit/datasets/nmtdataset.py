@@ -90,7 +90,13 @@ class NMTDatasets():
         tgt_tokens, tgt_vocab = self._bulid_array_nmt(tgt, tgt_vocab)
         return src_tokens, tgt_tokens, src_vocab, tgt_vocab
 
-    def get_tensor_tokens(self, src_tokens, tgt_tokens):
+    def get_tensor_dataset(self, src_tokens, tgt_tokens, train=True):
+        indices = slice(0, self.num_train) if train else slice(
+            self.num_train, None)
+
+        src_tokens, tgt_tokens = tuple(datasets[indices]
+                                       for datasets in (src_tokens,
+                                                        tgt_tokens))
         data = []
         for (src_token, tgt_token) in zip(src_tokens, tgt_tokens):
             src_tensor_ = torch.tensor([token for token in src_token],
@@ -113,6 +119,6 @@ if __name__ == '__main__':
     # print(src, tgt)
     src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset._build_tokens(
         data1)
-    data = nmtdataset.get_tensor_tokens(src_tokens, tgt_tokens)
+    data_train = nmtdataset.get_tensor_dataset(src_tokens, tgt_tokens)
     print(src_tokens[0], tgt_tokens[0])
-    print(data[0])
+    print(data_train[0])
