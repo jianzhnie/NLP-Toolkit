@@ -41,7 +41,7 @@ class PositionalEncoding(nn.Module):
         # 奇数位置编码
         pos_embedding[:, 1::2] = torch.cos(position * div_term)
         # [max_len, emb_size] ===> [max_len, 1, emb_size]
-        pos_embedding = pos_embedding.unsqueeze(0).transpose(0, 1)
+        pos_embedding = pos_embedding.unsqueeze(-2)
         # 不对位置编码求梯度
         self.register_buffer('pos_embedding', pos_embedding)
 
@@ -50,7 +50,6 @@ class PositionalEncoding(nn.Module):
         Args:
             token_embedding: Tensor, shape  [seq_len, batch_size, embedding_dim]
         """
-        token_embedding = token_embedding * math.sqrt(self.emb_size)
         # 输入的词向量与位置编码相加
         pos_embed = token_embedding + self.pos_embedding[:token_embedding.
                                                          size(0), :]
