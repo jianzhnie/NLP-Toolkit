@@ -5,6 +5,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
+from nlptoolkit.data.vocab import truncate_pad
 from nlptoolkit.datasets.nmtdataset import NMTDatasets
 from nlptoolkit.transformers.transformer.torch_transformer import \
     Seq2SeqTransformer
@@ -94,6 +95,52 @@ def evaluate(model, val_loader, device):
     return losses / len(val_loader)
 
 
+# function to generate output sequence using greedy algorithm
+def greedy_decode(model, src, src_mask, max_len, start_symbol, device):
+    src = src.to(device)
+    src_mask = src_mask.to(device)
+
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
+    for i in range(max_len - 1):
+        memory = memory.to(device)
+        tgt_mask = (generate_square_subsequent_mask(ys.size(0)).type(
+            torch.bool)).to(device)
+        out = model.decode(ys, memory, tgt_mask)
+        out = out.transpose(0, 1)
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim=1)
+        next_word = next_word.item()
+
+        ys = torch.cat(
+            [ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=0)
+        if next_word == EOS_IDX:
+            break
+    return ys
+
+
+# actual function to translate input sentence into target language
+def translate(model, src_vocab, src_sentence, num_steps, tgt_vocab, device):
+    model.eval()
+    src_tokens = [
+        src_vocab['<bos>']
+    ] + src_vocab[src_sentence.lower().split(' ')] + [src_vocab['<eos>']]
+    src_tokens = truncate_pad(src_tokens, num_steps, src_vocab['<pad>'])
+    src_tokens = torch.tensor(src_tokens)
+    src_tokens = src_tokens.unsqueeze(1)
+    num_tokens = src_tokens.shape[0]
+    src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
+    tgt_tokens = greedy_decode(model,
+                               src_tokens,
+                               src_mask,
+                               max_len=num_tokens + 5,
+                               start_symbol=BOS_IDX,
+                               device=device).flatten()
+
+    return ' '.join(tgt_vocab.to_tokens(list(
+        tgt_tokens.cpu().numpy()))).replace('<bos>', '').replace('<eos>', '')
+
+
 if __name__ == '__main__':
     UNK_IDX, PAD_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -151,8 +198,8 @@ if __name__ == '__main__':
                                      tgt_vocab_size=len(tgt_vocab),
                                      num_encoder_layers=1,
                                      num_decoder_layers=1,
-                                     emb_size=32,
-                                     nhead=1,
+                                     emb_size=64,
+                                     nhead=8,
                                      dim_feedforward=32)
 
     transformer = transformer.to(device)
@@ -175,3 +222,12 @@ if __name__ == '__main__':
         print((
             f'Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, '
             f'Epoch time = {(end_time - start_time):.3f}s'))
+
+        src_sentence = 'I have been expecting you.'
+        print(
+            translate(transformer,
+                      src_vocab,
+                      src_sentence=src_sentence,
+                      num_steps=10,
+                      tgt_vocab=tgt_vocab,
+                      device=device))
