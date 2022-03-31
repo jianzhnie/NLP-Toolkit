@@ -80,10 +80,7 @@ if __name__ == '__main__':
 
     root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
     nmtdataset = NMTDatasets(root=root)
-    src_tokens = nmtdataset.src_tokens
-    tgt_tokens = nmtdataset.tgt_tokens
-    src_vocab = nmtdataset.src_vocab
-    tgt_vocab = nmtdataset.tgt_vocab
+    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset._build_tokens()
 
     def generate_batch(data_batch, vocab=src_vocab):
         PAD_IDX = vocab['<pad>']
