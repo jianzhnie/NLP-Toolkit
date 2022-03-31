@@ -11,13 +11,11 @@ class NMTDatasets():
     """Defined in :numref:`sec_machine_translation`"""
     def __init__(self,
                  root='data',
-                 batch_size=32,
                  num_steps=10,
                  num_train=1000,
                  num_val=1000):
         super(NMTDatasets, self).__init__()
         self.root = root
-        self.batch_size = batch_size
         self.num_steps = num_steps
         self.num_train = num_train
         self.num_val = num_val
