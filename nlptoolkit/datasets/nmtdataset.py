@@ -20,9 +20,6 @@ class NMTDatasets():
         self.num_train = num_train
         self.num_val = num_val
 
-        self.src_tokens, self.tgt_tokens, self.src_vocab, self.tgt_vocab = self._build_tokens(
-            self._read_data())
-
     def _read_data(self):
         """Load the English-French dataset."""
         with open(self.root + '/fra-eng/fra.txt', encoding='utf-8') as f:
@@ -80,8 +77,11 @@ class NMTDatasets():
         ]
         return text_tokens, vocab
 
-    def _build_tokens(self, raw_text, src_vocab=None, tgt_vocab=None):
+    def _build_tokens(self, raw_text=None, src_vocab=None, tgt_vocab=None):
         """Defined in :numref:`sec_machine_translation`"""
+        if raw_text is None:
+            raw_text = self._read_data()
+
         src, tgt = self._tokenize(self._preprocess(raw_text),
                                   self.num_train + self.num_val)
         src_tokens, src_vocab = self._bulid_array_nmt(src, src_vocab)
