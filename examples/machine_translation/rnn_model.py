@@ -78,9 +78,10 @@ def epoch_time(start_time: int, end_time: int):
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
+    root = '/home/robin/jianzh/nlp-toolkit/data'
     nmtdataset = NMTDatasets(root=root)
-    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset._build_tokens()
+    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
+    )
 
     def generate_batch(data_batch, vocab=src_vocab):
         PAD_IDX = vocab['<pad>']
