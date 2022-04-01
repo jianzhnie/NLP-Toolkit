@@ -12,7 +12,7 @@ class NMTDatasets():
     def __init__(self,
                  root='data',
                  num_steps=10,
-                 num_train=10000,
+                 num_train=1000,
                  num_val=1000):
         super(NMTDatasets, self).__init__()
         self.root = root
