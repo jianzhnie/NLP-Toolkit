@@ -77,7 +77,10 @@ class NMTDatasets():
         ]
         return text_tokens, vocab
 
-    def _build_tokens(self, raw_text=None, src_vocab=None, tgt_vocab=None):
+    def get_dataset_tokens(self,
+                           raw_text=None,
+                           src_vocab=None,
+                           tgt_vocab=None):
         """Defined in :numref:`sec_machine_translation`"""
         if raw_text is None:
             raw_text = self._read_data()

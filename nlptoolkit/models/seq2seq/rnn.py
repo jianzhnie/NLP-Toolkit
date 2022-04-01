@@ -30,6 +30,8 @@ class Encoder(nn.Module):
 
         embedded = self.dropout(self.embedding(src))
 
+        # outputs: seq_len * batch_size * embed_dim
+        # hidden:  bidirectional * batch_size * embed_dim
         outputs, hidden = self.rnn(embedded)
 
         hidden = torch.tanh(
@@ -51,20 +53,24 @@ class Attention(nn.Module):
 
     def forward(self, decoder_hidden: Tensor,
                 encoder_outputs: Tensor) -> Tensor:
-
+        """
+        decoder_hidden: batch_size * embed_dim
+        encoder_outputs: seq_len * batch_size * embed_dim
+        """
         src_len = encoder_outputs.shape[0]
 
+        # repeated_decoder_hidden: batch_size * seq_len * embed_dim
         repeated_decoder_hidden = decoder_hidden.unsqueeze(1).repeat(
             1, src_len, 1)
-
+        # encoder_outputs:  batch_size *seq_len * embed_dim
         encoder_outputs = encoder_outputs.permute(1, 0, 2)
-
-        energy = torch.tanh(
-            self.attn(
-                torch.cat((repeated_decoder_hidden, encoder_outputs), dim=2)))
-
+        # output: batch_size *seq_len * (embed_dim_1 +  embed_dim_2)
+        output = torch.cat((repeated_decoder_hidden, encoder_outputs), dim=2)
+        # batch_size *seq_len * attn_dim
+        output = self.attn(output)
+        energy = torch.tanh(output)
+        # attention: batch_size *seq_len
         attention = torch.sum(energy, dim=2)
-
         return F.softmax(attention, dim=1)
 
 
@@ -90,29 +96,33 @@ class Decoder(nn.Module):
 
     def _weighted_encoder_rep(self, decoder_hidden: Tensor,
                               encoder_outputs: Tensor) -> Tensor:
+        # attn: batch_size * seq_len
+        attn = self.attention(decoder_hidden, encoder_outputs)
 
-        a = self.attention(decoder_hidden, encoder_outputs)
+        attn = attn.unsqueeze(1)
 
-        a = a.unsqueeze(1)
-
+        # encoder_outputs: seq_len * batch_size * embed_dim
+        #              ==> batch_size * seq_len * embed_dim
         encoder_outputs = encoder_outputs.permute(1, 0, 2)
 
-        weighted_encoder_rep = torch.bmm(a, encoder_outputs)
-
+        # weighted_encoder_rep: batch_size * seq_len * embed_dim
+        #                 ===> seq_len * batch_size * embed_dim
+        weighted_encoder_rep = torch.bmm(attn, encoder_outputs)
         weighted_encoder_rep = weighted_encoder_rep.permute(1, 0, 2)
-
         return weighted_encoder_rep
 
     def forward(self, input: Tensor, decoder_hidden: Tensor,
                 encoder_outputs: Tensor) -> Tuple[Tensor]:
 
         input = input.unsqueeze(0)
-
+        # batch_size * seq_len * embed_dim
         embedded = self.dropout(self.embedding(input))
 
+        # seq_len * batch_size * embed_dim
         weighted_encoder_rep = self._weighted_encoder_rep(
             decoder_hidden, encoder_outputs)
 
+        # seq_len * batch_size * (embed_dim1 + embed_dim2)
         rnn_input = torch.cat((embedded, weighted_encoder_rep), dim=2)
 
         output, decoder_hidden = self.rnn(rnn_input,
@@ -141,7 +151,10 @@ class Seq2Seq(nn.Module):
                 src: Tensor,
                 trg: Tensor,
                 teacher_forcing_ratio: float = 0.5) -> Tensor:
-
+        """
+        src: seq_len * batch_size
+        trg: seq_len * batch_size
+        """
         batch_size = src.shape[1]
         max_len = trg.shape[0]
         trg_vocab_size = self.decoder.output_dim
@@ -149,6 +162,8 @@ class Seq2Seq(nn.Module):
         outputs = torch.zeros(max_len, batch_size,
                               trg_vocab_size).to(self.device)
 
+        # encoder_outputs: seq_len * batch_size * embed_dim
+        # hidden:  batch_size * embed_dim
         encoder_outputs, hidden = self.encoder(src)
 
         # first input to the decoder is the <sos> token
