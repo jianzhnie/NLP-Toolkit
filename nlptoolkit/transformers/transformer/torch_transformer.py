@@ -12,11 +12,11 @@ import math
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torch.nn import Transformer, TransformerEncoder, TransformerEncoderLayer
 
 from nlptoolkit.data.embeddings.pos_embedding import PositionalEmbedding
 from nlptoolkit.data.embeddings.pos_encding import PositionalEncoding
-from nlptoolkit.data.embeddings.word_embedding import WordEmbedding
+from nlptoolkit.data.embeddings.token_embedding import TokenEmbedding
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
@@ -124,15 +124,13 @@ class TransformerModel(nn.Module):
         self.eos_id = eos_id
         self.dropout = dropout
 
-        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size,
-                                                emb_dim=d_model,
-                                                bos_id=self.bos_id)
+        self.src_word_embedding = TokenEmbedding(vocab_size=src_vocab_size,
+                                                 emb_dim=d_model)
         self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model,
                                                      max_length=max_length)
 
-        self.tgt_word_embedding = WordEmbedding(vocab_size=tgt_vocab_size,
-                                                emb_dim=d_model,
-                                                bos_id=self.bos_id)
+        self.tgt_word_embedding = TokenEmbedding(vocab_size=tgt_vocab_size,
+                                                 emb_dim=d_model)
         self.tgt_pos_embedding = PositionalEmbedding(emb_dim=d_model,
                                                      max_length=max_length)
 
@@ -209,3 +207,54 @@ class TransformerModel(nn.Module):
         predict = self.linear(dec_output)
 
         return predict
+
+
+# Seq2Seq Network
+class Seq2SeqTransformer(nn.Module):
+    def __init__(self,
+                 src_vocab_size: int,
+                 tgt_vocab_size: int,
+                 num_encoder_layers: int,
+                 num_decoder_layers: int,
+                 emb_size: int,
+                 nhead: int,
+                 dim_feedforward: int = 512,
+                 dropout: float = 0.1):
+        super(Seq2SeqTransformer, self).__init__()
+        self.transformer = Transformer(d_model=emb_size,
+                                       nhead=nhead,
+                                       num_encoder_layers=num_encoder_layers,
+                                       num_decoder_layers=num_decoder_layers,
+                                       dim_feedforward=dim_feedforward,
+                                       dropout=dropout)
+        self.generator = nn.Linear(emb_size, tgt_vocab_size)
+        self.src_tok_emb = TokenEmbedding(src_vocab_size, emb_size)
+        self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, emb_size)
+        self.positional_encoding = PositionalEncoding(emb_size,
+                                                      dropout=dropout)
+        self.init_weight()
+
+    def init_weight(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+
+    def forward(self, src: Tensor, trg: Tensor, src_mask: Tensor,
+                tgt_mask: Tensor, src_padding_mask: Tensor,
+                tgt_padding_mask: Tensor, memory_key_padding_mask: Tensor):
+        src_emb = self.src_tok_emb(src)
+        src_emb = self.positional_encoding(src_emb)
+        tgt_emb = self.tgt_tok_emb(trg)
+        tgt_emb = self.positional_encoding(tgt_emb)
+        outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None,
+                                src_padding_mask, tgt_padding_mask,
+                                memory_key_padding_mask)
+        return self.generator(outs)
+
+    def encode(self, src: Tensor, src_mask: Tensor):
+        return self.transformer.encoder(
+            self.positional_encoding(self.src_tok_emb(src)), src_mask)
+
+    def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
+        return self.transformer.decoder(
+            self.positional_encoding(self.tgt_tok_emb(tgt)), memory, tgt_mask)

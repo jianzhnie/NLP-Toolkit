@@ -14,7 +14,7 @@ from torch import Tensor
 
 
 # helper Module to convert tensor of input indices into corresponding tensor of token embeddings
-class WordEmbedding(nn.Module):
+class TokenEmbedding(nn.Module):
     """Word Embedding layer of Transformer.
 
     This layer automatically constructs a 2D embedding matrix based on the
@@ -37,9 +37,9 @@ class WordEmbedding(nn.Module):
         bos_id (int, optional):
             The start token id and also is used as padding id. Defaults to 0.
     """
-    def __init__(self, vocab_size: int, emb_dim: int, bos_id: int = 0):
-        super(WordEmbedding, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_dim, padding_idx=bos_id)
+    def __init__(self, vocab_size: int, emb_dim: int):
+        super(TokenEmbedding, self).__init__()
+        self.embedding = nn.Embedding(vocab_size, emb_dim)
         self.emb_dim = emb_dim
 
     def forward(self, tokens: Tensor):
