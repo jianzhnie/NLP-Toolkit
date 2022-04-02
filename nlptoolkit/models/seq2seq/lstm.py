@@ -90,6 +90,7 @@ class Seq2Seq(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         self.device = device
+        self.init_weights()
 
         assert encoder.hid_dim == decoder.hid_dim, \
             'Hidden dimensions of encoder and decoder must be equal!'
@@ -137,3 +138,10 @@ class Seq2Seq(nn.Module):
             input = trg[t] if teacher_force else top1
 
         return outputs
+
+    def init_weights(self):
+        for name, param in self.named_parameters():
+            if 'weight' in name:
+                nn.init.normal_(param.data, mean=0, std=0.01)
+            else:
+                nn.init.constant_(param.data, 0)
