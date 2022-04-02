@@ -79,7 +79,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
-    nmtdataset = NMTDatasets(root=root, num_train=160000, num_val=7000)
+    nmtdataset = NMTDatasets(root=root, num_train=1600, num_val=1000)
     src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
     )
 
@@ -133,8 +133,6 @@ if __name__ == '__main__':
                   hid_dim=64,
                   n_layers=1,
                   dropout=0.5)
-
-    # attn = Attention(enc_hid_dim=64, dec_hid_dim=64, attn_dim=8)
 
     dec = Decoder(output_dim=len(tgt_vocab),
                   emb_dim=32,
