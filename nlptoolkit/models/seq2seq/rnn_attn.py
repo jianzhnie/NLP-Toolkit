@@ -146,6 +146,7 @@ class Seq2Seq(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         self.device = device
+        self.init_weights()
 
     def forward(self,
                 src: Tensor,
