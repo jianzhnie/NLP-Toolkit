@@ -102,6 +102,7 @@ class Seq2Seq(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         self.device = device
+        self.init_weights()
 
         assert encoder.hid_dim == decoder.hid_dim, \
             'Hidden dimensions of encoder and decoder must be equal!'
