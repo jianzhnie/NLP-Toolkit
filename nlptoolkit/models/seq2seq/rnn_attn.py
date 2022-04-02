@@ -57,11 +57,14 @@ class Encoder(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, enc_hid_dim, dec_hid_dim):
+    def __init__(self, enc_hid_dim: int, dec_hid_dim: int, attn_dim: int):
         super().__init__()
 
-        self.attn = nn.Linear((enc_hid_dim * 2) + dec_hid_dim, dec_hid_dim)
-        self.fc = nn.Linear(dec_hid_dim, 1, bias=False)
+        self.enc_hid_dim = enc_hid_dim
+        self.dec_hid_dim = dec_hid_dim
+
+        self.attn = nn.Linear((enc_hid_dim * 2) + dec_hid_dim, attn_dim)
+        self.fc = nn.Linear(attn_dim, 1, bias=False)
 
     def forward(self, hidden, encoder_outputs):
 
@@ -84,6 +87,7 @@ class Attention(nn.Module):
         # energy = [batch size, src len, dec hid dim]
 
         attention = self.fc(energy).squeeze(2)
+        # attention = torch.sum(energy, dim=2)
 
         # attention= [batch size, src len]
 
