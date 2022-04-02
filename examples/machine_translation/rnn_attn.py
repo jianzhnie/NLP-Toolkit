@@ -5,7 +5,6 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
 from nlptoolkit.datasets.nmtdataset import NMTDatasets
@@ -80,42 +79,17 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     root = '/home/robin/jianzh/nlp-toolkit/data'
+    root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
     nmtdataset = NMTDatasets(root=root)
     src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
     )
-
-    def generate_batch(data_batch, vocab=src_vocab):
-        PAD_IDX = vocab['<pad>']
-        BOS_IDX = vocab['<bos>']
-        EOS_IDX = vocab['<eos>']
-        de_batch, en_batch = [], []
-        for (de_item, en_item) in data_batch:
-            de_batch.append(
-                torch.cat([
-                    torch.tensor([BOS_IDX]), de_item,
-                    torch.tensor([EOS_IDX])
-                ],
-                          dim=0))
-            en_batch.append(
-                torch.cat([
-                    torch.tensor([BOS_IDX]), en_item,
-                    torch.tensor([EOS_IDX])
-                ],
-                          dim=0))
-        de_batch = pad_sequence(de_batch, padding_value=PAD_IDX)
-        en_batch = pad_sequence(en_batch, padding_value=PAD_IDX)
-        return de_batch, en_batch
 
     def get_dataloader(train_data, val_data, batch_size=128):
 
         train_iter = DataLoader(train_data,
                                 batch_size=batch_size,
-                                shuffle=True,
-                                collate_fn=generate_batch)
-        valid_iter = DataLoader(val_data,
-                                batch_size=batch_size,
-                                shuffle=True,
-                                collate_fn=generate_batch)
+                                shuffle=True)
+        valid_iter = DataLoader(val_data, batch_size=batch_size, shuffle=True)
         return train_iter, valid_iter
 
     data_train = nmtdataset.get_tensor_dataset(src_tokens,
