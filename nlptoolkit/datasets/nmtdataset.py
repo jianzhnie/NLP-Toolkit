@@ -69,12 +69,12 @@ class NMTDatasets():
                           reserved_tokens=['<unk>', '<pad>', '<bos>', '<eos>'])
 
         text_tokens = [vocab[token] for token in tokens]
-        # text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
-        #                for token in text_tokens]
-        # text_tokens = [
-        #     self._truncate_pad(l, num_steps, vocab['<pad>'])
-        #     for l in text_tokens
-        # ]
+        text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
+                       for token in text_tokens]
+        text_tokens = [
+            self._truncate_pad(l, num_steps, vocab['<pad>'])
+            for l in text_tokens
+        ]
         return text_tokens, vocab
 
     def get_dataset_tokens(self,
