@@ -15,7 +15,7 @@ class RNNEncoder(nn.Module):
         self.embedding = nn.Embedding(vocab_size, embeb_dim)
 
         # no dropout as only one layer!
-        self.rnn = nn.GRU(einput_size=embeb_dim,
+        self.rnn = nn.GRU(input_size=embeb_dim,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
@@ -56,10 +56,10 @@ class RNNDecoder(nn.Module):
 
         self.embedding = nn.Embedding(vocab_size, embed_dim)
 
-        self.rnn = nn.LSTM(embed_dim + hidden_size,
-                           hidden_size,
-                           num_layers,
-                           dropout=dropout if num_layers > 1 else 0.)
+        self.rnn = nn.GRU(embed_dim + hidden_size,
+                          hidden_size,
+                          num_layers,
+                          dropout=dropout if num_layers > 1 else 0.)
 
         self.fc_out = nn.Linear(embed_dim + hidden_size * 2, vocab_size)
 
