@@ -8,8 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from nlptoolkit.datasets.nmtdataset import NMTDatasets
-from nlptoolkit.models.seq2seq.rnn_attn import (Attention, Decoder, Encoder,
-                                                Seq2Seq)
+from nlptoolkit.models.seq2seq.rnn_attn import RNNSeq2SeqAttnModel
 
 sys.path.append('../../')
 
@@ -101,24 +100,17 @@ if __name__ == '__main__':
 
     train_iter, valid_iter = get_dataloader(data_train,
                                             data_val,
-                                            batch_size=128)
+                                            batch_size=64)
 
-    enc = Encoder(input_dim=len(src_vocab),
-                  emb_dim=32,
-                  enc_hid_dim=64,
-                  dec_hid_dim=64,
-                  dropout=0.5)
-
-    attn = Attention(enc_hid_dim=64, dec_hid_dim=64, attn_dim=8)
-
-    dec = Decoder(output_dim=len(tgt_vocab),
-                  emb_dim=32,
-                  enc_hid_dim=64,
-                  dec_hid_dim=64,
-                  dropout=0.5,
-                  attention=attn)
-
-    model = Seq2Seq(enc, dec, device).to(device)
+    model = RNNSeq2SeqAttnModel(src_vocab_size=len(src_vocab),
+                                trg_vocab_size=len(tgt_vocab),
+                                embed_dim=32,
+                                enc_hidden_size=32,
+                                dec_hidden_size=32,
+                                attm_dim=8,
+                                num_layers=1,
+                                dropout=0.5,
+                                device=device)
 
     optimizer = torch.optim.Adam(model.parameters())
 
