@@ -4,16 +4,20 @@ import torch
 import torch.nn as nn
 
 
-class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, n_layers, dropout):
+class RNNEncoder(nn.Module):
+    def __init__(self, vocab_size, embeb_dim, hidden_size, num_layers,
+                 dropout):
         super().__init__()
 
-        self.hid_dim = hid_dim
-        self.n_layers = n_layers
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(input_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embeb_dim)
 
-        self.rnn = nn.LSTM(emb_dim, hid_dim, n_layers, dropout=dropout)
+        self.rnn = nn.LSTM(input_size=embeb_dim,
+                           hidden_size=hidden_size,
+                           num_layers=num_layers,
+                           dropout=dropout if num_layers > 1 else 0.)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -28,22 +32,30 @@ class Encoder(nn.Module):
         # cell = [n layers * n directions, batch size, hid dim]
 
         # outputs are always from the top hidden layer
-        return hidden, cell
+        return outputs, (hidden, cell)
 
 
-class Decoder(nn.Module):
-    def __init__(self, output_dim, emb_dim, hid_dim, n_layers, dropout):
+class RNNDecoder(nn.Module):
+    def __init__(self,
+                 vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.):
         super().__init__()
 
-        self.output_dim = output_dim
-        self.hid_dim = hid_dim
-        self.n_layers = n_layers
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(output_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
 
-        self.rnn = nn.LSTM(emb_dim, hid_dim, n_layers, dropout=dropout)
+        self.rnn = nn.LSTM(embed_dim,
+                           hidden_size,
+                           num_layers,
+                           dropout=dropout if num_layers > 1 else 0.)
 
-        self.fc_out = nn.Linear(hid_dim, output_dim)
+        self.fc_out = nn.Linear(hidden_size, vocab_size)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -80,22 +92,32 @@ class Decoder(nn.Module):
 
         # prediction = [batch size, output dim]
 
-        return prediction, hidden, cell
+        return prediction, (hidden, cell)
 
 
-class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder, device):
+class RNNSeq2Seq(nn.Module):
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.,
+                 device='cpu'):
         super().__init__()
 
-        self.encoder = encoder
-        self.decoder = decoder
+        self.src_vocab_size = src_vocab_size
+        self.trg_vocab_size = trg_vocab_size
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.device = device
         self.init_weights()
 
-        assert encoder.hid_dim == decoder.hid_dim, \
-            'Hidden dimensions of encoder and decoder must be equal!'
-        assert encoder.n_layers == decoder.n_layers, \
-            'Encoder and decoder must have equal number of layers!'
+        self.encoder = RNNEncoder(src_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
+        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
 
@@ -106,14 +128,13 @@ class Seq2Seq(nn.Module):
 
         batch_size = trg.shape[1]
         trg_len = trg.shape[0]
-        trg_vocab_size = self.decoder.output_dim
 
         # tensor to store decoder outputs
         outputs = torch.zeros(trg_len, batch_size,
-                              trg_vocab_size).to(self.device)
+                              self.trg_vocab_size).to(self.device)
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
-        hidden, cell = self.encoder(src)
+        encoder_output, (hidden, cell) = self.encoder(src)
 
         # first input to the decoder is the <sos> tokens
         input = trg[0, :]
@@ -122,7 +143,7 @@ class Seq2Seq(nn.Module):
 
             # insert input token embedding, previous hidden and previous cell states
             # receive output tensor (predictions) and new hidden and cell states
-            output, hidden, cell = self.decoder(input, hidden, cell)
+            output, (hidden, cell) = self.decoder(input, hidden, cell)
 
             # place predictions in a tensor holding predictions for each token
             outputs[t] = output
