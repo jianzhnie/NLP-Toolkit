@@ -66,7 +66,7 @@ class NMTDatasets():
         if vocab is None:
             vocab = Vocab(tokens,
                           min_freq=2,
-                          reserved_tokens=['<unk>', '<pad>', '<bos>', '<eos>'])
+                          reserved_tokens=['<pad>', '<bos>', '<eos>'])
 
         text_tokens = [vocab[token] for token in tokens]
         text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
