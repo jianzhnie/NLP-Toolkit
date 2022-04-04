@@ -13,7 +13,7 @@ from datasets import load_dataset
 if __name__ == '__main__':
     # 加载数据集
     root_dir = 'data/aclImdb/'
-    imdb_dataset = load_dataset('examples/dataset_examples/imdb.py',
+    imdb_dataset = load_dataset('examples/dataset_examples/custom_imdb.py',
                                 data_dir=root_dir)
     print(imdb_dataset)
     print('Length of training set: ', len(imdb_dataset))
