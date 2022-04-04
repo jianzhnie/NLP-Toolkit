@@ -4,16 +4,21 @@ import torch
 import torch.nn as nn
 
 
-class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, dropout):
+class RNNEncoder(nn.Module):
+    def __init__(self, vocab_size, embeb_dim, hidden_size, num_layers,
+                 dropout):
         super().__init__()
 
-        self.hid_dim = hid_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(input_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embeb_dim)
 
         # no dropout as only one layer!
-        self.rnn = nn.GRU(emb_dim, hid_dim)
+        self.rnn = nn.GRU(einput_size=embeb_dim,
+                          hidden_size=hidden_size,
+                          num_layers=num_layers,
+                          dropout=dropout if num_layers > 1 else 0.)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -33,21 +38,30 @@ class Encoder(nn.Module):
 
         # outputs are always from the top hidden layer
 
-        return hidden
+        return outputs, hidden
 
 
-class Decoder(nn.Module):
-    def __init__(self, output_dim, emb_dim, hid_dim, dropout):
+class RNNDecoder(nn.Module):
+    def __init__(self,
+                 vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.):
         super().__init__()
 
-        self.hid_dim = hid_dim
-        self.output_dim = output_dim
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(output_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
 
-        self.rnn = nn.GRU(emb_dim + hid_dim, hid_dim)
+        self.rnn = nn.LSTM(embed_dim + hidden_size,
+                           hidden_size,
+                           num_layers,
+                           dropout=dropout if num_layers > 1 else 0.)
 
-        self.fc_out = nn.Linear(emb_dim + hid_dim * 2, output_dim)
+        self.fc_out = nn.Linear(embed_dim + hidden_size * 2, vocab_size)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -95,17 +109,28 @@ class Decoder(nn.Module):
         return prediction, hidden
 
 
-class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder, device):
+class RNNSeq2Seq(nn.Module):
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.,
+                 device='cpu'):
         super().__init__()
 
-        self.encoder = encoder
-        self.decoder = decoder
-        self.device = device
-        self.init_weights()
+        self.src_vocab_size = src_vocab_size
+        self.trg_vocab_size = trg_vocab_size
 
-        assert encoder.hid_dim == decoder.hid_dim, \
-            'Hidden dimensions of encoder and decoder must be equal!'
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.device = device
+
+        self.encoder = RNNEncoder(src_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
+        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
 
@@ -116,14 +141,14 @@ class Seq2Seq(nn.Module):
 
         batch_size = trg.shape[1]
         trg_len = trg.shape[0]
-        trg_vocab_size = self.decoder.output_dim
+        trg_vocab_size = self.trg_vocab_size
 
         # tensor to store decoder outputs
         outputs = torch.zeros(trg_len, batch_size,
                               trg_vocab_size).to(self.device)
 
         # last hidden state of the encoder is the context
-        context = self.encoder(src)
+        _, context = self.encoder(src)
 
         # context also used as the initial hidden state of the decoder
         hidden = context
