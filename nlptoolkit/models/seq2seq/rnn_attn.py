@@ -187,7 +187,9 @@ class RNNSeq2SeqAttnModel(nn.Module):
                  src_vocab_size,
                  trg_vocab_size,
                  embed_dim,
-                 hidden_size,
+                 enc_hidden_size,
+                 dec_hidden_size,
+                 attm_dim,
                  num_layers,
                  dropout=0.,
                  device='cpu'):
@@ -195,15 +197,16 @@ class RNNSeq2SeqAttnModel(nn.Module):
 
         self.src_vocab_size = src_vocab_size
         self.trg_vocab_size = trg_vocab_size
-        self.hidden_size = hidden_size
+        self.enc_hidden_size = enc_hidden_size
+        self.dec_hidden_size = dec_hidden_size
         self.num_layers = num_layers
         self.device = device
         self.init_weights()
 
-        self.encoder = RNNEncoder(src_vocab_size, embed_dim, hidden_size,
-                                  num_layers, dropout)
-        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, hidden_size,
-                                  num_layers, dropout)
+        self.encoder = RNNEncoder(src_vocab_size, embed_dim, enc_hidden_size,
+                                  num_layers, enc_hidden_size, dropout)
+        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, enc_hidden_size,
+                                  dec_hidden_size, attm_dim, dropout)
 
     def forward(self,
                 src: Tensor,
