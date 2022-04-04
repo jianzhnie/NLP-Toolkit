@@ -14,12 +14,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.datasets.nlmdataset import \
-    NegativeSampleingSkipGramDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.modules.word2vec.word2vec import \
-    SkipGramNegativeSamplingModel
+from nlptoolkit.datasets.nlmdataset import NegativeSampleingSkipGramDataset
+from nlptoolkit.models.lm.word2vec import SkipGramNegativeSamplingModel
 
 sys.path.append('../../')
 

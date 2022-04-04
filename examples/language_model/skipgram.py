@@ -13,10 +13,10 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.datasets.nlmdataset import SkipGramDataset
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.models.modules.word2vec import SkipGramModel
+from nlptoolkit.datasets.nlmdataset import SkipGramDataset
+from nlptoolkit.models.lm import SkipGramModel
 
 sys.path.append('../../')
 
