@@ -7,22 +7,26 @@ import torch.nn.functional as F
 from torch import Tensor
 
 
-class Encoder(nn.Module):
-    def __init__(self, input_dim: int, emb_dim: int, enc_hid_dim: int,
-                 dec_hid_dim: int, dropout: float):
+class RNNEncoder(nn.Module):
+    def __init__(self, vocab_size: int, embeb_dim: int, enc_hidden_size: int,
+                 num_layers: int, dec_hidden_size: int, dropout: float):
         super().__init__()
 
-        self.input_dim = input_dim
-        self.emb_dim = emb_dim
-        self.enc_hid_dim = enc_hid_dim
-        self.dec_hid_dim = dec_hid_dim
+        self.vocab_size = vocab_size
+        self.embeb_dim = embeb_dim
+        self.enc_hidden_size = enc_hidden_size
+        self.dec_hidden_size = dec_hidden_size
         self.dropout = dropout
 
-        self.embedding = nn.Embedding(input_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embeb_dim)
 
-        self.rnn = nn.GRU(emb_dim, enc_hid_dim, bidirectional=True)
+        self.rnn = nn.GRU(input_size=embeb_dim,
+                          hidden_size=enc_hidden_size,
+                          num_layers=num_layers,
+                          bidirectional=True,
+                          dropout=dropout if num_layers > 1 else 0)
 
-        self.fc = nn.Linear(enc_hid_dim * 2, dec_hid_dim)
+        self.fc = nn.Linear(enc_hidden_size * 2, dec_hidden_size)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -47,8 +51,9 @@ class Encoder(nn.Module):
 
         # initial decoder hidden is final hidden state of the forwards and backwards
         # encoder RNNs fed through a linear layer
-        hidden = torch.tanh(
-            self.fc(torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1)))
+        hidden = torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1)
+        hidden = self.fc(hidden)
+        hidden = torch.tanh(hidden)
 
         # outputs = [src len, batch size, enc hid dim * 2]
         # hidden = [batch size, dec hid dim]
@@ -57,13 +62,15 @@ class Encoder(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, enc_hid_dim: int, dec_hid_dim: int, attn_dim: int):
+    def __init__(self, enc_hidden_size: int, dec_hidden_size: int,
+                 attn_dim: int):
         super().__init__()
 
-        self.enc_hid_dim = enc_hid_dim
-        self.dec_hid_dim = dec_hid_dim
+        self.enc_hid_dim = enc_hidden_size
+        self.dec_hid_dim = dec_hidden_size
 
-        self.attn = nn.Linear((enc_hid_dim * 2) + dec_hid_dim, attn_dim)
+        self.attn = nn.Linear((enc_hidden_size * 2) + dec_hidden_size,
+                              attn_dim)
         self.fc = nn.Linear(attn_dim, 1, bias=False)
 
     def forward(self, hidden, encoder_outputs):
@@ -81,8 +88,9 @@ class Attention(nn.Module):
         # hidden = [batch size, src len, dec hid dim]
         # encoder_outputs = [batch size, src len, enc hid dim * 2]
 
-        energy = torch.tanh(
-            self.attn(torch.cat((hidden, encoder_outputs), dim=2)))
+        energy = torch.cat((hidden, encoder_outputs), dim=2)
+        energy = self.attn(energy)
+        energy = torch.tanh(energy)
 
         # energy = [batch size, src len, dec hid dim]
 
@@ -94,24 +102,26 @@ class Attention(nn.Module):
         return F.softmax(attention, dim=1)
 
 
-class Decoder(nn.Module):
-    def __init__(self, output_dim: int, emb_dim: int, enc_hid_dim: int,
-                 dec_hid_dim: int, dropout: int, attention: nn.Module):
+class RNNDecoder(nn.Module):
+    def __init__(self, vocab_size: int, embed_dim: int, enc_hidden_size: int,
+                 dec_hidden_size: int, attn_dim: int, dropout: int):
         super().__init__()
 
-        self.emb_dim = emb_dim
-        self.enc_hid_dim = enc_hid_dim
-        self.dec_hid_dim = dec_hid_dim
-        self.output_dim = output_dim
+        self.embed_dim = embed_dim
+        self.enc_hidden_dim = enc_hidden_size
+        self.dec_hidden_dim = dec_hidden_size
+        self.vocab_size = vocab_size
         self.dropout = dropout
-        self.attention = attention
 
-        self.embedding = nn.Embedding(output_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
 
-        self.rnn = nn.GRU((enc_hid_dim * 2) + emb_dim, dec_hid_dim)
+        self.rnn = nn.GRU((enc_hidden_size * 2) + embed_dim, dec_hidden_size)
 
-        self.fc_out = nn.Linear((enc_hid_dim * 2) + dec_hid_dim + emb_dim,
-                                output_dim)
+        self.attention = Attention(enc_hidden_size=enc_hidden_size,
+                                   dec_hidden_size=dec_hidden_size,
+                                   attn_dim=attn_dim)
+        self.fc_out = nn.Linear(
+            (enc_hidden_size * 2) + dec_hidden_size + embed_dim, vocab_size)
 
         self.dropout = nn.Dropout(dropout)
 
@@ -172,15 +182,28 @@ class Decoder(nn.Module):
         return output, decoder_hidden.squeeze(0)
 
 
-class Seq2Seq(nn.Module):
-    def __init__(self, encoder: nn.Module, decoder: nn.Module,
-                 device: torch.device):
+class RNNSeq2SeqAttnModel(nn.Module):
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.,
+                 device='cpu'):
         super().__init__()
 
-        self.encoder = encoder
-        self.decoder = decoder
+        self.src_vocab_size = src_vocab_size
+        self.trg_vocab_size = trg_vocab_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.device = device
         self.init_weights()
+
+        self.encoder = RNNEncoder(src_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
+        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
 
     def forward(self,
                 src: Tensor,
@@ -194,7 +217,7 @@ class Seq2Seq(nn.Module):
 
         batch_size = src.shape[1]
         max_len = trg.shape[0]
-        trg_vocab_size = self.decoder.output_dim
+        trg_vocab_size = self.trg_vocab_size
 
         # tensor to store decoder outputs
         outputs = torch.zeros(max_len, batch_size,
