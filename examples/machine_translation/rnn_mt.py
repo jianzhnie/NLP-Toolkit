@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from nlptoolkit.datasets.nmtdataset import NMTDatasets
-from nlptoolkit.models.seq2seq.rnn_mt import Decoder, Encoder, Seq2Seq
+from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
 
 sys.path.append('../../')
 
@@ -107,18 +107,12 @@ if __name__ == '__main__':
                                             data_val,
                                             batch_size=128)
 
-    enc = Encoder(input_dim=len(src_vocab),
-                  emb_dim=32,
-                  hid_dim=64,
-                  dropout=0.5)
-
-    dec = Decoder(output_dim=len(tgt_vocab),
-                  emb_dim=32,
-                  hid_dim=64,
-                  dropout=0.5)
-
-    model = Seq2Seq(enc, dec, device).to(device)
-
+    model = RNNSeq2Seq(src_vocab_size=len(src_vocab),
+                       trg_vocab_size=len(tgt_vocab),
+                       embed_dim=32,
+                       hidden_size=64,
+                       num_layers=1,
+                       dropout=0.5)
     optimizer = torch.optim.Adam(model.parameters())
 
     def count_parameters(model: nn.Module):
