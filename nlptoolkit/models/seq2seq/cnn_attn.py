@@ -3,16 +3,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Encoder(nn.Module):
+class CNNEncoder(nn.Module):
     def __init__(self,
-                 input_dim,
-                 emb_dim,
-                 hid_dim,
-                 n_layers,
+                 vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
                  kernel_size,
                  dropout,
                  max_length=100,
-                 device=None):
+                 device='cpu'):
         super().__init__()
 
         assert kernel_size % 2 == 1, 'Kernel size must be odd!'
@@ -21,17 +21,18 @@ class Encoder(nn.Module):
 
         self.scale = torch.sqrt(torch.FloatTensor([0.5])).to(device)
 
-        self.token_embedding = nn.Embedding(input_dim, emb_dim)
-        self.pos_embedding = nn.Embedding(max_length, emb_dim)
+        self.token_embedding = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embedding = nn.Embedding(max_length, embed_dim)
 
-        self.emb2hid = nn.Linear(emb_dim, hid_dim)
-        self.hid2emb = nn.Linear(hid_dim, emb_dim)
+        self.emb2hid = nn.Linear(embed_dim, hidden_size)
+        self.hid2emb = nn.Linear(hidden_size, embed_dim)
 
         self.convs = nn.ModuleList([
-            nn.Conv1d(in_channels=hid_dim,
-                      out_channels=2 * hid_dim,
+            nn.Conv1d(in_channels=hidden_size,
+                      out_channels=2 * hidden_size,
                       kernel_size=kernel_size,
-                      padding=(kernel_size - 1) // 2) for _ in range(n_layers)
+                      padding=(kernel_size - 1) // 2)
+            for _ in range(num_layers)
         ])
 
         self.dropout = nn.Dropout(dropout)
@@ -109,12 +110,12 @@ class Encoder(nn.Module):
         return conved, combined
 
 
-class Decoder(nn.Module):
+class CNNDecoder(nn.Module):
     def __init__(self,
-                 output_dim,
-                 emb_dim,
-                 hid_dim,
-                 n_layers,
+                 vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
                  kernel_size,
                  dropout,
                  trg_pad_idx,
@@ -128,21 +129,21 @@ class Decoder(nn.Module):
 
         self.scale = torch.sqrt(torch.FloatTensor([0.5])).to(device)
 
-        self.token_embedding = nn.Embedding(output_dim, emb_dim)
-        self.pos_embedding = nn.Embedding(max_length, emb_dim)
+        self.token_embedding = nn.Embedding(vocab_size, embed_dim)
+        self.pos_embedding = nn.Embedding(max_length, embed_dim)
 
-        self.emb2hid = nn.Linear(emb_dim, hid_dim)
-        self.hid2emb = nn.Linear(hid_dim, emb_dim)
+        self.emb2hid = nn.Linear(embed_dim, hidden_size)
+        self.hid2emb = nn.Linear(hidden_size, embed_dim)
 
-        self.attn_hid2emb = nn.Linear(hid_dim, emb_dim)
-        self.attn_emb2hid = nn.Linear(emb_dim, hid_dim)
+        self.attn_hid2emb = nn.Linear(hidden_size, embed_dim)
+        self.attn_emb2hid = nn.Linear(embed_dim, hidden_size)
 
-        self.fc_out = nn.Linear(emb_dim, output_dim)
+        self.fc_out = nn.Linear(embed_dim, vocab_size)
 
         self.convs = nn.ModuleList([
-            nn.Conv1d(in_channels=hid_dim,
-                      out_channels=2 * hid_dim,
-                      kernel_size=kernel_size) for _ in range(n_layers)
+            nn.Conv1d(in_channels=hidden_size,
+                      out_channels=2 * hidden_size,
+                      kernel_size=kernel_size) for _ in range(num_layers)
         ])
 
         self.dropout = nn.Dropout(dropout)
@@ -276,11 +277,32 @@ class Decoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder):
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 kernel_size,
+                 dropout,
+                 trg_pad_idx,
+                 device='cpu'):
         super().__init__()
 
-        self.encoder = encoder
-        self.decoder = decoder
+        self.encoder = CNNEncoder(vocab_size=src_vocab_size,
+                                  embeb_dim=embed_dim,
+                                  hidden_size=hidden_size,
+                                  num_layers=num_layers,
+                                  kernel_size=kernel_size,
+                                  dropout=dropout)
+
+        self.decoder = CNNDecoder(vocab_size=trg_vocab_size,
+                                  embeb_dim=embed_dim,
+                                  hidden_size=hidden_size,
+                                  num_layers=num_layers,
+                                  kernel_size=kernel_size,
+                                  dropout=dropout,
+                                  trg_pad_idx=trg_pad_idx)
 
     def forward(self, src, trg):
 
