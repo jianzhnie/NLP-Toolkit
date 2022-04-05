@@ -276,7 +276,7 @@ class CNNDecoder(nn.Module):
         return output, attention
 
 
-class Seq2Seq(nn.Module):
+class CNNSeq2Seq(nn.Module):
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
@@ -290,19 +290,21 @@ class Seq2Seq(nn.Module):
         super().__init__()
 
         self.encoder = CNNEncoder(vocab_size=src_vocab_size,
-                                  embeb_dim=embed_dim,
-                                  hidden_size=hidden_size,
-                                  num_layers=num_layers,
-                                  kernel_size=kernel_size,
-                                  dropout=dropout)
-
-        self.decoder = CNNDecoder(vocab_size=trg_vocab_size,
-                                  embeb_dim=embed_dim,
+                                  embed_dim=embed_dim,
                                   hidden_size=hidden_size,
                                   num_layers=num_layers,
                                   kernel_size=kernel_size,
                                   dropout=dropout,
-                                  trg_pad_idx=trg_pad_idx)
+                                  device=device)
+
+        self.decoder = CNNDecoder(vocab_size=trg_vocab_size,
+                                  embed_dim=embed_dim,
+                                  hidden_size=hidden_size,
+                                  num_layers=num_layers,
+                                  kernel_size=kernel_size,
+                                  dropout=dropout,
+                                  trg_pad_idx=trg_pad_idx,
+                                  device=device)
 
     def forward(self, src, trg):
 
