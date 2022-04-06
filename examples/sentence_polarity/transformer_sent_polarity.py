@@ -8,8 +8,8 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 
+from nlptoolkit.data.embeddings.pos_encding import PositionalEncoding
 from nlptoolkit.data.utils.utils import length_to_mask, load_sentence_polarity
-from nlptoolkit.models.embeddings.pos_encding import PositionalEncoding
 
 sys.path.append('../../')
 

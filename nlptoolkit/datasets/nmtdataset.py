@@ -12,7 +12,7 @@ class NMTDatasets():
     def __init__(self,
                  root='data',
                  num_steps=10,
-                 num_train=10000,
+                 num_train=1000,
                  num_val=1000):
         super(NMTDatasets, self).__init__()
         self.root = root
@@ -66,15 +66,15 @@ class NMTDatasets():
         if vocab is None:
             vocab = Vocab(tokens,
                           min_freq=2,
-                          reserved_tokens=['<unk>', '<pad>', '<bos>', '<eos>'])
+                          reserved_tokens=['<pad>', '<bos>', '<eos>'])
 
         text_tokens = [vocab[token] for token in tokens]
-        # text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
-        #                for token in text_tokens]
-        # text_tokens = [
-        #     self._truncate_pad(l, num_steps, vocab['<pad>'])
-        #     for l in text_tokens
-        # ]
+        text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
+                       for token in text_tokens]
+        text_tokens = [
+            self._truncate_pad(l, num_steps, vocab['<pad>'])
+            for l in text_tokens
+        ]
         return text_tokens, vocab
 
     def get_dataset_tokens(self,

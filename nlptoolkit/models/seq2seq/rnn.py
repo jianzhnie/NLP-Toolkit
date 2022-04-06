@@ -31,7 +31,7 @@ class Encoder(nn.Module):
         embedded = self.dropout(self.embedding(src))
         # embedded = [src_len, batch size, emb dim]
 
-        # outputs = [src_len, batch size, hid_dim * n_directions]
+        # outputs = [src_len, batch size,git hid_dim * n_directions]
         # hidden = [n_layers * n_directions, batch_size, hid_dim]
 
         outputs, hidden = self.rnn(embedded)

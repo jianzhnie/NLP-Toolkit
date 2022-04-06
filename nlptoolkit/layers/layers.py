@@ -67,9 +67,13 @@ class PositionWiseFFN(nn.Module):
         self.dense2 = nn.Linear(ffn_num_hiddens, ffn_num_outputs)
 
     def forward(self, X):
+        # x = [batch size, seq len, ffn_num_input]
         X = self.relu(self.dense1(X))
+        # x = [batch size, seq len, ffn_num_hiddens]
         X = self.dropout(X)
         X = self.dense2(X)
+        # x = [batch size, seq len, hid dim]
+
         return X
 
 

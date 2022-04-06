@@ -2,7 +2,6 @@ import sys
 from timeit import default_timer as timer
 
 import torch
-from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
 from nlptoolkit.data.vocab import truncate_pad
@@ -147,40 +146,15 @@ if __name__ == '__main__':
 
     root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
     nmtdataset = NMTDatasets(root=root)
-    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset._build_tokens()
-
-    def generate_batch(data_batch, vocab=src_vocab):
-        PAD_IDX = vocab['<pad>']
-        BOS_IDX = vocab['<bos>']
-        EOS_IDX = vocab['<eos>']
-        src_batch, tgt_batch = [], []
-        for (src_item, tgt_item) in data_batch:
-            src_batch.append(
-                torch.cat([
-                    torch.tensor([BOS_IDX]), src_item,
-                    torch.tensor([EOS_IDX])
-                ],
-                          dim=0))
-            tgt_batch.append(
-                torch.cat([
-                    torch.tensor([BOS_IDX]), tgt_item,
-                    torch.tensor([EOS_IDX])
-                ],
-                          dim=0))
-        src_batch = pad_sequence(src_batch, padding_value=PAD_IDX)
-        tgt_batch = pad_sequence(tgt_batch, padding_value=PAD_IDX)
-        return src_batch, tgt_batch
+    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
+    )
 
     def get_dataloader(train_data, val_data, batch_size=128):
 
         train_iter = DataLoader(train_data,
                                 batch_size=batch_size,
-                                shuffle=True,
-                                collate_fn=generate_batch)
-        valid_iter = DataLoader(val_data,
-                                batch_size=batch_size,
-                                shuffle=True,
-                                collate_fn=generate_batch)
+                                shuffle=True)
+        valid_iter = DataLoader(val_data, batch_size=batch_size, shuffle=True)
         return train_iter, valid_iter
 
     data_train = nmtdataset.get_tensor_dataset(src_tokens,
@@ -199,7 +173,7 @@ if __name__ == '__main__':
                                      num_encoder_layers=1,
                                      num_decoder_layers=1,
                                      emb_size=64,
-                                     nhead=8,
+                                     nhead=1,
                                      dim_feedforward=32)
 
     transformer = transformer.to(device)
