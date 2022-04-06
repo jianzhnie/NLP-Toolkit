@@ -1,182 +1,162 @@
 import random
-from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch import Tensor
 
 
-class Encoder(nn.Module):
-    def __init__(self, input_dim: int, emb_dim: int, enc_hid_dim: int,
-                 dec_hid_dim: int, dropout: float):
+class RNNEncoder(nn.Module):
+    def __init__(self, vocab_size, embeb_dim, hidden_size, num_layers,
+                 dropout):
         super().__init__()
 
-        self.input_dim = input_dim
-        self.emb_dim = emb_dim
-        self.enc_hid_dim = enc_hid_dim
-        self.dec_hid_dim = dec_hid_dim
-        self.dropout = dropout
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(input_dim, emb_dim)
+        self.embedding = nn.Embedding(vocab_size, embeb_dim)
 
-        self.rnn = nn.GRU(emb_dim, enc_hid_dim, bidirectional=True)
-
-        self.fc = nn.Linear(enc_hid_dim * 2, dec_hid_dim)
+        self.rnn = nn.LSTM(input_size=embeb_dim,
+                           hidden_size=hidden_size,
+                           num_layers=num_layers,
+                           dropout=dropout if num_layers > 1 else 0.)
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, src: Tensor) -> Tuple[Tensor]:
+    def forward(self, src):
+
         # src = [src len, batch size]
         embedded = self.dropout(self.embedding(src))
-        # embedded = [src_len, batch size, emb dim]
+        # embedded = [src len, batch size, emb dim]
+        outputs, (hidden, cell) = self.rnn(embedded)
+        # outputs = [src len, batch size, hid dim * n directions]
+        # hidden = [n layers * n directions, batch size, hid dim]
+        # cell = [n layers * n directions, batch size, hid dim]
 
-        # outputs = [src_len, batch size,git hid_dim * n_directions]
-        # hidden = [n_layers * n_directions, batch_size, hid_dim]
-
-        outputs, hidden = self.rnn(embedded)
-
-        hidden = torch.tanh(
-            self.fc(torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1)))
-
-        return outputs, hidden
+        # outputs are always from the top hidden layer
+        return outputs, (hidden, cell)
 
 
-class Attention(nn.Module):
-    def __init__(self, enc_hid_dim: int, dec_hid_dim: int, attn_dim: int):
+class RNNDecoder(nn.Module):
+    def __init__(self,
+                 vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.):
         super().__init__()
 
-        self.enc_hid_dim = enc_hid_dim
-        self.dec_hid_dim = dec_hid_dim
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
 
-        self.attn_in = (enc_hid_dim * 2) + dec_hid_dim
+        self.embedding = nn.Embedding(vocab_size, embed_dim)
 
-        self.attn = nn.Linear(self.attn_in, attn_dim)
+        self.rnn = nn.LSTM(embed_dim,
+                           hidden_size,
+                           num_layers,
+                           dropout=dropout if num_layers > 1 else 0.)
 
-    def forward(self, decoder_hidden: Tensor,
-                encoder_outputs: Tensor) -> Tensor:
-        """
-        decoder_hidden: batch_size * embed_dim
-        encoder_outputs: seq_len * batch_size * embed_dim
-        """
-        src_len = encoder_outputs.shape[0]
-
-        # repeated_decoder_hidden: batch_size * seq_len * embed_dim
-        repeated_decoder_hidden = decoder_hidden.unsqueeze(1).repeat(
-            1, src_len, 1)
-        # encoder_outputs:  batch_size *seq_len * embed_dim
-        encoder_outputs = encoder_outputs.permute(1, 0, 2)
-        # output: batch_size *seq_len * (embed_dim_1 +  embed_dim_2)
-        output = torch.cat((repeated_decoder_hidden, encoder_outputs), dim=2)
-        # batch_size *seq_len * attn_dim
-        output = self.attn(output)
-        energy = torch.tanh(output)
-        # attention: batch_size *seq_len
-        attention = torch.sum(energy, dim=2)
-        return F.softmax(attention, dim=1)
-
-
-class Decoder(nn.Module):
-    def __init__(self, output_dim: int, emb_dim: int, enc_hid_dim: int,
-                 dec_hid_dim: int, dropout: int, attention: nn.Module):
-        super().__init__()
-
-        self.emb_dim = emb_dim
-        self.enc_hid_dim = enc_hid_dim
-        self.dec_hid_dim = dec_hid_dim
-        self.output_dim = output_dim
-        self.dropout = dropout
-        self.attention = attention
-
-        self.embedding = nn.Embedding(output_dim, emb_dim)
-
-        self.rnn = nn.GRU((enc_hid_dim * 2) + emb_dim, dec_hid_dim)
-
-        self.out = nn.Linear(self.attention.attn_in + emb_dim, output_dim)
+        self.fc_out = nn.Linear(hidden_size, vocab_size)
 
         self.dropout = nn.Dropout(dropout)
 
-    def _weighted_encoder_rep(self, decoder_hidden: Tensor,
-                              encoder_outputs: Tensor) -> Tensor:
-        # attn: batch_size * seq_len
-        attn = self.attention(decoder_hidden, encoder_outputs)
+    def forward(self, input, hidden, cell):
 
-        attn = attn.unsqueeze(1)
+        # input = [batch size]
+        # hidden = [n layers * n directions, batch size, hid dim]
+        # cell = [n layers * n directions, batch size, hid dim]
 
-        # encoder_outputs: seq_len * batch_size * embed_dim
-        #              ==> batch_size * seq_len * embed_dim
-        encoder_outputs = encoder_outputs.permute(1, 0, 2)
-
-        # weighted_encoder_rep: batch_size * seq_len * embed_dim
-        #                 ===> seq_len * batch_size * embed_dim
-        weighted_encoder_rep = torch.bmm(attn, encoder_outputs)
-        weighted_encoder_rep = weighted_encoder_rep.permute(1, 0, 2)
-        return weighted_encoder_rep
-
-    def forward(self, input: Tensor, decoder_hidden: Tensor,
-                encoder_outputs: Tensor) -> Tuple[Tensor]:
+        # n directions in the decoder will both always be 1, therefore:
+        # hidden = [n layers, batch size, hid dim]
+        # context = [n layers, batch size, hid dim]
 
         input = input.unsqueeze(0)
-        # batch_size * seq_len * embed_dim
+
+        # input = [1, batch size]
+
         embedded = self.dropout(self.embedding(input))
 
-        # seq_len * batch_size * embed_dim
-        weighted_encoder_rep = self._weighted_encoder_rep(
-            decoder_hidden, encoder_outputs)
+        # embedded = [1, batch size, emb dim]
 
-        # seq_len * batch_size * (embed_dim1 + embed_dim2)
-        rnn_input = torch.cat((embedded, weighted_encoder_rep), dim=2)
+        output, (hidden, cell) = self.rnn(embedded, (hidden, cell))
 
-        output, decoder_hidden = self.rnn(rnn_input,
-                                          decoder_hidden.unsqueeze(0))
+        # output = [seq len, batch size, hid dim * n directions]
+        # hidden = [n layers * n directions, batch size, hid dim]
+        # cell = [n layers * n directions, batch size, hid dim]
 
-        embedded = embedded.squeeze(0)
-        output = output.squeeze(0)
-        weighted_encoder_rep = weighted_encoder_rep.squeeze(0)
+        # seq len and n directions will always be 1 in the decoder, therefore:
+        # output = [1, batch size, hid dim]
+        # hidden = [n layers, batch size, hid dim]
+        # cell = [n layers, batch size, hid dim]
 
-        output = self.out(
-            torch.cat((output, weighted_encoder_rep, embedded), dim=1))
+        prediction = self.fc_out(output.squeeze(0))
 
-        return output, decoder_hidden.squeeze(0)
+        # prediction = [batch size, output dim]
+
+        return prediction, (hidden, cell)
 
 
-class Seq2Seq(nn.Module):
-    def __init__(self, encoder: nn.Module, decoder: nn.Module,
-                 device: torch.device):
+class RNNSeq2Seq(nn.Module):
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 embed_dim,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.,
+                 device='cpu'):
         super().__init__()
 
-        self.encoder = encoder
-        self.decoder = decoder
+        self.src_vocab_size = src_vocab_size
+        self.trg_vocab_size = trg_vocab_size
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.device = device
+        self.init_weights()
 
-    def forward(self,
-                src: Tensor,
-                trg: Tensor,
-                teacher_forcing_ratio: float = 0.5) -> Tensor:
-        """
-        src: seq_len * batch_size
-        trg: seq_len * batch_size
-        """
-        batch_size = src.shape[1]
-        max_len = trg.shape[0]
-        trg_vocab_size = self.decoder.output_dim
+        self.encoder = RNNEncoder(src_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
+        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, hidden_size,
+                                  num_layers, dropout)
 
-        outputs = torch.zeros(max_len, batch_size,
-                              trg_vocab_size).to(self.device)
+    def forward(self, src, trg, teacher_forcing_ratio=0.5):
 
-        # encoder_outputs: seq_len * batch_size * embed_dim
-        # hidden:  batch_size * embed_dim
-        encoder_outputs, hidden = self.encoder(src)
+        # src = [src len, batch size]
+        # trg = [trg len, batch size]
+        # teacher_forcing_ratio is probability to use teacher forcing
+        # e.g. if teacher_forcing_ratio is 0.75 we use ground-truth inputs 75% of the time
 
-        # first input to the decoder is the <sos> token
-        output = trg[0, :]
+        batch_size = trg.shape[1]
+        trg_len = trg.shape[0]
 
-        for t in range(1, max_len):
-            output, hidden = self.decoder(output, hidden, encoder_outputs)
+        # tensor to store decoder outputs
+        outputs = torch.zeros(trg_len, batch_size,
+                              self.trg_vocab_size).to(self.device)
+
+        # last hidden state of the encoder is used as the initial hidden state of the decoder
+        encoder_output, (hidden, cell) = self.encoder(src)
+
+        # first input to the decoder is the <sos> tokens
+        input = trg[0, :]
+
+        for t in range(1, trg_len):
+
+            # insert input token embedding, previous hidden and previous cell states
+            # receive output tensor (predictions) and new hidden and cell states
+            output, (hidden, cell) = self.decoder(input, hidden, cell)
+
+            # place predictions in a tensor holding predictions for each token
             outputs[t] = output
+
+            # decide if we are going to use teacher forcing or not
             teacher_force = random.random() < teacher_forcing_ratio
-            top1 = output.max(1)[1]
-            output = (trg[t] if teacher_force else top1)
+
+            # get the highest predicted token from our predictions
+            top1 = output.argmax(1)
+
+            # if teacher forcing, use actual next token as next input
+            # if not, use predicted token
+            input = trg[t] if teacher_force else top1
 
         return outputs
 
