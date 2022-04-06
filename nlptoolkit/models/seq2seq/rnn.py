@@ -27,11 +27,13 @@ class Encoder(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, src: Tensor) -> Tuple[Tensor]:
-
+        # src = [src len, batch size]
         embedded = self.dropout(self.embedding(src))
+        # embedded = [src_len, batch size, emb dim]
 
-        # outputs: seq_len * batch_size * embed_dim
-        # hidden:  bidirectional * batch_size * embed_dim
+        # outputs = [src_len, batch size, hid_dim * n_directions]
+        # hidden = [n_layers * n_directions, batch_size, hid_dim]
+
         outputs, hidden = self.rnn(embedded)
 
         hidden = torch.tanh(
