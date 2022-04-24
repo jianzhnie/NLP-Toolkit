@@ -10,7 +10,7 @@ Description:
 import torch
 import torch.nn as nn
 
-from nlptoolkit.models.transformer.common import EncoderBlock
+from nlptoolkit.transformers.common import EncoderBlock
 
 
 class Embedding(nn.Module):
