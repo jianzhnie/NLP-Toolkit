@@ -6,14 +6,14 @@ from transformers import PretrainedModel
 class BertEmbeddings(nn.Module):
     """Include embeddings from word, position and token_type embeddings."""
     def __init__(self,
-                 vovab_size,
+                 vocab_size,
                  hidden_size=768,
                  hidden_dropout_prob=0.1,
                  max_position_embeddings=512,
                  type_vocab_size=16) -> None:
         super().__init__()
 
-        self.token_embeddings = nn.Embedding(vovab_size, hidden_size)
+        self.token_embeddings = nn.Embedding(vocab_size, hidden_size)
         self.position_embeddings = nn.Embedding(max_position_embeddings,
                                                 hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
