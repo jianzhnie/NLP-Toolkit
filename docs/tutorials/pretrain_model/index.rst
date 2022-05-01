@@ -22,7 +22,6 @@
    ERNIE-Doc <ERNIE-Doc>
    THU-ERNIE <THU-ERNIE>
    KBERT <KBERT>
-   ALBERT <ALBERT>  
+   ALBERT <ALBERT>
    ELECTRA <ELECTRA>
    Performer <Performer>
-
