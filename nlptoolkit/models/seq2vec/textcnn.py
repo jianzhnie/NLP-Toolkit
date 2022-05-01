@@ -125,7 +125,7 @@ class CNNEncoder(nn.Module):
         # If output_dim is None, result shape of (batch_size, len(ngram_filter_sizes) * num_filter));
         # else, result shape of (batch_size, output_dim).
         convs_out = [
-            self._activation(conv(inputs)).squeeze(2) for conv in self.convs
+            self.activation(conv(inputs)).squeeze(2) for conv in self.convs
         ]
         maxpool_out = [
             F.adaptive_max_pool1d(t, output_size=1).squeeze(2)
