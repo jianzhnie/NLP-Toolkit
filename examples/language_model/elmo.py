@@ -17,10 +17,10 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.datasets.elmodataset import BiLMDataset, load_corpus
+from nlptoolkit.datasets.elmodataset import BiLMDataset, load_corpus
 from nlptoolkit.data.utils.utils import PAD_TOKEN, get_loader
 from nlptoolkit.data.vocab import save_vocab
-from nlptoolkit.models.modules.elmo.elmo_model import BiLM
+from nlptoolkit.models.elmo.elmo_model import BiLM
 
 sys.path.append('../../')
 
