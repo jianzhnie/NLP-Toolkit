@@ -8,7 +8,7 @@ def minEditDistance(source: str, target: str) -> int:
     参数:
       source: 源字符串
       target: 目标字符串
-    
+
     返回:
       两个字符串的最小编辑距离,即源字符串转换成目标字符串的最少编辑操作次数
     """

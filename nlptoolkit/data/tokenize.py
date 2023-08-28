@@ -8,12 +8,13 @@ Description:
 '''
 
 import re
+
 import jieba
+
 from .vocab import Vocab
 
 
 class BaseTokenizer(object):
-
     def __init__(self, vocab: Vocab):
         self.vocab = vocab
 
@@ -29,7 +30,6 @@ class Tokenizer(object):
 
     Defined in :numref:`sec_utils`
     """
-
     def __init__(self, lang):
         self.lang = lang
 
@@ -63,7 +63,6 @@ class JiebaTokenizer(BaseTokenizer):
     Args:
         vocab(paddlenlp.data.Vocab): An instance of :class:`paddlenlp.data.Vocab`.
     """
-
     def __init__(self, vocab: Vocab):
         super(JiebaTokenizer, self).__init__(vocab)
 

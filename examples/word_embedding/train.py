@@ -1,12 +1,12 @@
-import torch
-import torch.nn as nn
 import sys
 
-sys.path.append('../../')
-sys.path.append('../')
-# from nlptoolkit.data.vocab import Vocab
-from paddlenlp.datasets import load_dataset
+import torch
+import torch.nn as nn
 from paddlenlp.data.vocab import Vocab
+from paddlenlp.datasets import load_dataset
+
+from nlptoolkit.data.vocab import Vocab
+
 
 class BoWClassifier(nn.Module):
     """
@@ -23,16 +23,15 @@ class BoWClassifier(nn.Module):
         hidden_size (obj:`int`, optional, defaults to 128): The first full-connected layer hidden size.
         fc_hidden_size (obj:`int`, optional, defaults to 96): The second full-connected layer hidden size.
         num_classes (obj:`int`): All the labels that the data has.
-    
+
     参数:
     - vocab_size: 词表大小
     - embed_dim: 嵌入维度
     - num_classes: 分类数
     - hidden_size: 第一个全连接层隐藏层大小
     - dropout: dropout概率
-    
-    """
 
+    """
     def __init__(self,
                  vocab_size: int,
                  embed_dim: int,
@@ -56,13 +55,13 @@ class BoWClassifier(nn.Module):
     def forward(self, text: torch.Tensor):
         """
         前向传播过程
-        
+
         参数:
         - text: 输入文本,形状为 [batch_size, seq_len]
-        
+
         返回:
         - output: 分类logits,形状为 [batch_size, num_classes]
-        
+
         """
 
         # 获取词嵌入表示
@@ -84,16 +83,16 @@ class BoWClassifier(nn.Module):
 
 
 def main():
-    train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
+    train_ds, dev_ds = load_dataset('chnsenticorp', splits=['train', 'dev'])
     print(train_ds)
 
-    vocab_path = "/home/robin/work_dir/llm/nlp-toolkit/data/dict.txt"
+    vocab_path = '/home/robin/work_dir/llm/nlp-toolkit/data/dict.txt'
     lm_vocab = Vocab.load_vocabulary(vocab_path)
     print(lm_vocab)
     print(len(lm_vocab))
 
-
-    lm_vocab.save_vocabulary("/home/robin/work_dir/llm/nlp-toolkit/data/vocab.txt")
+    lm_vocab.save_vocabulary(
+        '/home/robin/work_dir/llm/nlp-toolkit/data/vocab.txt')
     model = BoWClassifier(vocab_size=len(lm_vocab),
                           embed_dim=128,
                           num_classes=len(train_ds.label_list),
@@ -103,5 +102,5 @@ def main():
     return
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -50,7 +50,7 @@ def truncate_pad(line, num_steps, padding_token):
 
 class Vocab(object):
     """Vocabulary for text.
-    
+
     The class used to convert between tokens and ids. It also includes some
     store/load functions.
 
@@ -81,7 +81,6 @@ class Vocab(object):
             to specify further special tokens that will be exposed as attribute
             of the vocabulary and associated with an index.
     """
-
     def __init__(self,
                  counter=None,
                  max_size=None,
@@ -100,31 +99,33 @@ class Vocab(object):
 
         # Handle special tokens
         self.special_token_dict = {
-            "unk_token": unk_token,
-            "pad_token": pad_token,
-            "bos_token": bos_token,
-            "eos_token": eos_token,
+            'unk_token': unk_token,
+            'pad_token': pad_token,
+            'bos_token': bos_token,
+            'eos_token': eos_token,
         }
         kwargs.update(self.special_token_dict)
 
+        # check if special tokens are in kwargs
         special_tokens = []
         special_iter = kwargs.keys()
         for special_token_name in special_iter:
             # Test if kwarg specifies a special token
-            if not special_token_name.endswith("_token"):
+            if not special_token_name.endswith('_token'):
                 raise ValueError(
-                    "{} is invalid. Only keyword arguments "
+                    '{} is invalid. Only keyword arguments '
                     "that end in '_token' are supported "
-                    "to declare special tokens.".format(special_token_name))
+                    'to declare special tokens.'.format(special_token_name))
 
             special_token = kwargs[special_token_name]
             if special_token is not None and special_token not in special_tokens:
                 special_tokens.append(special_token)
 
+        # map tokens to indices and indices to tokens
         if counter is None:
-            assert token_to_idx is not None, "token_to_idx must be provided if counter is None"
+            assert token_to_idx is not None, 'token_to_idx must be provided if counter is None'
             for special_token in special_tokens:
-                assert special_token in token_to_idx, "{} is not in token_to_idx".format(
+                assert special_token in token_to_idx, '{} is not in token_to_idx'.format(
                     special_token)
 
             self._token_to_idx = token_to_idx
@@ -135,6 +136,7 @@ class Vocab(object):
             if unk_token:
                 unk_index = self._token_to_idx[unk_token]
                 self._token_to_idx = collections.defaultdict(lambda: unk_index)
+                print(self._token_to_idx)
                 self._token_to_idx.update(token_to_idx)
         else:
             # map special tokens to index
@@ -169,25 +171,24 @@ class Vocab(object):
             if freq < min_freq or len(self.idx_to_token) == max_size:
                 break
             if token not in special_tokens:
-                self.idx_to_token[max(list(self.idx_to_token.keys()) + [-1]) +
-                                  1] = token
-                self.token_to_idx[token] = len(self.idx_to_token) - 1
+                self.idx_to_token[len(self._idx_to_token)] = token
+                self._token_to_idx[token] = len(self._token_to_idx) - 1
 
     def _sort_index_according_to_user_specification(self, token_to_idx):
         # Sanity checks
         if not set(token_to_idx.keys()).issubset(self.token_to_idx.keys()):
             raise ValueError(
-                "User-specified token_to_idx mapping can only contain "
-                "tokens that will be part of the vocabulary.")
+                'User-specified token_to_idx mapping can only contain '
+                'tokens that will be part of the vocabulary.')
         if len(set(token_to_idx.values())) != len(token_to_idx):
             raise ValueError(
-                "User-specified indices must not contain duplicates.")
+                'User-specified indices must not contain duplicates.')
         if min(token_to_idx.values()) < 0 or max(token_to_idx.values()) >= len(
                 self.token_to_idx):
             raise ValueError(
-                "User-specified indices must not be < 0 or >= the number of tokens "
-                "that will be in the vocabulary. The current vocab contains {}"
-                "tokens.".format(len(self.token_to_idx)))
+                'User-specified indices must not be < 0 or >= the number of tokens '
+                'that will be in the vocabulary. The current vocab contains {}'
+                'tokens.'.format(len(self.token_to_idx)))
 
         # Update index ordering
         for token, new_idx in token_to_idx.items():
@@ -269,12 +270,13 @@ class Vocab(object):
             str: The JSON string including information of vocab.
         """
         vocab_dict = {}
-        vocab_dict["idx_to_token"] = dict(self._idx_to_token)
-        vocab_dict["token_to_idx"] = dict(self._token_to_idx)
-        vocab_dict["identifiers_to_tokens"] = self._identifiers_to_tokens
+        vocab_dict['idx_to_token'] = dict(self._idx_to_token)
+        vocab_dict['token_to_idx'] = dict(self._token_to_idx)
+        vocab_dict['unk_token'] = self.unk_token
+        vocab_dict['identifiers_to_tokens'] = self._identifiers_to_tokens
         json_str = json.dumps(vocab_dict)
         if path:
-            with io.open(path, "w", encoding="utf-8") as f:
+            with io.open(path, 'w', encoding='utf-8') as f:
                 f.write(json_str)
         return json_str
 
@@ -293,16 +295,18 @@ class Vocab(object):
 
         """
         if os.path.isfile(json_str):
-            with io.open(json_str, "r", encoding="utf-8") as f:
+            with io.open(json_str, 'r', encoding='utf-8') as f:
                 vocab_dict = json.load(f)
         else:
             vocab_dict = json.loads(json_str)
-        token_to_idx = vocab_dict.get("token_to_idx")
-        identifiers_to_tokens = vocab_dict.get("identifiers_to_tokens", dict())
-        if "unk_token" in identifiers_to_tokens:
-            del identifiers_to_tokens["unk_token"]
+        token_to_idx = vocab_dict.get('token_to_idx')
+        unk_token = vocab_dict.get('unk_token')
+        identifiers_to_tokens = vocab_dict.get('identifiers_to_tokens', dict())
+        if 'unk_token' in identifiers_to_tokens:
+            del identifiers_to_tokens['unk_token']
         vocab = cls(counter=None,
                     token_to_idx=token_to_idx,
+                    unk_token=unk_token,
                     **identifiers_to_tokens)
 
         return vocab
@@ -408,18 +412,18 @@ class Vocab(object):
         )
         return vocab
 
-    def save_vocab(self, path):
+    def save_vocabulary(self, path):
         """Save the vocabulary to a file. """
         with open(path, 'w') as writer:
-            for idx in range(len(self.idx_to_token)):
-                writer.write(self.idx_to_token[idx] + '\n')
+            for idx in range(len(self._idx_to_token)):
+                writer.write(self._idx_to_token[idx] + '\n')
 
-    def load_vocab(vocab_file,
-                   unk_token=None,
-                   pad_token=None,
-                   bos_token=None,
-                   eos_token=None,
-                   **kwargs):
+    def load_vocabulary(vocab_file,
+                        unk_token=None,
+                        pad_token=None,
+                        bos_token=None,
+                        eos_token=None,
+                        **kwargs):
         """
         Builds the :class:`Vocab` from a file reserving all tokens by calling
         :meth:`Vocab.from_dict` method. The file contains a token per line, and
@@ -445,9 +449,9 @@ class Vocab(object):
         """
 
         token_to_idx = {}
-        with io.open(vocab_file, "r", encoding="utf-8") as file_reader:
+        with io.open(vocab_file, 'r', encoding='utf-8') as file_reader:
             for index, token in enumerate(file_reader):
-                token = token.rstrip("\n")
+                token = token.rstrip('\n')
                 token_to_idx[token] = int(index)
         vocab = Vocab.from_dict(token_to_idx,
                                 unk_token=unk_token,

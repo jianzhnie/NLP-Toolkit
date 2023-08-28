@@ -77,8 +77,8 @@ class PositionalEncodingD2L(nn.Module):
 
 
 if __name__ == '__main__':
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
     plt.figure(figsize=(15, 10))
     vocab_size = 1000
     batch_size = 32
