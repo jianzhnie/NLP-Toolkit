@@ -14,12 +14,12 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
+sys.path.append('../../')
+sys.path.append('../')
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
 from nlptoolkit.datasets.nlmdataset import CbowDataset
 from nlptoolkit.models.lm import CBOWLanguageModel
-
-sys.path.append('../../')
 
 if __name__ == '__main__':
     embedding_dim = 64
