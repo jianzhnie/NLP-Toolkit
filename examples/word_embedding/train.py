@@ -2,10 +2,13 @@ import sys
 
 import torch
 import torch.nn as nn
-from paddlenlp.data.vocab import Vocab
 from paddlenlp.datasets import load_dataset
+from torch.optim import Adam
+from torch.utils.data import DataLoader, Dataset
 
-from nlptoolkit.data.vocab import Vocab
+sys.path.append('../../')
+from nlptoolkit.data.tokenizer import JiebaTokenizer
+from nlptoolkit.data.vocab import Vocab, truncate_pad
 
 
 class BoWClassifier(nn.Module):
@@ -44,13 +47,13 @@ class BoWClassifier(nn.Module):
         self.embed = nn.Embedding(vocab_size, embed_dim)
 
         # 全连接层
-        self.fc = nn.Linear(embed_dim, hidden_size)
+        self.fc1 = nn.Linear(embed_dim, hidden_size)
 
         # Dropout
         self.dropout = nn.Dropout(dropout)
 
         # 输出层
-        self.out = nn.Linear(hidden_size, num_classes)
+        self.fc2 = nn.Linear(hidden_size, num_classes)
 
     def forward(self, text: torch.Tensor):
         """
@@ -71,35 +74,99 @@ class BoWClassifier(nn.Module):
         embed = torch.mean(embed, dim=1)
 
         # 全连接层 extracted_embed
-        extracted_embed = torch.tanh(self.fc(embed))
+        extracted_embed = torch.tanh(self.fc1(embed))
 
         # Dropout正则化
         extracted_embed = self.dropout(extracted_embed)
 
         # 输出层
-        output = self.out(extracted_embed)
+        output = self.fc2(extracted_embed)
 
         return output
 
 
+class TorchDataset(Dataset):
+    def __init__(self,
+                 dataset,
+                 tokenizer: JiebaTokenizer,
+                 vocab: Vocab,
+                 max_seq_len: int,
+                 pad_token_id: int = 0):
+        self.dataset = dataset
+        self.tokenizer = tokenizer
+        self.vocab = vocab
+        self.max_seq_len = max_seq_len
+        self.pad_token_id = pad_token_id
+
+    def __getitem__(self, index):
+        example = self.dataset[index]
+        text = example['text']
+        label = int(example['label'])
+        tokens = self.tokenizer.cut(text)
+
+        input_ids = self.vocab.to_ids(tokens)
+        valid_length = torch.tensor(len(input_ids))
+
+        input_ids = truncate_pad(inputs=input_ids,
+                                 max_seq_len=self.max_seq_len,
+                                 padding_token=self.pad_token_id)
+
+        input_ids = torch.tensor(input_ids, dtype=torch.int32)
+        label = torch.tensor(label, dtype=torch.int64)
+
+        return input_ids, valid_length, label
+
+    def __len__(self):
+        return len(self.dataset)
+
+
+def train(model: nn.Module,
+          train_loader: DataLoader,
+          optimizer: Adam,
+          loss_fn: None,
+          num_epoch: int = 10,
+          device: str = 'cpu'):
+
+    for epoch in range(num_epoch):
+        total_loss = 0
+        for batch in train_loader:
+            input_ids, valid_length, labels = [x.to(device) for x in batch]
+            optimizer.zero_grad()
+            logits = model(input_ids)
+            loss = loss_fn(logits, labels)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        print(f'Loss: {total_loss:.2f}')
+
+
 def main():
     train_ds, dev_ds = load_dataset('chnsenticorp', splits=['train', 'dev'])
-    print(train_ds)
-
+    num_classes = len(train_ds.label_list)
     vocab_path = '/home/robin/work_dir/llm/nlp-toolkit/data/dict.txt'
-    lm_vocab = Vocab.load_vocabulary(vocab_path)
-    print(lm_vocab)
-    print(len(lm_vocab))
+    lm_vocab = Vocab.load_vocabulary(vocab_path, unk_token='[UNK]')
 
-    lm_vocab.save_vocabulary(
-        '/home/robin/work_dir/llm/nlp-toolkit/data/vocab.txt')
+    tokenizer = JiebaTokenizer(lm_vocab)
+    train_dataset = TorchDataset(train_ds, tokenizer, lm_vocab, 128)
+    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
     model = BoWClassifier(vocab_size=len(lm_vocab),
                           embed_dim=128,
-                          num_classes=len(train_ds.label_list),
+                          num_classes=num_classes,
                           hidden_size=128,
                           dropout=0.5)
-    print(model)
-    return
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = Adam(model.parameters(), lr=0.001)
+    model.to(device)
+    train(model,
+          train_dataloader,
+          optimizer,
+          loss_fn,
+          num_epoch=10,
+          device=device)
 
 
 if __name__ == '__main__':

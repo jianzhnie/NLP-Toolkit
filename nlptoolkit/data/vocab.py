@@ -38,14 +38,12 @@ def count_corpus(tokens):
     return collections.Counter(tokens)
 
 
-def truncate_pad(line, num_steps, padding_token):
+def truncate_pad(inputs, max_seq_len, padding_token):
     """Truncate or pad sequences.
-
-    Defined in :numref:`sec_machine_translation`
     """
-    if len(line) > num_steps:
-        return line[:num_steps]  # Truncate
-    return line + [padding_token] * (num_steps - len(line))  # Pad
+    if len(inputs) > max_seq_len:
+        return inputs[:max_seq_len]  # Truncate
+    return inputs + [padding_token] * (max_seq_len - len(inputs))  # Pad
 
 
 class Vocab(object):
@@ -133,10 +131,6 @@ class Vocab(object):
                 idx: token
                 for token, idx in token_to_idx.items()
             }
-            if unk_token:
-                unk_index = self._token_to_idx[unk_token]
-                self._token_to_idx = collections.OrderedDict(lambda: unk_index)
-                self._token_to_idx.update(token_to_idx)
         else:
             # map special tokens to index
             self._idx_to_token = {
@@ -149,9 +143,6 @@ class Vocab(object):
 
             self._index_counter_keys(counter, special_tokens, max_size,
                                      min_freq)
-
-            if token_to_idx:
-                self._sort_index_according_to_user_specification(token_to_idx)
 
     def _index_counter_keys(self, counter, special_tokens, max_size, min_freq):
         # sort by frequency, then alphabetically
@@ -166,32 +157,6 @@ class Vocab(object):
             if token not in special_tokens:
                 self.idx_to_token[len(self._idx_to_token)] = token
                 self._token_to_idx[token] = len(self._token_to_idx)
-
-    def _sort_index_according_to_user_specification(self, token_to_idx):
-        # Sanity checks
-        if not set(token_to_idx.keys()).issubset(self.token_to_idx.keys()):
-            raise ValueError(
-                'User-specified token_to_idx mapping can only contain '
-                'tokens that will be part of the vocabulary.')
-        if len(set(token_to_idx.values())) != len(token_to_idx):
-            raise ValueError(
-                'User-specified indices must not contain duplicates.')
-        if min(token_to_idx.values()) < 0 or max(token_to_idx.values()) >= len(
-                self.token_to_idx):
-            raise ValueError(
-                'User-specified indices must not be < 0 or >= the number of tokens '
-                'that will be in the vocabulary. The current vocab contains {}'
-                'tokens.'.format(len(self.token_to_idx)))
-
-        # Update index ordering
-        for token, new_idx in token_to_idx.items():
-            old_idx = self.token_to_idx[token]
-            ousted_token = self.idx_to_token[new_idx]
-
-            self.token_to_idx[token] = new_idx
-            self.token_to_idx[ousted_token] = old_idx
-            self.idx_to_token[old_idx] = ousted_token
-            self.idx_to_token[new_idx] = token
 
     def to_tokens(self, indices):
         """
@@ -223,16 +188,17 @@ class Vocab(object):
             return an integer. If `tokens` is a list/tuple of str, it will
             return a list of integers.
         """
-        if isinstance(tokens, (list, tuple)):
-            return [self.to_ids(token) for token in tokens]
-        return self._token_to_idx.get(tokens, self.unk_token)
+
+        return self[tokens]
 
     def __len__(self):
         return len(self._idx_to_token)
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self._token_to_idx.get(tokens, self.unk_token)
+            return self._token_to_idx[
+                tokens] if tokens in self._token_to_idx else self._token_to_idx[
+                    self.unk_token]
         return [self.__getitem__(token) for token in tokens]
 
     def __contains__(self, token):
