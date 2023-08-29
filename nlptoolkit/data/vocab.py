@@ -436,12 +436,11 @@ class Vocab(object):
 
         token_lst = []
         token_to_idx = collections.OrderedDict()
-        with open(vocab_file, 'r', encoding='utf-8') as f:
-            index = 0
-            for line in f.readlines():
-                token = line.rstrip('\n').split('\t')[0]
-                token_to_idx[token] = int(index)
-                index += 1
+        with open(vocab_file, 'r', encoding='utf-8') as reader:
+            tokens = reader.readlines()
+            for index, token in enumerate(tokens):
+                token = token.rstrip('\n').split('\t')[0]
+                token_to_idx[token] = index
         token_lst = list(token_to_idx.keys())
         token_to_idx = {token: idx for idx, token in enumerate(token_lst)}
         vocab = Vocab.from_dict(token_to_idx,

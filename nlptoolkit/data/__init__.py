@@ -6,3 +6,8 @@ LastEditors: jianzhnie
 Description:
 
 '''
+
+from .tokenizer import JiebaTokenizer
+from .vocab import Vocab
+
+__all__ = ['JiebaTokenizer', 'Vocab']
