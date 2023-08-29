@@ -104,7 +104,7 @@ class TorchDataset(Dataset):
         label = int(example['label'])
         tokens = self.tokenizer.cut(text)
 
-        input_ids = self.vocab.to_ids(tokens)
+        input_ids = self.vocab.to_index(tokens)
         valid_length = torch.tensor(len(input_ids))
 
         input_ids = truncate_pad(inputs=input_ids,

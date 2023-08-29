@@ -10,6 +10,7 @@ import collections
 import io
 import json
 import os
+from typing import Dict, Iterable, List
 
 BOS_TOKEN = '<bos>'
 EOS_TOKEN = '<eos>'
@@ -81,13 +82,13 @@ class Vocab(object):
     """
     def __init__(self,
                  counter=None,
-                 max_size=None,
-                 min_freq=1,
-                 token_to_idx=None,
-                 unk_token=UNK_TOKEN,
-                 pad_token=PAD_TOKEN,
-                 bos_token=BOS_TOKEN,
-                 eos_token=EOS_TOKEN,
+                 max_size: int = None,
+                 min_freq: int = 1,
+                 token_to_idx: Dict[str, int] = None,
+                 unk_token: str = UNK_TOKEN,
+                 pad_token: str = PAD_TOKEN,
+                 bos_token: str = BOS_TOKEN,
+                 eos_token: str = EOS_TOKEN,
                  **kwargs):
 
         self.unk_token = unk_token
@@ -105,7 +106,7 @@ class Vocab(object):
         kwargs.update(self.special_token_dict)
 
         # check if special tokens are in kwargs
-        special_tokens = []
+        special_tokens: List[str] = []
         special_iter = kwargs.keys()
         for special_token_name in special_iter:
             # Test if kwarg specifies a special token
@@ -126,20 +127,20 @@ class Vocab(object):
                 assert special_token in token_to_idx, '{} is not in token_to_idx'.format(
                     special_token)
 
-            self._token_to_idx = token_to_idx
-            self._idx_to_token = {
+            self.token_to_idx: Dict[str, int] = token_to_idx
+            self.idx_to_token: Dict[int, str] = {
                 idx: token
                 for token, idx in token_to_idx.items()
             }
         else:
             # map special tokens to index
-            self._idx_to_token = {
+            self.idx_to_token = {
                 idx: special_token
                 for idx, special_token in enumerate(special_tokens)
             }
-            self._token_to_idx = collections.OrderedDict()
-            self._token_to_idx.update(
-                (token, idx) for idx, token in self._idx_to_token.items())
+            self.token_to_idx = collections.OrderedDict()
+            self.token_to_idx.update(
+                (token, idx) for idx, token in self.idx_to_token.items())
 
             self._index_counter_keys(counter, special_tokens, max_size,
                                      min_freq)
@@ -155,8 +156,8 @@ class Vocab(object):
             if freq < min_freq or len(self.idx_to_token) == max_size:
                 break
             if token not in special_tokens:
-                self.idx_to_token[len(self._idx_to_token)] = token
-                self._token_to_idx[token] = len(self._token_to_idx)
+                self.idx_to_token[len(self.idx_to_token)] = token
+                self.token_to_idx[token] = len(self.token_to_idx)
 
     def to_tokens(self, indices):
         """
@@ -172,10 +173,10 @@ class Vocab(object):
             return a list of str.
         """
         if hasattr(indices, '__len__') and len(indices) > 1:
-            return [self._idx_to_token[int(index)] for index in indices]
-        return self._idx_to_token[indices]
+            return [self.idx_to_token[int(index)] for index in indices]
+        return self.idx_to_token[indices]
 
-    def to_ids(self, tokens):
+    def to_index(self, tokens):
         """
         Maps the input tokens into indices.
 
@@ -192,27 +193,17 @@ class Vocab(object):
         return self[tokens]
 
     def __len__(self):
-        return len(self._idx_to_token)
+        return len(self.idx_to_token)
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self._token_to_idx[
-                tokens] if tokens in self._token_to_idx else self._token_to_idx[
+            return self.token_to_idx[
+                tokens] if tokens in self.token_to_idx else self.token_to_idx[
                     self.unk_token]
         return [self.__getitem__(token) for token in tokens]
 
     def __contains__(self, token):
-        return token in self._token_to_idx
-
-    @property
-    def idx_to_token(self):
-        # Returns index-token dict
-        return self._idx_to_token
-
-    @property
-    def token_to_idx(self):
-        # Return token-index dict
-        return self._token_to_idx
+        return token in self.token_to_idx
 
     def to_json(self, path=None):
         """
@@ -229,8 +220,8 @@ class Vocab(object):
             str: The JSON string including information of vocab.
         """
         vocab_dict = {}
-        vocab_dict['idx_to_token'] = dict(self._idx_to_token)
-        vocab_dict['token_to_idx'] = dict(self._token_to_idx)
+        vocab_dict['idx_to_token'] = dict(self.idx_to_token)
+        vocab_dict['token_to_idx'] = dict(self.token_to_idx)
         vocab_dict['special_token'] = self.special_token_dict
         json_str = json.dumps(vocab_dict)
         if path:
@@ -306,7 +297,7 @@ class Vocab(object):
         return vocab
 
     @staticmethod
-    def build_vocab(iterator,
+    def build_vocab(iterator: Iterable,
                     max_size=None,
                     min_freq=1,
                     token_to_idx=None,
@@ -367,8 +358,8 @@ class Vocab(object):
     def save_vocabulary(self, path):
         """Save the vocabulary to a file. """
         with open(path, 'w') as writer:
-            for idx in range(len(self._idx_to_token)):
-                writer.write(self._idx_to_token[idx] + '\n')
+            for idx in range(len(self.idx_to_token)):
+                writer.write(self.idx_to_token[idx] + '\n')
 
     def load_vocabulary(vocab_file,
                         unk_token=None,
