@@ -86,10 +86,10 @@ class Vocab(object):
                  max_size=None,
                  min_freq=1,
                  token_to_idx=None,
-                 unk_token=None,
-                 pad_token=None,
-                 bos_token=None,
-                 eos_token=None,
+                 unk_token=UNK_TOKEN,
+                 pad_token=PAD_TOKEN,
+                 bos_token=BOS_TOKEN,
+                 eos_token=EOS_TOKEN,
                  **kwargs):
 
         self.unk_token = unk_token
@@ -135,8 +135,7 @@ class Vocab(object):
             }
             if unk_token:
                 unk_index = self._token_to_idx[unk_token]
-                self._token_to_idx = collections.defaultdict(lambda: unk_index)
-                print(self._token_to_idx)
+                self._token_to_idx = collections.OrderedDict(lambda: unk_index)
                 self._token_to_idx.update(token_to_idx)
         else:
             # map special tokens to index
@@ -144,7 +143,7 @@ class Vocab(object):
                 idx: special_token
                 for idx, special_token in enumerate(special_tokens)
             }
-            self._token_to_idx = collections.defaultdict()
+            self._token_to_idx = collections.OrderedDict()
             self._token_to_idx.update(
                 (token, idx) for idx, token in self._idx_to_token.items())
 
@@ -153,12 +152,6 @@ class Vocab(object):
 
             if token_to_idx:
                 self._sort_index_according_to_user_specification(token_to_idx)
-            if unk_token:
-                self._token_to_idx.default_factory = lambda: self._token_to_idx[
-                    unk_token]
-
-        # _expose_tokens_as_attributes
-        self._identifiers_to_tokens = kwargs
 
     def _index_counter_keys(self, counter, special_tokens, max_size, min_freq):
         # sort by frequency, then alphabetically
@@ -172,7 +165,7 @@ class Vocab(object):
                 break
             if token not in special_tokens:
                 self.idx_to_token[len(self._idx_to_token)] = token
-                self._token_to_idx[token] = len(self._token_to_idx) - 1
+                self._token_to_idx[token] = len(self._token_to_idx)
 
     def _sort_index_according_to_user_specification(self, token_to_idx):
         # Sanity checks
@@ -272,8 +265,7 @@ class Vocab(object):
         vocab_dict = {}
         vocab_dict['idx_to_token'] = dict(self._idx_to_token)
         vocab_dict['token_to_idx'] = dict(self._token_to_idx)
-        vocab_dict['unk_token'] = self.unk_token
-        vocab_dict['identifiers_to_tokens'] = self._identifiers_to_tokens
+        vocab_dict['special_token'] = self.special_token_dict
         json_str = json.dumps(vocab_dict)
         if path:
             with io.open(path, 'w', encoding='utf-8') as f:
@@ -300,14 +292,8 @@ class Vocab(object):
         else:
             vocab_dict = json.loads(json_str)
         token_to_idx = vocab_dict.get('token_to_idx')
-        unk_token = vocab_dict.get('unk_token')
-        identifiers_to_tokens = vocab_dict.get('identifiers_to_tokens', dict())
-        if 'unk_token' in identifiers_to_tokens:
-            del identifiers_to_tokens['unk_token']
-        vocab = cls(counter=None,
-                    token_to_idx=token_to_idx,
-                    unk_token=unk_token,
-                    **identifiers_to_tokens)
+        special_tokens = vocab_dict.get('special_token', dict())
+        vocab = cls(counter=None, token_to_idx=token_to_idx, **special_tokens)
 
         return vocab
 
@@ -396,9 +382,9 @@ class Vocab(object):
             Vocab: An instance of :class:`Vocab` generated from given iterator
             and other informations.
         """
-        counter = collections.Counter()
-        for tokens in iterator:
-            counter.update(tokens)
+        if iterator and isinstance(iterator[0], (list, tuple)):
+            iterator = [token for line in iterator for token in line]
+        counter = collections.Counter(iterator)
         vocab = Vocab(
             counter,
             max_size=max_size,
@@ -448,11 +434,16 @@ class Vocab(object):
             Vocab: An instance of :class:`Vocab` generated from the given file.
         """
 
-        token_to_idx = {}
-        with io.open(vocab_file, 'r', encoding='utf-8') as file_reader:
-            for index, token in enumerate(file_reader):
-                token = token.rstrip('\n')
+        token_lst = []
+        token_to_idx = collections.OrderedDict()
+        with open(vocab_file, 'r', encoding='utf-8') as f:
+            index = 0
+            for line in f.readlines():
+                token = line.rstrip('\n').split('\t')[0]
                 token_to_idx[token] = int(index)
+                index += 1
+        token_lst = list(token_to_idx.keys())
+        token_to_idx = {token: idx for idx, token in enumerate(token_lst)}
         vocab = Vocab.from_dict(token_to_idx,
                                 unk_token=unk_token,
                                 pad_token=pad_token,
