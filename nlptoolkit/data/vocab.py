@@ -39,12 +39,12 @@ def count_corpus(tokens):
     return collections.Counter(tokens)
 
 
-def truncate_pad(inputs, max_seq_len, padding_token):
+def truncate_pad(inputs, max_seq_len, padding_token_id):
     """Truncate or pad sequences.
     """
     if len(inputs) > max_seq_len:
         return inputs[:max_seq_len]  # Truncate
-    return inputs + [padding_token] * (max_seq_len - len(inputs))  # Pad
+    return inputs + [padding_token_id] * (max_seq_len - len(inputs))  # Pad
 
 
 class Vocab(object):
@@ -123,15 +123,13 @@ class Vocab(object):
         # map tokens to indices and indices to tokens
         if counter is None:
             assert token_to_idx is not None, 'token_to_idx must be provided if counter is None'
-            for special_token in special_tokens:
-                assert special_token in token_to_idx, '{} is not in token_to_idx'.format(
-                    special_token)
-
             self.token_to_idx: Dict[str, int] = token_to_idx
             self.idx_to_token: Dict[int, str] = {
                 idx: token
                 for token, idx in token_to_idx.items()
             }
+            self.add_tokens(special_tokens)
+
         else:
             # map special tokens to index
             self.idx_to_token = {
@@ -156,8 +154,16 @@ class Vocab(object):
             if freq < min_freq or len(self.idx_to_token) == max_size:
                 break
             if token not in special_tokens:
-                self.idx_to_token[len(self.idx_to_token)] = token
-                self.token_to_idx[token] = len(self.token_to_idx)
+                self.add_tokens(token)
+
+    def add_tokens(self, tokens):
+        if not isinstance(tokens, (list, tuple)):
+            if tokens not in self.token_to_idx:
+                self.idx_to_token[len(self.idx_to_token)] = tokens
+                self.token_to_idx[tokens] = len(self.token_to_idx)
+        else:
+            for token in tokens:
+                self.add_tokens(token)
 
     def to_tokens(self, indices):
         """
