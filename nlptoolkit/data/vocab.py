@@ -39,45 +39,37 @@ def count_corpus(tokens):
     return collections.Counter(tokens)
 
 
-def truncate_pad(inputs, max_seq_len, padding_token_id):
-    """Truncate or pad sequences.
-    """
-    if len(inputs) > max_seq_len:
-        return inputs[:max_seq_len]  # Truncate
-    return inputs + [padding_token_id] * (max_seq_len - len(inputs))  # Pad
-
-
 class Vocab(object):
-    """Vocabulary for text.
+    """
+    Vocabulary for text.
 
-    The class used to convert between tokens and ids. It also includes some
+    The class is used to convert between tokens and ids. It also includes some
     store/load functions.
 
     Args:
-        counter (collections.Counter, optional): A Counter intance describes
-            the tokens and their frequencies. Its keys will be indexed accroding
-            to the order of frequency sorting to construct mapping relationship.
+        counter (collections.Counter, optional): A Counter instance describing
+            the tokens and their frequencies. Its keys will be indexed according
+            to the order of frequency sorting to construct the mapping relationship.
             If None, `token_to_idx` must be provided as the mapping relationship.
             Default: None.
         max_size (int, optional): Max size of vocab, not including special tokens.
             Default: None.
         min_freq (int, optional): Ignore tokens whose frequencies are less than
             `min_freq`. Default: 1.
-        token_to_idx (dict, optional): A dict specifies the mapping relationship
+        token_to_idx (dict, optional): A dict specifying the mapping relationship
             between tokens and indices to be used. If provided, adjust the tokens
             and indices mapping according to it. If None, counter must be provided.
             Default: None.
-        unk_token (str, optional): Special token for unknow token. If no need,
-            it also could be None. Default: None.
-        pad_token (str, optional): Special token for padding token. If no need,
-            it also could be None. Default: None.
-        bos_token (str, optional): Special token for bos token. If no need, it
-            also could be None. Default: None.
-        eos_token (str, optional): Special token for eos token. If no need, it
-            lso could be None. Default: None.
-
-        kwargs (dict): Keyword arguments ending with `_token`. It can be used
-            to specify further special tokens that will be exposed as attribute
+        unk_token (str, optional): Special token for unknown token. If not needed,
+            it can be None. Default: '<unk>'.
+        pad_token (str, optional): Special token for padding token. If not needed,
+            it can be None. Default: '<pad>'.
+        bos_token (str, optional): Special token for beginning of sentence (BOS) token.
+            If not needed, it can be None. Default: '<bos>'.
+        eos_token (str, optional): Special token for end of sentence (EOS) token.
+            If not needed, it can be None. Default: '<eos>'.
+        kwargs (dict): Keyword arguments ending with '_token'. It can be used
+            to specify further special tokens that will be exposed as attributes
             of the vocabulary and associated with an index.
     """
     def __init__(self,
@@ -105,7 +97,7 @@ class Vocab(object):
         }
         kwargs.update(self.special_token_dict)
 
-        # check if special tokens are in kwargs
+        # Check if special tokens are in kwargs
         special_tokens: List[str] = []
         special_iter = kwargs.keys()
         for special_token_name in special_iter:
@@ -120,7 +112,7 @@ class Vocab(object):
             if special_token is not None and special_token not in special_tokens:
                 special_tokens.append(special_token)
 
-        # map tokens to indices and indices to tokens
+        # Map tokens to indices and indices to tokens
         if counter is None:
             assert token_to_idx is not None, 'token_to_idx must be provided if counter is None'
             self.token_to_idx: Dict[str, int] = token_to_idx
@@ -131,7 +123,7 @@ class Vocab(object):
             self.add_tokens(special_tokens)
 
         else:
-            # map special tokens to index
+            # Map special tokens to index
             self.idx_to_token = {
                 idx: special_token
                 for idx, special_token in enumerate(special_tokens)
@@ -144,9 +136,9 @@ class Vocab(object):
                                      min_freq)
 
     def _index_counter_keys(self, counter, special_tokens, max_size, min_freq):
-        # sort by frequency, then alphabetically
+        # Sort by frequency, then alphabetically
         token_freqs = sorted(counter.items(), key=lambda x: x[1], reverse=True)
-        # frequencies of special tokens are not counted when building vocabulary
+        # Frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         special_tokens = set(special_tokens)
         max_size = None if max_size is None else max_size + len(special_tokens)
@@ -167,7 +159,7 @@ class Vocab(object):
 
     def to_tokens(self, indices):
         """
-        Maps the input indices to token list.
+        Maps the input indices to a token or list of tokens.
 
         Args:
             indices (int|list[int]|tuple[int]|numpy.ndarray): The input indice(s) for mapping.
@@ -191,11 +183,10 @@ class Vocab(object):
                 mapping.
 
         Returns:
-            int|list[int]: Obationed indice(s). If `tokens` is a str, it will
+            int|list[int]: Obtained indice(s). If `tokens` is a str, it will
             return an integer. If `tokens` is a list/tuple of str, it will
             return a list of integers.
         """
-
         return self[tokens]
 
     def __len__(self):
@@ -203,9 +194,8 @@ class Vocab(object):
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self.token_to_idx[
-                tokens] if tokens in self.token_to_idx else self.token_to_idx[
-                    self.unk_token]
+            return self.token_to_idx.get(tokens,
+                                         self.token_to_idx.get(self.unk_token))
         return [self.__getitem__(token) for token in tokens]
 
     def __contains__(self, token):
@@ -213,14 +203,13 @@ class Vocab(object):
 
     def to_json(self, path=None):
         """
-        Summarizes some information of vocab as JSON string. If path is gaven,
-        the JSON string will be saved into files. The JSON string and the saved
-        file all can be used to reconstruct the :class:`Vocab` by calling
-        :meth:`from_json` method.
+        Summarizes some information of the vocab as a JSON string. If a path is
+        # JSON string. The JSON string and the saved file can both be used to reconstruct the `Vocab`
+        # by calling the `from_json` method.
 
         Args:
-            path (str, optional): The path to save JSON string. If None, the
-                JSON will not be saved. Default: None.
+            path (str, optional): The path to save the JSON string. If None, the JSON will not be saved.
+                Default: None.
 
         Returns:
             str: The JSON string including information of vocab.
@@ -238,16 +227,13 @@ class Vocab(object):
     @classmethod
     def from_json(cls, json_str):
         """
-        Loads :class:`Vocab` from JSON string or JSON file, which is gotten by
-        calling :meth:`to_json` method.
+        Loads a `Vocab` from a JSON string or JSON file, which is generated by calling the `to_json` method.
 
         Args:
-            json_str (str): JSON string or file path of JSON string.
+            json_str (str): JSON string or file path to a JSON string.
 
         Returns:
-            Vocab: An instance of :class:`Vocab` generated from information
-            contained in JSON string.
-
+            Vocab: An instance of `Vocab` generated from the information contained in the JSON string.
         """
         if os.path.isfile(json_str):
             with io.open(json_str, 'r', encoding='utf-8') as f:
@@ -257,7 +243,6 @@ class Vocab(object):
         token_to_idx = vocab_dict.get('token_to_idx')
         special_tokens = vocab_dict.get('special_token', dict())
         vocab = cls(counter=None, token_to_idx=token_to_idx, **special_tokens)
-
         return vocab
 
     @classmethod
@@ -269,27 +254,23 @@ class Vocab(object):
                   eos_token=None,
                   **kwargs):
         """
-        Builds the :class:`Vocab` from a dict.
+        Builds the `Vocab` from a dictionary.
 
         Args:
-            token_to_idx (dict): A dict describes the mapping relationship between
-                tokens and indices.
-            unk_token (str, optional): The special token for unknow token. If
-                no need, it also could be None. Default: None.
-            pad_token (str, optional): The special token for padding token. If
-                no need, it also could be None. Default: None.
-            bos_token (str, optional): The special token for bos token. If no
-                need, it also could be None. Default: None.
-            eos_token (str, optional): The special token for eos token. If no
-                need, it also could be None. Default: None.
-
-            kwargs (dict): Keyword arguments ending with `_token`. It can be
-                used to specify further special tokens that will be exposed as
-                attribute of the vocabulary and associated with an index.
+            token_to_idx (dict): A dictionary describing the mapping relationship between tokens and indices.
+            unk_token (str, optional): The special token for unknown tokens '<unk>'. If not needed, it can
+                be None. Default: None.
+            pad_token (str, optional): The special token for padding tokens '<pad>'. If not needed, it can
+                be None. Default: None.
+            bos_token (str, optional): The special token for beginning of sentence (BOS) token '<bos>'.
+                If not needed, it can be None. Default: None.
+            eos_token (str, optional): The special token for end of sentence (EOS) token '<eos>'.
+                If not needed, it can be None. Default: None.
+            kwargs (dict): Keyword arguments ending with '_token'. It can be used to specify further special
+                tokens that will be exposed as attributes of the vocabulary and associated with an index.
 
         Returns:
-            Vocab: An instance of :class:`Vocab` generated from the given dict
-            and special tokens.
+            Vocab: An instance of `Vocab` generated from the given dictionary and special tokens.
         """
         vocab = cls(
             counter=None,
@@ -313,37 +294,30 @@ class Vocab(object):
                     eos_token=None,
                     **kwargs):
         """
-        Builds the :class:`Vocab` accoring to given iterator and other
-        information. Firstly, iterate over the `iterator` to construct a
-        :class:`collections.Counter` and used to init the as  :class:`Vocab`.
+        Builds the `Vocab` according to a given iterator and other information. It first iterates over the
+        `iterator` to construct a `collections.Counter` and uses it to initialize the `Vocab`.
 
         Args:
-            iterator (collections.Iterable): Iterator of tokens. Each element
-                should be a list of tokens if wordlevel vocab is needed.
-            max_size (int, optional): The max size of vocab, not including
-                special tokens. Default: None.
-            min_freq (int, optional): Ignore tokens whose frequencies are less
-                than `min_freq`. Default: 1.
-            token_to_idx (dict, optional): A dict specifies the mapping
-                relationship between tokens and indices to be used. If provided,
-                adjust the tokens and indices mapping according to it. If None,
-                counter must be provided. Default: None.
-            unk_token (str, optional): The special token for unknow token
-                '<unk>'. If no need, it also could be None. Default: None.
-            pad_token (str, optional): The special token for padding token
-                '<pad>'. If no need, it also could be None. Default: None.
-            bos_token (str, optional): The special token for bos token '<bos>'.
-                If no need, it also could be None. Default: None.
-            eos_token (str, optional): The special token for eos token '<eos>'.
-                If no need, it also could be None. Default: None.
-
-            kwargs (dict): Keyword arguments ending with `_token`. It can be
-                used to specify further special tokens that will be exposed as
-                attribute of the vocabulary and associated with an index.
+            iterator (collections.Iterable): Iterator of tokens. Each element should be a list of tokens if
+                word-level vocab is needed.
+            max_size (int, optional): The max size of vocab, not including special tokens. Default: None.
+            min_freq (int, optional): Ignore tokens whose frequencies are less than `min_freq`. Default: 1.
+            token_to_idx (dict, optional): A dict specifying the mapping relationship between tokens and
+                indices to be used. If provided, adjust the tokens and indices mapping according to it.
+                If None, counter must be provided. Default: None.
+            unk_token (str, optional): The special token for unknown tokens '<unk>'. If not needed, it can
+                be None. Default: None.
+            pad_token (str, optional): The special token for padding tokens '<pad>'. If not needed, it can
+                be None. Default: None.
+            bos_token (str, optional): The special token for beginning of sentence (BOS) token '<bos>'.
+                If not needed, it can be None. Default: None.
+            eos_token (str, optional): The special token for end of sentence (EOS) token '<eos>'.
+                If not needed, it can be None. Default: None.
+            kwargs (dict): Keyword arguments ending with '_token'. It can be used to specify further special
+                tokens that will be exposed as attributes of the vocabulary and associated with an index.
 
         Returns:
-            Vocab: An instance of :class:`Vocab` generated from given iterator
-            and other informations.
+            Vocab: An instance of `Vocab` generated from the given iterator and other information.
         """
         if iterator and isinstance(iterator[0], (list, tuple)):
             iterator = [token for line in iterator for token in line]
@@ -362,39 +336,38 @@ class Vocab(object):
         return vocab
 
     def save_vocabulary(self, path):
-        """Save the vocabulary to a file. """
+        """Save the vocabulary to a file."""
         with open(path, 'w') as writer:
             for idx in range(len(self.idx_to_token)):
                 writer.write(self.idx_to_token[idx] + '\n')
 
-    def load_vocabulary(vocab_file,
+    @classmethod
+    def load_vocabulary(cls,
+                        vocab_file,
                         unk_token=None,
                         pad_token=None,
                         bos_token=None,
                         eos_token=None,
                         **kwargs):
         """
-        Builds the :class:`Vocab` from a file reserving all tokens by calling
-        :meth:`Vocab.from_dict` method. The file contains a token per line, and
-        the line index would be the index of corresponding token.
+        Builds the `Vocab` from a file, preserving all tokens by calling the `from_dict` method.
+        The file contains a token per line, and the line index would be the index of the corresponding token.
 
         Args:
-            filepath (str): the path of file to construct vocabulary.
-            unk_token (str, optional): special token for unknown token. If no
-                need, it also could be None. Default: None.
-            pad_token (str, optional): special token for padding token. If no
-                need, it also could be None. Default: None.
-            bos_token (str, optional): special token for bos token. If no need,
-                it also could be None. Default: None.
-            eos_token (str, optional): special token for eos token. If no need,
-                it also could be None. Default: None.
-
-            kwargs (dict): Keyword arguments ending with `_token`. It can be
-                used to specify further special tokens that will be exposed as
-                attribute of the vocabulary and associated with an index.
+            vocab_file (str): The path of the file used to construct the vocabulary.
+            unk_token (str, optional): The special token for unknown tokens '<unk>'. If not needed, it can
+                be None. Default: None.
+            pad_token (str, optional): The special token for padding tokens '<pad>'. If not needed, it can
+                be None. Default: None.
+            bos_token (str, optional): The special token for beginning of sentence (BOS) token '<bos>'.
+                If not needed, it can be None. Default: None.
+            eos_token (str, optional): The special token for end of sentence (EOS) token '<eos>'.
+                If not needed, it can be None. Default: None.
+            kwargs (dict): Keyword arguments ending with '_token'. It can be used to specify further special
+                tokens that will be exposed as attributes of the vocabulary and associated with an index.
 
         Returns:
-            Vocab: An instance of :class:`Vocab` generated from the given file.
+            Vocab: An instance of `Vocab` generated from the given file.
         """
 
         token_lst = []
@@ -406,26 +379,26 @@ class Vocab(object):
                 vocab[token] = index
         token_lst = list(vocab.keys())
         token_to_idx = {token: idx for idx, token in enumerate(token_lst)}
-        vocab = Vocab.from_dict(token_to_idx,
-                                unk_token=unk_token,
-                                pad_token=pad_token,
-                                bos_token=bos_token,
-                                eos_token=eos_token,
-                                **kwargs)
+        vocab = cls.from_dict(token_to_idx,
+                              unk_token=unk_token,
+                              pad_token=pad_token,
+                              bos_token=bos_token,
+                              eos_token=eos_token,
+                              **kwargs)
         return vocab
 
     def get_unk_token_id(self):
-        return self.token_to_idx[
-            self.unk_token] if self.unk_token is not None else self.unk_token
+        return self.token_to_idx.get(
+            self.unk_token) if self.unk_token is not None else None
 
     def get_bos_token_id(self):
-        return self.token_to_idx[
-            self.bos_token] if self.bos_token is not None else self.bos_token
+        return self.token_to_idx.get(
+            self.bos_token) if self.bos_token is not None else None
 
     def get_eos_token_id(self):
-        return self.token_to_idx[
-            self.eos_token] if self.eos_token is not None else self.eos_token
+        return self.token_to_idx.get(
+            self.eos_token) if self.eos_token is not None else None
 
     def get_pad_token_id(self):
-        return self.token_to_idx[
-            self.pad_token] if self.pad_token is not None else self.pad_token
+        return self.token_to_idx.get(
+            self.pad_token) if self.pad_token is not None else None

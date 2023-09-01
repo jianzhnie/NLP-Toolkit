@@ -8,6 +8,7 @@ Description:
 '''
 
 import re
+from typing import List, Union
 
 import jieba
 
@@ -25,15 +26,49 @@ class BaseTokenizer(object):
         pass
 
 
-class Tokenizer(object):
-    """Split text lines into word or character tokens.
+class Tokenizer:
+    """
+    Tokenizes text lines into word or character tokens.
+
+    Args:
+        lang (str, optional): Language identifier. Default is 'en'.
+
+    Attributes:
+        lang (str): Language identifier.
+
+    Usage:
+    ```
+    tokenizer = Tokenizer()
+    tokens = tokenizer.tokenize("Hello, World!", token='word')
+    ```
 
     Defined in :numref:`sec_utils`
     """
-    def __init__(self, lang):
+    def __init__(self, lang: str = 'en'):
         self.lang = lang
 
-    def tokenize(self, sentence, token='word'):
+    def tokenize(self,
+                 sentence: str,
+                 token: str = 'word') -> Union[List[str], List[List[str]]]:
+        """
+        Tokenize the input sentence into word or character tokens.
+
+        Args:
+            sentence (str): The input sentence to tokenize.
+            token (str, optional): Token type. Either 'word' or 'char'. Default is 'word'.
+
+        Returns:
+            Union[List[str], List[List[str]]]: A list of tokens.
+
+        Raises:
+            ValueError: If an unknown token type is provided.
+
+        Usage:
+        ```
+        tokens = tokenizer.tokenize("Hello, World!", token='word')
+        ```
+
+        """
         sentence = re.sub(r"[\*\"“”\n\\…\+\-\/\=\(\)‘•:\[\]\|’\!;]", ' ',
                           str(sentence))
         sentence = re.sub(r'[ ]+', ' ', sentence)
@@ -41,17 +76,13 @@ class Tokenizer(object):
         sentence = re.sub(r'\,+', ',', sentence)
         sentence = re.sub(r'\?+', '?', sentence)
         sentence = sentence.lower()
-        assert token in ('word', 'char'), 'Unknown token type: ' + token
-        return [
-            line.split() if token == 'word' else list(line)
-            for line in sentence
-        ]
 
-
-def get_idx_from_word(word, word_to_idx, unk_word):
-    if word in word_to_idx:
-        return word_to_idx[word]
-    return word_to_idx[unk_word]
+        if token == 'word':
+            return sentence.split()
+        elif token == 'char':
+            return [list(word) for word in sentence.split()]
+        else:
+            raise ValueError('Unknown token type: ' + token)
 
 
 class JiebaTokenizer(BaseTokenizer):
@@ -150,7 +181,13 @@ class JiebaTokenizer(BaseTokenizer):
                 # [1170578, 575565]
         """
         words = self.cut(sentence, cut_all, use_hmm)
+
         return [
-            get_idx_from_word(word, self.vocab.token_to_idx,
-                              self.vocab.unk_token) for word in words
+            self.get_idx_from_word(word, self.vocab.token_to_idx,
+                                   self.vocab.unk_token) for word in words
         ]
+
+    def get_idx_from_word(self, word, word_to_idx, unk_word):
+        if word in word_to_idx:
+            return word_to_idx[word]
+        return word_to_idx[unk_word]
