@@ -204,7 +204,7 @@ def train(model: nn.Module,
 def main():
     train_ds, dev_ds = load_dataset('chnsenticorp', splits=['train', 'dev'])
     num_classes = len(train_ds.label_list)
-    vocab_path = '/home/robin/work_dir/llm/nlp-toolkit/data/dict.txt'
+    vocab_path = '/home/robin/work_dir/llm/nlp-toolkit/data/word_vocab.txt'
     lm_vocab = Vocab.load_vocabulary(vocab_path,
                                      unk_token='[UNK]',
                                      pad_token='[PAD]')

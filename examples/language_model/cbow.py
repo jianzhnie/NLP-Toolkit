@@ -6,12 +6,14 @@ LastEditors: jianzhnie
 Description:
 
 '''
-# Defined in Section 5.2.3.1
+import sys
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
+sys.path.append('../../')
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
 from nlptoolkit.datasets.nlmdataset import CbowDataset
