@@ -11,59 +11,83 @@ import math
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.nn import init
 
 from .function import RNNReLUCell, RNNTanhCell
 
 
-def _get_activation_fn(activation):
-    if activation == 'relu':
-        return F.relu
-    elif activation == 'tanh':
-        return F.tanh
-
-    raise RuntimeError(
-        'activation should be relu/tanh, not {}'.format(activation))
-
-
 class NaiveCustomRNN(nn.Module):
     """
+    A custom implementation of a simple RNN layer.
     - 𝐇𝑡=𝜙(𝐗𝑡𝐖𝑥ℎ+𝐇𝑡−1𝐖ℎℎ+𝐛ℎ).
     - 𝐎𝑡=𝐇𝑡𝐖ℎ𝑞+𝐛𝑞.
+
+    Args:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+
+    Attributes:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+        W_xh (nn.Parameter): Weight matrix for input-to-hidden connections.
+        W_hh (nn.Parameter): Weight matrix for hidden-to-hidden connections.
+        b_h (nn.Parameter): Bias for hidden state.
+        W_hq (nn.Parameter): Weight matrix for hidden-to-output connections.
+        b_q (nn.Parameter): Bias for output.
 
     Reference:
         https://d2l.ai
     """
+
     def __init__(self, input_size, hidden_size):
         super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # 隐藏层参数
+        # Hidden layer parameters
         self.W_xh = nn.Parameter(torch.Tensor(input_size, hidden_size))
         self.W_hh = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_h = nn.Parameter(torch.Tensor(hidden_size))
 
-        # 输出层参数
+        # Output layer parameters
         self.W_hq = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_q = nn.Parameter(torch.Tensor(hidden_size))
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
+        """
+        Initialize weights and biases with uniform random values.
+
+        Weight initialization follows the Xavier initialization scheme.
+
+        Returns:
+            None
+        """
         stdv = 1.0 / math.sqrt(self.hidden_size)
         for weight in self.parameters():
-            init.uniform_(weight, -stdv, stdv)
+            nn.init.uniform_(weight, -stdv, stdv)
 
-    def forward(self, input, hx):
+    def forward(self, input, hx=None):
+        """
+        Forward pass of the RNN layer.
+
+        Args:
+            input (torch.Tensor): The input tensor of shape (batch_size, input_size).
+            hx (torch.Tensor, optional): The initial hidden state tensor of shape (batch_size, hidden_size).
+                If not provided, it is initialized as zeros.
+
+        Returns:
+            out (torch.Tensor): The output tensor of shape (batch_size, hidden_size).
+            hy (torch.Tensor): The updated hidden state tensor of shape (batch_size, hidden_size).
+        """
         if hx is None:
-            hx = Variable(input.new_zeros(input.size(0), self.hidden_size))
+            hx = input.new_zeros(input.size(0), self.hidden_size)
+
         hy = torch.mm(input, self.W_xh) + torch.mm(hx, self.W_hh) + self.b_h
         hy = torch.tanh(hy)
         out = torch.mm(hy, self.W_hq) + self.b_q
+
         return out, hy
 
 
