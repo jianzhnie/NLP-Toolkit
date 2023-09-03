@@ -101,8 +101,6 @@ def train_one_epoch(
     start_time = time.time()
     for idx, batch in enumerate(train_data):
         inputs, targets = batch
-        print(inputs.shape)
-        print(targets.shape)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         model.zero_grad()
@@ -125,8 +123,7 @@ def train_one_epoch(
             print(
                 '| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                 'loss {:5.2f} | ppl {:8.2f}'.format(
-                    epoch, idx,
-                    len(train_data) // args.bptt, lr,
+                    epoch, idx, len(train_data), lr,
                     elapsed * 1000 / args.log_interval, cur_loss,
                     math.exp(cur_loss)))
             total_loss = 0
@@ -144,8 +141,16 @@ def evaluate(model, eval_data, criterion, vocab_size, args):
             if args.model == 'Transformer':
                 output = model(data)
                 output = output.view(-1, vocab_size)
-            total_loss += len(data) * criterion(output, targets).item()
-    return total_loss
+                cur_loss = criterion(output, targets)
+
+            total_loss += cur_loss.item()
+            if idx % args.log_interval == 0 and idx > 0:
+                cur_loss = total_loss / args.log_interval
+                print('Val | {:5d}/{:5d} batches |'
+                      'loss {:5.2f} | ppl {:8.2f}'.format(
+                          idx, len(eval_data), cur_loss, math.exp(cur_loss)))
+                total_loss = 0
+    return total_loss / len(eval_data)
 
 
 def train_and_evaluate(model, train_data, eval_data, criterion, lr, epoch,
@@ -215,7 +220,6 @@ def main():
         model = RNNModel(args.model, vocab_size, args.d_model,
                          args.num_hidden_size, args.num_layers, args.dropout,
                          args.tied).to(device)
-    print(model)
     criterion = nn.NLLLoss()
 
     train_and_evaluate(model,
@@ -226,9 +230,6 @@ def main():
                        epoch=args.epochs,
                        vocab_size=vocab_size,
                        args=args)
-
-    for i in range(10):
-        print(train_dataset[i])
 
 
 if __name__ == '__main__':
