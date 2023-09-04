@@ -20,61 +20,101 @@ from .rnn import RNNCellBase
 
 class NaiveCustomGRU(nn.Module):
     """
+    A custom implementation of a GRU (Gated Recurrent Unit) layer.
+
     - 𝐑𝑡=𝜎(𝐗𝑡𝐖𝑥𝑟+𝐇𝑡−1𝐖ℎ𝑟+𝐛𝑟),
     - 𝐙𝑡=𝜎(𝐗𝑡𝐖𝑥𝑧+𝐇𝑡−1𝐖ℎ𝑧+𝐛𝑧),
     - 𝐇̃𝑡=tanh(𝐗𝑡𝐖𝑥ℎ+(𝐑𝑡⊙𝐇𝑡−1)𝐖ℎℎ+𝐛ℎ)
     - 𝐇𝑡=𝐙𝑡⊙𝐇𝑡−1+(1−𝐙𝑡)⊙𝐇̃ 𝑡.
 
+    
+    Args:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+
+    Attributes:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+        W_xz (nn.Parameter): Weight matrix for the update gate.
+        W_hz (nn.Parameter): Weight matrix for the hidden-to-hidden update gate.
+        b_z (nn.Parameter): Bias for the update gate.
+        W_xr (nn.Parameter): Weight matrix for the reset gate.
+        W_hr (nn.Parameter): Weight matrix for the hidden-to-hidden reset gate.
+        b_r (nn.Parameter): Bias for the reset gate.
+        W_xh (nn.Parameter): Weight matrix for the candidate hidden state.
+        W_hh (nn.Parameter): Weight matrix for the hidden-to-hidden candidate hidden state.
+        b_h (nn.Parameter): Bias for the candidate hidden state.
+        W_hq (nn.Parameter): Weight matrix for the hidden-to-output connections.
+        b_q (nn.Parameter): Bias for the output.
 
     Reference:
         https://d2l.ai
     """
-    def __init__(self, input_size, hidden_size):
-        super().__init__()
 
+    def __init__(self, input_size: int, hidden_size: int):
+        super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # 更新门参数 z_gate
+        # Update gate parameters (z_gate)
         self.W_xz = nn.Parameter(torch.Tensor(input_size, hidden_size))
         self.W_hz = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_z = nn.Parameter(torch.Tensor(hidden_size))
 
-        # 重置门参数 r_gate
+        # Reset gate parameters (r_gate)
         self.W_xr = nn.Parameter(torch.Tensor(input_size, hidden_size))
         self.W_hr = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_r = nn.Parameter(torch.Tensor(hidden_size))
 
-        # 候选隐状态参数
+        # Candidate hidden state parameters (h_tilda)
         self.W_xh = nn.Parameter(torch.Tensor(input_size, hidden_size))
         self.W_hh = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_h = nn.Parameter(torch.Tensor(hidden_size))
 
-        # 输出层参数
+        # Output parameters
         self.W_hq = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_q = nn.Parameter(torch.Tensor(hidden_size))
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
+        """
+        Initialize weights and biases with uniform random values.
+
+        Weight initialization follows the Xavier initialization scheme.
+
+        Returns:
+            None
+        """
         stdv = 1.0 / math.sqrt(self.hidden_size)
         for weight in self.parameters():
-            init.uniform_(weight, -stdv, stdv)
+            nn.init.uniform_(weight, -stdv, stdv)
 
     def forward(self, input, hx):
+        """
+        Forward pass of the GRU layer.
+
+        Args:
+            input (torch.Tensor): The input tensor of shape (batch_size, input_size).
+            hx (torch.Tensor): The initial hidden state tensor of shape (batch_size, hidden_size).
+
+        Returns:
+            out (torch.Tensor): The output tensor of shape (batch_size, hidden_size).
+            hy (torch.Tensor): The final hidden state tensor of shape (batch_size, hidden_size).
+        """
         if hx is None:
-            hx = Variable(input.new_zeros(input.size(0), self.hidden_size))
-        z_gate = torch.sigmoid(
-            torch.mm(input, self.W_xz) + torch.mm(hx, self.W_hz) + self.b_z)
-        r_gate = torch.sigmoid(
-            torch.mm(input, self.W_xr) + torch.mm(hx, self.W_hr) + self.b_r)
-        # 候选隐状态
-        h_tilda = torch.tanh(
-            torch.mm(input, self.W_xh) + torch.mm(r_gate * hx, self.W_hh) +
-            self.b_h)
-        # 隐状态
+            hx = input.new_zeros(input.size(0), self.hidden_size)
+        
+        z_gate = torch.sigmoid(torch.mm(input, self.W_xz) + torch.mm(hx, self.W_hz) + self.b_z)
+        r_gate = torch.sigmoid(torch.mm(input, self.W_xr) + torch.mm(hx, self.W_hr) + self.b_r)
+        
+        # Candidate hidden state
+        h_tilda = torch.tanh(torch.mm(input, self.W_xh) + torch.mm(r_gate * hx, self.W_hh) + self.b_h)
+        
+        # Hidden state
         hy = z_gate * hx + (1 - z_gate) * h_tilda
         out = torch.mm(hy, self.W_hq) + self.b_q
+        
         return out, hy
 
 
