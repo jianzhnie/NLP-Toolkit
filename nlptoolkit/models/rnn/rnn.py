@@ -6,8 +6,6 @@ LastEditors: jianzhnie
 Description:
 
 '''
-
-import math
 from typing import Tuple
 
 import torch
@@ -16,8 +14,7 @@ import torch.nn as nn
 
 class RNNTanhCell(nn.Module):
     """
-    A custom implementation of a simple RNN Cell layer.
-    - 𝐇𝑡=𝜙(𝐗𝑡𝐖𝑥ℎ+𝐇𝑡−1𝐖ℎℎ+𝐛ℎ).
+    A custom implementation of a simple RNN Cell layer using tanh activation.
 
     Args:
         input_size (int): The number of expected features in the input.
@@ -32,14 +29,10 @@ class RNNTanhCell(nn.Module):
         b_hh (nn.Parameter): Bias for hidden state.
 
     Example usage:
-    ```python
-        rnn_cell = NaiveRNNCell(input_size=64, hidden_size=128)
+        rnn_cell = RNNTanhCell(input_size=64, hidden_size=128)
         input_data = torch.randn(32, 64)  # Batch size of 32, input size of 64
         hidden_state = torch.zeros(32, 128)  # Initial hidden state
-        output, new_hidden_state = rnn_cell(input_data, hidden_state)
-    ```
-    Reference:
-        https://d2l.ai
+        new_hidden_state = rnn_cell(input_data, hidden_state)
     """
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
@@ -64,7 +57,8 @@ class RNNTanhCell(nn.Module):
         Returns:
             None
         """
-        stdv = 1.0 / math.sqrt(self.hidden_size)
+        stdv = 1.0 / torch.sqrt(
+            torch.tensor(self.hidden_size, dtype=torch.float32))
         for weight in self.parameters():
             nn.init.uniform_(weight, -stdv, stdv)
 
@@ -78,7 +72,7 @@ class RNNTanhCell(nn.Module):
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, input_size).
             hidden (torch.Tensor, optional): The initial hidden state tensor of shape (batch_size, hidden_size).
-                If not provided, it is initialized as zeros.
+                If not provided, it is initialized with zeros.
 
         Returns:
             out (torch.Tensor): The output tensor of shape (batch_size, hidden_size).
@@ -96,7 +90,7 @@ class RNNTanhCell(nn.Module):
 
 class RNNBase(nn.Module):
     """
-    Custom RNN model implemented using NaiveRNNCell.
+    Custom RNNBase model implemented using RNNTanhCell.
 
     Args:
         input_size (int): The size of the input features.
@@ -106,18 +100,15 @@ class RNNBase(nn.Module):
         input_size (int): The size of the input features.
         hidden_size (int): The size of the hidden state.
         rnn_cells (nn.ModuleList): List of RNN cells.
-        fc (nn.Linear): Fully connected layer for output.
 
     Methods:
         forward(input, hidden): Perform the forward pass of the RNN model.
 
     Example usage:
-    ```python
         rnn_model = RNNBase(input_size=64, hidden_size=128)
         input_data = torch.randn(32, 10, 64)
         # Batch size of 32, sequence length of 10, input size of 64
         output, final_hidden_state = rnn_model(input_data)
-    ```
     """
     def __init__(self, input_size: int, hidden_size: int):
         super(RNNBase, self).__init__()
@@ -136,15 +127,15 @@ class RNNBase(nn.Module):
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).
-            hidden (torch.Tensor, optional): Initial hidden state tensor of shape (num_layers, batch, hidden_size).
+            hidden (torch.Tensor, optional): Initial hidden state tensor of shape (batch, hidden_size).
                 Defaults to None, in which case it is initialized with zeros.
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Tuple containing:
                 - output (torch.Tensor): Output tensor of shape (batch, sequence, hidden_size).
-                - final_hidden (torch.Tensor): Final hidden state tensor of shape (num_layers, batch, hidden_size).
+                - final_hidden (torch.Tensor): Final hidden state tensor of shape (batch, hidden_size).
         """
-        bs, seq_sz, _ = input.size()
+        bs, seq_len, hidden_size = input.size()
 
         if hidden is None:
             # Initialize hidden state with zeros
@@ -154,14 +145,14 @@ class RNNBase(nn.Module):
         output = []
 
         # Forward pass through RNN layers
-        for t in range(seq_sz):
+        for t in range(seq_len):
             x_t = input[:, t, :]
             # Pass the input through the current RNN layer
             hidden = self.rnn_cell(x_t, hidden)
             output.append(hidden[0] if isinstance(hidden, tuple) else hidden)
 
         # Concatenate and stack the hidden states
-        output = torch.cat(output, dim=0).view(bs, seq_sz, -1)
+        output = torch.cat(output, dim=0).view(bs, seq_len, -1)
         return output, hidden
 
 
