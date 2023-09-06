@@ -12,11 +12,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-
-from .function import LSTMCell as lstmcell
-from .rnn import RNNCellBase
 
 WEIGHT_INIT_RANGE = 0.1
 
@@ -72,7 +68,6 @@ class NaiveCustomLSTM(nn.Module):
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
     """
-
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
         self.input_size = input_size
@@ -145,9 +140,12 @@ class NaiveCustomLSTM(nn.Module):
         for t in range(seq_sz):
             x_t = x[:, t, :]
 
-            input_gate = torch.sigmoid(x_t @ self.W_xi + h_t @ self.W_hi + self.b_i)
-            forget_gate = torch.sigmoid(x_t @ self.W_xf + h_t @ self.W_hf + self.b_f)
-            output_gate = torch.sigmoid(x_t @ self.W_xo + h_t @ self.W_ho + self.b_o)
+            input_gate = torch.sigmoid(x_t @ self.W_xi + h_t @ self.W_hi +
+                                       self.b_i)
+            forget_gate = torch.sigmoid(x_t @ self.W_xf + h_t @ self.W_hf +
+                                        self.b_f)
+            output_gate = torch.sigmoid(x_t @ self.W_xo + h_t @ self.W_ho +
+                                        self.b_o)
 
             C_tilda = torch.tanh(x_t @ self.W_xc + h_t @ self.W_hc + self.b_c)
 
@@ -160,102 +158,6 @@ class NaiveCustomLSTM(nn.Module):
         hidden_seq = torch.cat(hidden_seq, dim=0)
         hidden_seq = hidden_seq.transpose(0, 1).contiguous()
         return hidden_seq, (h_t, c_t)
-
-class LSTMCell(RNNCellBase):
-    r"""A long short-term memory (LSTM) cell.
-
-    .. math::
-
-        \begin{array}{ll}
-        i = \sigma(W_{ii} x + b_{ii} + W_{hi} h + b_{hi}) \\
-        f = \sigma(W_{if} x + b_{if} + W_{hf} h + b_{hf}) \\
-        g = \tanh(W_{ig} x + b_{ig} + W_{hg} h + b_{hg}) \\
-        o = \sigma(W_{io} x + b_{io} + W_{ho} h + b_{ho}) \\
-        c' = f * c + i * g \\
-        h' = o \tanh(c') \\
-        \end{array}
-
-    where :math:`\sigma` is the sigmoid function.
-
-    Args:
-        input_size: The number of expected features in the input `x`
-        hidden_size: The number of features in the hidden state `h`
-        bias: If `False`, then the layer does not use bias weights `b_ih` and
-            `b_hh`. Default: ``True``
-
-    Inputs: input, (h_0, c_0)
-        - **input** of shape `(batch, input_size)`: tensor containing input features
-        - **h_0** of shape `(batch, hidden_size)`: tensor containing the initial hidden
-          state for each element in the batch.
-        - **c_0** of shape `(batch, hidden_size)`: tensor containing the initial cell state
-          for each element in the batch.
-
-          If `(h_0, c_0)` is not provided, both **h_0** and **c_0** default to zero.
-
-    Outputs: h_1, c_1
-        - **h_1** of shape `(batch, hidden_size)`: tensor containing the next hidden state
-          for each element in the batch
-        - **c_1** of shape `(batch, hidden_size)`: tensor containing the next cell state
-          for each element in the batch
-
-    Attributes:
-        weight_ih: the learnable input-hidden weights, of shape
-            `(4*hidden_size x input_size)`
-        weight_hh: the learnable hidden-hidden weights, of shape
-            `(4*hidden_size x hidden_size)`
-        bias_ih: the learnable input-hidden bias, of shape `(4*hidden_size)`
-        bias_hh: the learnable hidden-hidden bias, of shape `(4*hidden_size)`
-
-    Examples::
-
-        >>> rnn = nn.LSTMCell(10, 20)
-        >>> input = torch.randn(6, 3, 10)
-        >>> hx = torch.randn(3, 20)
-        >>> cx = torch.randn(3, 20)
-        >>> output = []
-        >>> for i in range(6):
-                hx, cx = rnn(input[i], (hx, cx))
-                output.append(hx)
-    """
-    def __init__(self, input_size, hidden_size, bias=True):
-        super(LSTMCell, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.bias = bias
-        self.weight_ih = nn.Parameter(torch.Tensor(4 * hidden_size,
-                                                   input_size))
-        self.weight_hh = nn.Parameter(
-            torch.Tensor(4 * hidden_size, hidden_size))
-        if bias:
-            self.bias_ih = nn.Parameter(torch.Tensor(4 * hidden_size))
-            self.bias_hh = nn.Parameter(torch.Tensor(4 * hidden_size))
-        else:
-            self.register_parameter('bias_ih', None)
-            self.register_parameter('bias_hh', None)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        stdv = 1.0 / math.sqrt(self.hidden_size)
-        for weight in self.parameters():
-            weight.data.uniform_(-stdv, stdv)
-
-    def forward(self, input, hx=None):
-        self.check_forward_input(input)
-        if hx is None:
-            hx = input.new_zeros(input.size(0),
-                                 self.hidden_size,
-                                 requires_grad=False)
-            hx = (hx, hx)
-        self.check_forward_hidden(input, hx[0], '[0]')
-        self.check_forward_hidden(input, hx[1], '[1]')
-        return lstmcell(
-            input,
-            hx,
-            self.weight_ih,
-            self.weight_hh,
-            self.bias_ih,
-            self.bias_hh,
-        )
 
 
 class CustomLSTM(nn.Module):
