@@ -69,14 +69,22 @@ class Tokenizer:
         ```
 
         """
+        # 将句子中的特殊字符（如星号、引号、换行符、反斜杠、加号、减号、斜杠、等号、括号、单引号、冒号、方括号、竖线、感叹号和分号）
+        # 替换为一个空格。
+
         sentence = re.sub(r"[\*\"“”\n\\…\+\-\/\=\(\)‘•:\[\]\|’\!;]", ' ',
                           str(sentence))
+        # 将连续多个空格替换为一个空格。这有助于将多个连续空格合并成一个。
         sentence = re.sub(r'[ ]+', ' ', sentence)
+        # 将连续多个感叹号替换为一个感叹号，类似地，后面的行也分别用于处理连续的逗号和问号。
         sentence = re.sub(r'\!+', '!', sentence)
         sentence = re.sub(r'\,+', ',', sentence)
         sentence = re.sub(r'\?+', '?', sentence)
+        # 替换非字母字符（包括数字、符号和空格）为一个空格。这将确保句子中只包含字母字符。
+        sentence = re.sub(r'[^A-Za-z]+', ' ', sentence)
+        # 将整个句子转换为小写字母，以确保文本的一致性，因为在自然语言处理任务中通常不区分大小写。
         sentence = sentence.lower()
-
+        # 接下来，根据指定的token类型，函数将句子分割成单词或字符，并返回结果：
         if token == 'word':
             return sentence.split()
         elif token == 'char':

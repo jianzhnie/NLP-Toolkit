@@ -137,12 +137,14 @@ class Vocab(object):
 
     def _index_counter_keys(self, counter, special_tokens, max_size, min_freq):
         # Sort by frequency, then alphabetically
-        token_freqs = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+        self.token_freqs = sorted(counter.items(),
+                                  key=lambda x: x[1],
+                                  reverse=True)
         # Frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         special_tokens = set(special_tokens)
         max_size = None if max_size is None else max_size + len(special_tokens)
-        for token, freq in token_freqs:
+        for token, freq in self.token_freqs:
             if freq < min_freq or len(self.idx_to_token) == max_size:
                 break
             if token not in special_tokens:
@@ -218,6 +220,7 @@ class Vocab(object):
         vocab_dict['idx_to_token'] = dict(self.idx_to_token)
         vocab_dict['token_to_idx'] = dict(self.token_to_idx)
         vocab_dict['special_token'] = self.special_token_dict
+        vocab_dict['token_freqs'] = self.token_freqs
         json_str = json.dumps(vocab_dict)
         if path:
             with io.open(path, 'w', encoding='utf-8') as f:
@@ -402,3 +405,6 @@ class Vocab(object):
     def get_pad_token_id(self):
         return self.token_to_idx.get(
             self.pad_token) if self.pad_token is not None else None
+
+    def get_token_freq(self):
+        return self.token_freqs
