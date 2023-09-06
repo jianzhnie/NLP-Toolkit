@@ -1,11 +1,39 @@
-'''
-Author: jianzhnie
-Date: 2021-12-29 16:07:11
-LastEditTime: 2022-01-04 10:37:58
-LastEditors: jianzhnie
-Description:
+"""
+在自然语言处理（NLP）和文本处理领域，有许多不同的词元化方法，常用的包括以下几种：
 
-'''
+1.空格分词（Whitespace Tokenization）：
+
+    将文本按照空格进行分割，将每个分割后的词作为一个词元。例如，"Hello world!"会被分割为[“Hello”, “world!”]。
+
+2.分词器（Tokenizer）：
+
+    使用专门的分词器工具，如NLTK（Natural Language Toolkit）或spaCy，在文本中识别和分割单词。这些分词器可以处理更复杂的分割规则，例如处理标点符号、缩写词等。
+
+3.n-gram分词：
+
+    将文本切分为连续的n个词的组合，这些组合称为n-gram。常见的是二元（bigram）和三元（trigram）分词。例如，"Hello world!"的bigram分词为[“Hello world”, “world!”]。
+
+4.字符级别分词（Character-level Tokenization）：
+
+    将文本按照字符进行分割，将每个字符作为一个词元。这种方法对于处理字符级别的任务（如拼写检查、机器翻译等）很有用。
+
+5.子词（Subword）分词：
+
+    将单词切分为更小的单元，如词根、前缀或后缀等。这种方法可以处理未登录词（out-of-vocabulary）问题，并且对于具有复杂形态的语言（如德语、芬兰语）也很有效。常见的子词分词算法有Byte-Pair Encoding（BPE）和SentencePiece。
+
+6.正则表达式分词（Regular Expression Tokenization）：
+
+    使用正则表达式来定义词元的分割规则。这样可以灵活地根据需要定义分割规则，适用于特定领域的文本处理任务。
+
+7.词干提取（Stemming）和词形还原（Lemmatization）：
+
+    词干提取和词形还原是将单词转换为其基本形式的方法，通常用于减少词汇的复杂性。它们可以与其他词元化方法结合使用。
+
+8.专业领域的自定义分词：
+
+    对于特定领域的文本，有时需要开发自定义的分词方法，以处理领域特有的术语和规则。
+这些词元化方法可以根据任务和语言的不同进行组合和调整，选择合适的方法有助于提高NLP应用的性能和效果。
+"""
 
 import re
 from typing import List, Union
