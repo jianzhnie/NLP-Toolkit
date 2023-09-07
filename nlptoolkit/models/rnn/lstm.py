@@ -145,6 +145,8 @@ class NaiveLSTMCell(nn.Module):
             )
         else:
             h_x, c_x = hidden
+            assert h_x.shape == c_x.shape
+            assert h_x.shape[1] == self.hidden_size
 
         # Input gate
         input_gate = torch.sigmoid(input @ self.W_xi + h_x @ self.W_hi +
@@ -177,7 +179,6 @@ class LSTMBase(nn.Module):
     Args:
         input_size (int): The number of expected features in the input.
         hidden_size (int): The number of features in the hidden state.
-        output_size (int): The number of features in the output.
 
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
@@ -186,13 +187,9 @@ class LSTMBase(nn.Module):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.output_size = output_size
 
         # LSTM cell
         self.lstm_cell = NaiveLSTMCell(input_size, hidden_size)
-
-        # Fully connected layer
-        self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(
         self,
@@ -208,7 +205,7 @@ class LSTMBase(nn.Module):
                 and cell state tensor of shape (batch_size, hidden_size). If not provided, they are initialized as zeros.
 
         Returns:
-            hidden_seq (torch.Tensor): The sequence of hidden states of shape (batch_size, sequence_size, hidden_size).
+            outputs (torch.Tensor): The sequence of hidden states of shape (batch_size, sequence_size, hidden_size).
             (h_x, c_x) (tuple): The final hidden state tensor of shape (batch_size, hidden_size)
                 and cell state tensor of shape (batch_size, hidden_size).
         """
@@ -222,7 +219,7 @@ class LSTMBase(nn.Module):
         else:
             h_x, c_x = hidden
 
-        hidden_seq = []
+        outputs = []
 
         for t in range(seq_len):
             x_t = input[:, t, :]
@@ -232,15 +229,11 @@ class LSTMBase(nn.Module):
 
             h_x, c_x = hy, cy
 
-            hidden_seq.append(hy.unsqueeze(0))
+            outputs.append(hy)
 
-        hidden_seq = torch.cat(hidden_seq, dim=0).view(bs, seq_len,
-                                                       self.hidden_size)
+        outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
 
-        # Apply fully connected layer to the hidden states
-        output = self.fc(hidden_seq)
-
-        return output, (h_x, c_x)
+        return outputs, (h_x, c_x)
 
 
 class CustomLSTM(nn.Module):
