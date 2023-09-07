@@ -8,11 +8,10 @@ Description:
 '''
 
 import math
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-from torch.nn import init
 
 
 class NaiveGRUCell(nn.Module):
@@ -41,8 +40,6 @@ class NaiveGRUCell(nn.Module):
         W_xh (nn.Parameter): Weight matrix for the candidate hidden state.
         W_hh (nn.Parameter): Weight matrix for the hidden-to-hidden candidate hidden state.
         b_h (nn.Parameter): Bias for the candidate hidden state.
-        W_hq (nn.Parameter): Weight matrix for the hidden-to-output connections.
-        b_q (nn.Parameter): Bias for the output.
 
     Reference:
         https://d2l.ai
@@ -67,10 +64,7 @@ class NaiveGRUCell(nn.Module):
         self.W_hh = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_h = nn.Parameter(torch.Tensor(hidden_size))
 
-        # Output parameters
-        self.W_hq = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
-        self.b_q = nn.Parameter(torch.Tensor(hidden_size))
-
+        # Initialize parameters
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -86,145 +80,177 @@ class NaiveGRUCell(nn.Module):
         for weight in self.parameters():
             nn.init.uniform_(weight, -stdv, stdv)
 
-    def forward(self, input, hx):
+    def forward(self,
+                input: torch.Tensor,
+                hx: torch.Tensor = None) -> torch.Tensor:
         """
-        Forward pass of the GRU layer.
+        Forward pass of the GRU cell.
 
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, input_size).
-            hx (torch.Tensor): The initial hidden state tensor of shape (batch_size, hidden_size).
+            hx (torch.Tensor, optional): The initial hidden state tensor of shape (batch_size, hidden_size).
+                If not provided, it is initialized as zeros.
 
         Returns:
-            out (torch.Tensor): The output tensor of shape (batch_size, hidden_size).
             hy (torch.Tensor): The final hidden state tensor of shape (batch_size, hidden_size).
         """
         if hx is None:
-            hx = input.new_zeros(input.size(0), self.hidden_size)
+            hx = input.new_zeros(input.size(0),
+                                 self.hidden_size).to(input.device)
 
-        z_gate = torch.sigmoid(
-            torch.mm(input, self.W_xz) + torch.mm(hx, self.W_hz) + self.b_z)
-        r_gate = torch.sigmoid(
+        # Reset gate
+        reset_gate = torch.sigmoid(
             torch.mm(input, self.W_xr) + torch.mm(hx, self.W_hr) + self.b_r)
+
+        # Update gate
+        update_gate = torch.sigmoid(
+            torch.mm(input, self.W_xz) + torch.mm(hx, self.W_hz) + self.b_z)
 
         # Candidate hidden state
         h_tilda = torch.tanh(
-            torch.mm(input, self.W_xh) + torch.mm(r_gate * hx, self.W_hh) +
+            torch.mm(input, self.W_xh) + torch.mm(reset_gate * hx, self.W_hh) +
             self.b_h)
 
         # Hidden state
-        hy = z_gate * hx + (1 - z_gate) * h_tilda
-        out = torch.mm(hy, self.W_hq) + self.b_q
-
-        return out, hy
-
-
-class GRUBase(nn.Module):
-    def __init__(self, input_size, hidden_size, bias=True):
-        super(GRUBase, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.bias = bias
-
-        self.input2hidden = nn.Linear(input_size, 3 * hidden_size, bias=bias)
-        self.hidden2hidden = nn.Linear(hidden_size, 3 * hidden_size, bias=bias)
-
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        stdv = 1.0 / math.sqrt(self.hidden_size)
-        for weight in self.parameters():
-            init.uniform_(weight, -stdv, stdv)
-
-    def forward(self, input, hx=None):
-        """
-        Inputs:
-              input: of shape (batch_size, input_size)
-              hx: of shape (batch_size, hidden_size)
-        Output:
-              hy: of shape (batch_size, hidden_size)
-        """
-
-        if hx is None:
-            hx = Variable(input.new_zeros(input.size(0), self.hidden_size))
-
-        x_t = self.input2hidden(input)
-        h_t = self.hidden2hidden(hx)
-
-        x_reset, x_upd, x_new = x_t.chunk(3, 1)
-        h_reset, h_upd, h_new = h_t.chunk(3, 1)
-
-        reset_gate = torch.sigmoid(x_reset + h_reset)
-        update_gate = torch.sigmoid(x_upd + h_upd)
-        new_gate = torch.tanh(x_new + (reset_gate * h_new))
-
-        hy = update_gate * hx + (1 - update_gate) * new_gate
+        hy = update_gate * hx + (1 - update_gate) * h_tilda
 
         return hy
 
 
-class GRU(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, bias, output_size):
-        super(GRU, self).__init__()
+class GRULayer(nn.Module):
+    """
+    A custom implementation of a GRU layer.
+
+    Args:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+
+    Reference:
+        https://github.com/piEsposito/pytorch-lstm-by-hand
+    """
+    def __init__(self, input_size: int, hidden_size: int):
+        super(GRULayer, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+
+        # GRU cell
+        self.gru_cell = NaiveGRUCell(input_size, hidden_size)
+
+    def forward(
+        self,
+        input: torch.Tensor,
+        hidden: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the GRU layer.
+
+        Args:
+            input (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
+            hidden (torch.Tensor, optional): The initial hidden state tensor of shape (batch_size, hidden_size).
+                If not provided, it is initialized as zeros.
+
+        Returns:
+            outputs (torch.Tensor): The sequence of hidden states of shape (batch_size, sequence_size, hidden_size).
+            hy (torch.Tensor): The final hidden state tensor of shape (batch_size, hidden_size).
+        """
+        bs, seq_len, _ = input.size()
+
+        if hidden is None:
+            # Initialize hidden state with zeros
+            hidden = torch.zeros(bs, self.hidden_size).to(input.device)
+
+        outputs = []
+
+        # Forward pass through RNN layers through time
+        for t in range(seq_len):
+            x_t = input[:, t, :]
+
+            # GRU cell forward pass
+            hidden = self.gru_cell(x_t, hidden)
+            outputs.append(hidden)
+
+        outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
+
+        return outputs, hidden
+
+
+class MultiLayerGRU(nn.Module):
+    """
+    Multi-layer GRU model implemented using multiple GRULayer layers.
+
+    Args:
+        input_size (int): The size of the input features.
+        hidden_size (int): The size of the hidden state.
+        num_layers (int): The number of GRU layers to stack.
+
+    Example usage:
+    ```python
+        gru_model = MultiLayerGRU(input_size=64, hidden_size=128, num_layers=2)
+        input_data = torch.randn(32, 10, 64)
+        # Batch size of 32, sequence length of 10, input size of 64
+        output, layer_hidden_states = gru_model(input_data)
+    ```
+    """
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1):
+        super(MultiLayerGRU, self).__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.bias = bias
-        self.output_size = output_size
 
-        self.rnn_cell_list = nn.ModuleList()
+        # Create a list of GRU cells for each layer
+        self.rnn_model = nn.ModuleList(
+            [NaiveGRUCell(input_size, hidden_size) for _ in range(num_layers)])
 
-        self.rnn_cell_list.append(
-            GRUBase(self.input_size, self.hidden_size, self.bias))
-        for layer in range(1, self.num_layers):
-            self.rnn_cell_list.append(
-                GRUBase(self.hidden_size, self.hidden_size, self.bias))
-        self.fc = nn.Linear(self.hidden_size, self.output_size)
+    def forward(
+        self,
+        input: torch.Tensor,
+        hidden: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Perform the forward pass of the multi-layer GRU model.
 
-    def forward(self, input, hx=None):
+        Args:
+            input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).
+            hidden (torch.Tensor, optional): Initial hidden state tensor of shape (batch, num_layers, hidden_size).
+                If not provided, it is initialized with zeros.
 
-        # Input of shape (batch_size, seqence length, input_size)
-        #
-        # Output of shape (batch_size, output_size)
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Tuple containing:
+                - output (torch.Tensor): Output tensor of shape (batch, sequence, hidden_size).
+                - layer_hidden_states (torch.Tensor): Hidden state tensor of shape (batch, num_layers, hidden_size)
+                    at the final layer.
+        """
+        bs, seq_len, _ = input.size()
 
-        if hx is None:
-            if torch.cuda.is_available():
-                h0 = Variable(
-                    torch.zeros(self.num_layers, input.size(0),
-                                self.hidden_size).cuda())
-            else:
-                h0 = Variable(
-                    torch.zeros(self.num_layers, input.size(0),
-                                self.hidden_size))
-
+        if hidden is None:
+            # Initialize hidden state with zeros
+            hidden = torch.zeros(bs, self.num_layers,
+                                 self.hidden_size).to(input.device)
         else:
-            h0 = hx
+            _, num_layers, _ = hidden.size()
+            assert num_layers == self.num_layers, 'Number of layers mismatch'
 
-        outs = []
+        outputs = []
+        layer_hidden_states = []
 
-        hidden = list()
-        for layer in range(self.num_layers):
-            hidden.append(h0[layer, :, :])
+        for t in range(seq_len):
+            x_t = input[:, t, :]
 
-        for t in range(input.size(1)):
+            for layer_idx in range(self.num_layers):
+                rnn_cell = self.rnn_model[layer_idx]
+                hy = rnn_cell(x_t, hidden[:, layer_idx])
+                hidden[:, layer_idx] = hy
 
-            for layer in range(self.num_layers):
+                # Store the hidden state of every layer
+                layer_hidden_states.append(hy)
 
-                if layer == 0:
-                    hidden_l = self.rnn_cell_list[layer](input[:, t, :],
-                                                         hidden[layer])
-                else:
-                    hidden_l = self.rnn_cell_list[layer](hidden[layer - 1],
-                                                         hidden[layer])
-                hidden[layer] = hidden_l
+            # Store output
+            outputs.append(hy)
 
-                hidden[layer] = hidden_l
+        # Concatenate and stack the hidden states
+        outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
+        # Stack the hidden states at each layer
+        layer_hidden_states = torch.stack(layer_hidden_states, dim=1)
 
-            outs.append(hidden_l)
-
-        # Take only last time step. Modify for seq to seq
-        out = outs[-1].squeeze()
-
-        out = self.fc(out)
-
-        return out
+        return outputs, layer_hidden_states

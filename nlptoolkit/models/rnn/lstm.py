@@ -167,7 +167,7 @@ class NaiveLSTMCell(nn.Module):
         return hy, cy
 
 
-class LSTMBase(nn.Module):
+class LSTMLayer(nn.Module):
     """
     A custom implementation of an LSTM layer.
 
@@ -178,8 +178,8 @@ class LSTMBase(nn.Module):
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
     """
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
-        super().__init__()
+    def __init__(self, input_size: int, hidden_size: int):
+        super(LSTMLayer, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
 

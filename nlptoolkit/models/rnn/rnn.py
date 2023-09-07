@@ -129,7 +129,7 @@ class RNNTanhCell(nn.Module):
         return hy
 
 
-class RNNBase(nn.Module):
+class RNNLayer(nn.Module):
     """
     Custom RNNBase model implemented using RNNTanhCell.
 
@@ -152,7 +152,7 @@ class RNNBase(nn.Module):
         output, final_hidden_state = rnn_model(input_data)
     """
     def __init__(self, input_size: int, hidden_size: int):
-        super(RNNBase, self).__init__()
+        super(RNNLayer, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
 
@@ -204,15 +204,6 @@ class MultiLayerRNN(nn.Module):
         hidden_size (int): The size of the hidden state.
         num_layers (int): The number of RNN layers to stack.
 
-    Attributes:
-        input_size (int): The size of the input features.
-        hidden_size (int): The size of the hidden state.
-        num_layers (int): The number of RNN layers.
-        rnn_cells (nn.ModuleList): List of RNN cells for each layer.
-
-    Methods:
-        forward(input, hidden): Perform the forward pass of the multi-layer RNN model.
-
     Example usage:
     ```python
         rnn_model = MultiLayerRNN(input_size=64, hidden_size=128, num_layers=2)
@@ -221,19 +212,15 @@ class MultiLayerRNN(nn.Module):
         output, final_hidden_state = rnn_model(input_data)
     ```
     """
-    def __init__(self, input_size: int, hidden_size: int, output_size: int,
-                 num_layers: int):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1):
         super(MultiLayerRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.output_size = output_size
         self.num_layers = num_layers
 
         # Create a list of RNN cells for each layer
-        self.rnn_cells = nn.ModuleList(
+        self.rnn_model = nn.ModuleList(
             [RNNTanhCell(input_size, hidden_size) for _ in range(num_layers)])
-        # output layer
-        self.fc = nn.Linear(hidden_size, 2)
 
     def forward(
             self,
@@ -273,7 +260,7 @@ class MultiLayerRNN(nn.Module):
             # Forward pass through each RNN layer
             for layer_idx in range(self.num_layers):
                 # Pass the input through the current RNN layer
-                rnn_cell = self.rnn_cells[layer_idx]
+                rnn_cell = self.rnn_model[layer_idx]
                 hy = rnn_cell(x_t, hidden[:, layer_idx])
                 hidden[:, layer_idx] = hy
                 layer_hidden_states.append(hy)
@@ -288,7 +275,7 @@ class MultiLayerRNN(nn.Module):
 
 
 if __name__ == '__main__':
-    rnn_model = RNNBase(input_size=64, hidden_size=128, output_size=2)
+    rnn_model = RNNLayer(input_size=64, hidden_size=128, output_size=2)
     input_data = torch.randn(32, 10, 64)
     # Batch size of 32, sequence length of 10, input size of 64
     output, final_hidden_state = rnn_model(input_data)
