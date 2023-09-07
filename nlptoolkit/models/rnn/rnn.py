@@ -151,15 +151,13 @@ class RNNBase(nn.Module):
         # Batch size of 32, sequence length of 10, input size of 64
         output, final_hidden_state = rnn_model(input_data)
     """
-    def __init__(self, input_size: int, hidden_size: int, output_size: int):
+    def __init__(self, input_size: int, hidden_size: int):
         super(RNNBase, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # Create a list of RNN cells
+        # RNN cell Model
         self.rnn_cell = RNNTanhCell(input_size, hidden_size)
-        # output layer
-        self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(
             self,
@@ -184,16 +182,17 @@ class RNNBase(nn.Module):
             # Initialize hidden state with zeros
             hidden = torch.zeros(bs, self.hidden_size).to(input.device)
 
+        output = []
         # Forward pass through RNN layers
         for t in range(seq_len):
             x_t = input[:, t, :]
             # Pass the input through the current RNN layer
-            hy = self.rnn_cell(x_t, hidden)
-            hidden = hy
+            hidden = self.rnn_cell(x_t, hidden)
+            output.append(hidden)
 
-        # output layer
-        output = self.fc(hy)
-        return output, hy
+        # Cat the output
+        output = torch.cat(output, dim=0).view(bs, seq_len, hidden_size)
+        return output, hidden
 
 
 class MultiLayerRNN(nn.Module):
