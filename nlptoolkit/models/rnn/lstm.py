@@ -8,6 +8,7 @@ Description:
 '''
 
 import math
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -39,9 +40,19 @@ def log_sum_exp(vec):
         torch.sum(torch.exp(vec - max_score_broadcast)))
 
 
-class NaiveCustomLSTM(nn.Module):
+class NaiveLSTMCell(nn.Module):
     """
     A custom implementation of an LSTM layer.
+
+    ```
+    - I𝑡=𝜎(𝐗𝑡𝐖𝑥i+𝐇𝑡−1𝐖ℎi+𝐛i),
+    - F𝑡=𝜎(𝐗𝑡𝐖𝑥f+𝐇𝑡−1𝐖ℎf+𝐛f),
+    - O𝑡=𝜎(𝐗𝑡𝐖𝑥o+𝐇𝑡−1𝐖ℎo+𝐛o),
+    - 𝐂̃_𝑡=tanh(𝐗𝑡𝐖𝑥c+𝐇𝑡−1𝐖ℎc+𝐛c),
+    - 𝐂̃𝑡=F𝑡@C𝑡-1 + I𝑡@𝐂̃_𝑡
+    - H𝑡=O𝑡@tanh(𝐂̃𝑡)
+    ```
+
 
     Args:
         input_size (int): The number of expected features in the input.
@@ -62,8 +73,6 @@ class NaiveCustomLSTM(nn.Module):
         W_xo (nn.Parameter): Weight matrix for the output gate.
         W_ho (nn.Parameter): Weight matrix for the hidden-to-hidden output gate.
         b_o (nn.Parameter): Bias for the output gate.
-        W_hq (nn.Parameter): Weight matrix for the hidden-to-output connections.
-        b_q (nn.Parameter): Bias for the output.
 
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
@@ -93,10 +102,7 @@ class NaiveCustomLSTM(nn.Module):
         self.W_ho = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_o = nn.Parameter(torch.Tensor(hidden_size))
 
-        # Output
-        self.W_hq = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
-        self.b_q = nn.Parameter(torch.Tensor(hidden_size))
-
+        # Init parameters
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -112,52 +118,138 @@ class NaiveCustomLSTM(nn.Module):
         for weight in self.parameters():
             nn.init.uniform_(weight, -stdv, stdv)
 
-    def forward(self, x, init_states=None):
+    def forward(
+        self,
+        input: torch.Tensor,
+        hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the LSTM cell.
+
+        Args:
+            input (torch.Tensor): The input tensor of shape (batch_size, input_size).
+            hidden (tuple, optional): The initial hidden state tensor of shape (batch_size, hidden_size)
+                and cell state tensor of shape (batch_size, hidden_size). If not provided, they are initialized as zeros.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Tuple containing:
+                - hy (torch.Tensor): The hidden state tensor of shape (batch_size, hidden_size).
+                - cy (torch.Tensor): The cell state tensor of shape (batch_size, hidden_size).
+        """
+        bs = input.shape[0]
+
+        if hidden is None:
+            h_x, c_x = (
+                torch.zeros(bs, self.hidden_size).to(input.device),
+                torch.zeros(bs, self.hidden_size).to(input.device),
+            )
+        else:
+            h_x, c_x = hidden
+
+        # Input gate
+        input_gate = torch.sigmoid(input @ self.W_xi + h_x @ self.W_hi +
+                                   self.b_i)
+
+        # Forget gate
+        forget_gate = torch.sigmoid(input @ self.W_xf + h_x @ self.W_hf +
+                                    self.b_f)
+
+        # Output gate
+        output_gate = torch.sigmoid(input @ self.W_xo + h_x @ self.W_ho +
+                                    self.b_o)
+
+        # Candidate memory cell
+        C_tilda = torch.tanh(input @ self.W_xc + h_x @ self.W_hc + self.b_c)
+
+        # Update cell state
+        cy = forget_gate * c_x + input_gate * C_tilda
+
+        # Update hidden state
+        hy = output_gate * torch.tanh(cy)
+
+        return hy, cy
+
+
+class LSTMBase(nn.Module):
+    """
+    A custom implementation of an LSTM layer.
+
+    ```
+    - I𝑡=𝜎(𝐗𝑡𝐖𝑥i+𝐇𝑡−1𝐖ℎi+𝐛i),
+    - F𝑡=𝜎(𝐗𝑡𝐖𝑥f+𝐇𝑡−1𝐖ℎf+𝐛f),
+    - O𝑡=𝜎(𝐗𝑡𝐖𝑥o+𝐇𝑡−1𝐖ℎo+𝐛o),
+    - 𝐂̃_𝑡=tanh(𝐗𝑡𝐖𝑥c+𝐇𝑡−1𝐖ℎc+𝐛c),
+    - 𝐂̃𝑡=F𝑡@C𝑡-1 + I𝑡@𝐂̃_𝑡
+    - H𝑡=O𝑡@tanh(𝐂̃𝑡)
+    ```
+
+
+    Args:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+
+    Attributes:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+        W_xi (nn.Parameter): Weight matrix for the input gate.
+        W_hi (nn.Parameter): Weight matrix for the hidden-to-hidden input gate.
+        b_i (nn.Parameter): Bias for the input gate.
+        W_xf (nn.Parameter): Weight matrix for the forget gate.
+        W_hf (nn.Parameter): Weight matrix for the hidden-to-hidden forget gate.
+        b_f (nn.Parameter): Bias for the forget gate.
+        W_xc (nn.Parameter): Weight matrix for the candidate memory cell.
+        W_hc (nn.Parameter): Weight matrix for the hidden-to-hidden candidate memory cell.
+        b_c (nn.Parameter): Bias for the candidate memory cell.
+        W_xo (nn.Parameter): Weight matrix for the output gate.
+        W_ho (nn.Parameter): Weight matrix for the hidden-to-hidden output gate.
+        b_o (nn.Parameter): Bias for the output gate.
+        W_hq (nn.Parameter): Weight matrix for the hidden-to-output connections.
+        b_q (nn.Parameter): Bias for the output.
+
+    Reference:
+        https://github.com/piEsposito/pytorch-lstm-by-hand
+    """
+    def __init__(self, input_size: int, hidden_size: int, output_size: int):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.lstm_cell = NaiveLSTMCell(input_size, hidden_size)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, input, hidden=None):
         """
         Forward pass of the LSTM layer.
 
         Args:
-            x (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
-            init_states (tuple, optional): The initial hidden state tensor of shape (batch_size, hidden_size)
+            input (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
+            hidden (tuple, optional): The initial hidden state tensor of shape (batch_size, hidden_size)
                 and cell state tensor of shape (batch_size, hidden_size). If not provided, they are initialized as zeros.
 
         Returns:
             hidden_seq (torch.Tensor): The sequence of hidden states of shape (batch_size, sequence_size, hidden_size).
-            (h_t, c_t) (tuple): The final hidden state tensor of shape (batch_size, hidden_size)
+            (h_x, c_x) (tuple): The final hidden state tensor of shape (batch_size, hidden_size)
                 and cell state tensor of shape (batch_size, hidden_size).
         """
-        bs, seq_sz, _ = x.size()
-        hidden_seq = []
-
-        if init_states is None:
-            h_t, c_t = (
-                torch.zeros(bs, self.hidden_size).to(x.device),
-                torch.zeros(bs, self.hidden_size).to(x.device),
+        bs, seq_len, _ = input.size()
+        if hidden is None:
+            h_x, c_x = (
+                torch.zeros(bs, self.hidden_size).to(input.device),
+                torch.zeros(bs, self.hidden_size).to(input.device),
             )
         else:
-            h_t, c_t = init_states
+            h_x, c_x = hidden
 
-        for t in range(seq_sz):
-            x_t = x[:, t, :]
+        hidden_seq = []
+        for t in range(seq_len):
+            x_t = input[:, t, :]
 
-            input_gate = torch.sigmoid(x_t @ self.W_xi + h_t @ self.W_hi +
-                                       self.b_i)
-            forget_gate = torch.sigmoid(x_t @ self.W_xf + h_t @ self.W_hf +
-                                        self.b_f)
-            output_gate = torch.sigmoid(x_t @ self.W_xo + h_t @ self.W_ho +
-                                        self.b_o)
+            hy, cy = self.lstm_cell(x_t, (h_x, c_x))
 
-            C_tilda = torch.tanh(x_t @ self.W_xc + h_t @ self.W_hc + self.b_c)
+            h_x, c_x = hy, cy
 
-            c_t = forget_gate * c_t + input_gate * C_tilda
-            h_t = output_gate * torch.tanh(c_t)
-
-            hidden_seq.append(h_t.unsqueeze(0))
-
-        # Reshape hidden_seq for output
-        hidden_seq = torch.cat(hidden_seq, dim=0)
+            hidden_seq.append(hy.unsqueeze(0))
         hidden_seq = hidden_seq.transpose(0, 1).contiguous()
-        return hidden_seq, (h_t, c_t)
+        return hidden_seq, (h_x, c_x)
 
 
 class CustomLSTM(nn.Module):

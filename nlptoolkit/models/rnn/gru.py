@@ -15,14 +15,14 @@ from torch.autograd import Variable
 from torch.nn import init
 
 
-class NaiveCustomGRU(nn.Module):
+class NaiveGRUCell(nn.Module):
     """
     A custom implementation of a GRU (Gated Recurrent Unit) layer.
 
     - 𝐑𝑡=𝜎(𝐗𝑡𝐖𝑥𝑟+𝐇𝑡−1𝐖ℎ𝑟+𝐛𝑟),
     - 𝐙𝑡=𝜎(𝐗𝑡𝐖𝑥𝑧+𝐇𝑡−1𝐖ℎ𝑧+𝐛𝑧),
     - 𝐇̃𝑡=tanh(𝐗𝑡𝐖𝑥ℎ+(𝐑𝑡⊙𝐇𝑡−1)𝐖ℎℎ+𝐛ℎ)
-    - 𝐇𝑡=𝐙𝑡⊙𝐇𝑡−1+(1−𝐙𝑡)⊙𝐇̃ 𝑡.
+    - 𝐇𝑡=𝐙𝑡⊙𝐇𝑡−1+(1−𝐙𝑡)⊙𝐇̃𝑡.
 
 
     Args:
