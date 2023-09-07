@@ -102,7 +102,7 @@ class NaiveLSTMCell(nn.Module):
         self.W_ho = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
         self.b_o = nn.Parameter(torch.Tensor(hidden_size))
 
-        # Init parameters
+        # Initialize parameters
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -174,37 +174,10 @@ class LSTMBase(nn.Module):
     """
     A custom implementation of an LSTM layer.
 
-    ```
-    - I𝑡=𝜎(𝐗𝑡𝐖𝑥i+𝐇𝑡−1𝐖ℎi+𝐛i),
-    - F𝑡=𝜎(𝐗𝑡𝐖𝑥f+𝐇𝑡−1𝐖ℎf+𝐛f),
-    - O𝑡=𝜎(𝐗𝑡𝐖𝑥o+𝐇𝑡−1𝐖ℎo+𝐛o),
-    - 𝐂̃_𝑡=tanh(𝐗𝑡𝐖𝑥c+𝐇𝑡−1𝐖ℎc+𝐛c),
-    - 𝐂̃𝑡=F𝑡@C𝑡-1 + I𝑡@𝐂̃_𝑡
-    - H𝑡=O𝑡@tanh(𝐂̃𝑡)
-    ```
-
-
     Args:
         input_size (int): The number of expected features in the input.
         hidden_size (int): The number of features in the hidden state.
-
-    Attributes:
-        input_size (int): The number of expected features in the input.
-        hidden_size (int): The number of features in the hidden state.
-        W_xi (nn.Parameter): Weight matrix for the input gate.
-        W_hi (nn.Parameter): Weight matrix for the hidden-to-hidden input gate.
-        b_i (nn.Parameter): Bias for the input gate.
-        W_xf (nn.Parameter): Weight matrix for the forget gate.
-        W_hf (nn.Parameter): Weight matrix for the hidden-to-hidden forget gate.
-        b_f (nn.Parameter): Bias for the forget gate.
-        W_xc (nn.Parameter): Weight matrix for the candidate memory cell.
-        W_hc (nn.Parameter): Weight matrix for the hidden-to-hidden candidate memory cell.
-        b_c (nn.Parameter): Bias for the candidate memory cell.
-        W_xo (nn.Parameter): Weight matrix for the output gate.
-        W_ho (nn.Parameter): Weight matrix for the hidden-to-hidden output gate.
-        b_o (nn.Parameter): Bias for the output gate.
-        W_hq (nn.Parameter): Weight matrix for the hidden-to-output connections.
-        b_q (nn.Parameter): Bias for the output.
+        output_size (int): The number of features in the output.
 
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
@@ -213,10 +186,19 @@ class LSTMBase(nn.Module):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.output_size = output_size
+
+        # LSTM cell
         self.lstm_cell = NaiveLSTMCell(input_size, hidden_size)
+
+        # Fully connected layer
         self.fc = nn.Linear(hidden_size, output_size)
 
-    def forward(self, input, hidden=None):
+    def forward(
+        self,
+        input: torch.Tensor,
+        hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Forward pass of the LSTM layer.
 
@@ -231,6 +213,7 @@ class LSTMBase(nn.Module):
                 and cell state tensor of shape (batch_size, hidden_size).
         """
         bs, seq_len, _ = input.size()
+
         if hidden is None:
             h_x, c_x = (
                 torch.zeros(bs, self.hidden_size).to(input.device),
@@ -240,16 +223,24 @@ class LSTMBase(nn.Module):
             h_x, c_x = hidden
 
         hidden_seq = []
+
         for t in range(seq_len):
             x_t = input[:, t, :]
 
+            # LSTM cell forward pass
             hy, cy = self.lstm_cell(x_t, (h_x, c_x))
 
             h_x, c_x = hy, cy
 
             hidden_seq.append(hy.unsqueeze(0))
-        hidden_seq = hidden_seq.transpose(0, 1).contiguous()
-        return hidden_seq, (h_x, c_x)
+
+        hidden_seq = torch.cat(hidden_seq, dim=0).view(bs, seq_len,
+                                                       self.hidden_size)
+
+        # Apply fully connected layer to the hidden states
+        output = self.fc(hidden_seq)
+
+        return output, (h_x, c_x)
 
 
 class CustomLSTM(nn.Module):
