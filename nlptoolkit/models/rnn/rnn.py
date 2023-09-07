@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 
 
-class RNNTanhCell(nn.Module):
+class NaiveRNNTanhCell(nn.Module):
     """
     A custom implementation of a simple RNN Cell layer using tanh activation.
 
@@ -84,11 +84,52 @@ class RNNTanhCell(nn.Module):
         # Compute the RNN cell's output
         output = torch.mm(input, self.W_xh) + self.b_xh + torch.mm(
             hidden, self.W_hh) + self.b_hh
+
+        # Another way to compute the RNN cell's output
+        # combined = torch.cat((input, hidden), dim=1)
+        # output = torch.mm(combined, self.W_xh)
+
         output = torch.tanh(output)
 
         # The new hidden state is the same as the output in a basic RNN cell
         new_hidden = output
         return output, new_hidden
+
+
+class RNNTanhCell(nn.Module):
+    """
+    A simple RNN cell module using tanh activation.
+
+    Args:
+        input_size: The number of expected features in the input x
+        hidden_size: The number of features in the hidden state h
+    """
+    def __init__(self, input_size: int, hidden_size: int) -> None:
+        super().__init__()
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+
+        # Use nn.Linear to simplify the code
+        self.ih = nn.Linear(input_size, hidden_size)
+        self.hh = nn.Linear(hidden_size, hidden_size)
+
+    def forward(self, input: torch.Tensor,
+                hidden: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the RNN cell.
+
+        Args:
+            input: Input tensor of shape (batch_size, input_size)
+            hidden: Initial hidden state of shape (batch_size, hidden_size)
+
+        Returns:
+            hy: Next hidden state of shape (batch_size, hidden_size)
+        """
+        if hidden is None:
+            hidden = input.new_zeros(input.size(0), self.hidden_size)
+        hy = torch.tanh(self.ih(input) + self.hh(hidden))
+        return hy, hy
 
 
 class RNNBase(nn.Module):
@@ -223,7 +264,7 @@ class MultiLayerRNN(nn.Module):
             assert num_layers == self.num_layers, 'Number of layers mismatch'
 
         # Initialize a list to collect the hidden states at each layer
-        output = []
+        outputs = []
 
         # Forward pass through RNN layers
         for t in range(seq_len):
@@ -237,11 +278,11 @@ class MultiLayerRNN(nn.Module):
                 hy, hidden[:, layer_idx] = rnn_cell(x_t, hidden[:, layer_idx])
                 layer_hidden_states.append(hy)
 
-            output.append(hy)
+            outputs.append(hy)
 
         # Concatenate and stack the hidden states
-        output = torch.cat(output, dim=0).view(bs, seq_len, self.hidden_size)
-        return output, hidden
+        outputs = torch.cat(output, dim=0).view(bs, seq_len, self.hidden_size)
+        return outputs, layer_hidden_states
 
 
 if __name__ == '__main__':
