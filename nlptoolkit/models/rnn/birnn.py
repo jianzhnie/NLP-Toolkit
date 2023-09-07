@@ -9,159 +9,130 @@ Description:
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
-from .gru import GRUBase
-from .lstm import LSTMBase
-from .rnn import RNNBase
+from .gru import NaiveGRUCell
+from .lstm import NaiveLSTMCell
+from .rnn import NaiveRNNTanhCell
 
 
 class BidirRecurrentModel(nn.Module):
-    def __init__(self, mode, input_size, hidden_size, num_layers, bias,
-                 output_size):
+    """
+    Bidirectional Recurrent Model that supports LSTM, GRU, and RNN variants.
+
+    Args:
+        mode (str): The RNN cell type ('LSTM', 'GRU', 'RNN_TANH', or 'RNN_RELU').
+        input_size (int): The size of the input features.
+        hidden_size (int): The size of the hidden state.
+        num_layers (int): The number of RNN layers to stack.
+        bidirectional (bool): Whether or not to include bias terms in the RNN cells.
+
+
+    Example usage:
+    ```python
+        model = BidirRecurrentModel(mode='LSTM', input_size=64, hidden_size=128, num_layers=2, bias=True, output_size=10)
+        input_data = torch.randn(32, 10, 64)
+        # Batch size of 32, sequence length of 10, input size of 64
+        output = model(input_data)
+    ```
+    """
+    def __init__(self,
+                 mode: str,
+                 input_size: int,
+                 hidden_size: int,
+                 num_layers: int,
+                 bidirectional: bool = True):
         super(BidirRecurrentModel, self).__init__()
         self.mode = mode
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.bias = bias
-        self.output_size = output_size
-
-        self.rnn_cell_list = nn.ModuleList()
+        self.bidirectional = bidirectional
 
         if mode == 'LSTM':
-
-            self.rnn_cell_list.append(
-                LSTMBase(self.input_size, self.hidden_size, self.bias))
-            for layer in range(1, self.num_layers):
-                self.rnn_cell_list.append(
-                    LSTMBase(self.hidden_size, self.hidden_size, self.bias))
-
+            Cell = NaiveLSTMCell
         elif mode == 'GRU':
-            self.rnn_cell_list.append(
-                GRUBase(self.input_size, self.hidden_size, self.bias))
-            for layer in range(1, self.num_layers):
-                self.rnn_cell_list.append(
-                    GRUBase(self.hidden_size, self.hidden_size, self.bias))
-
-        elif mode == 'RNN_TANH':
-            self.rnn_cell_list.append(
-                RNNBase(self.input_size, self.hidden_size, self.bias, 'tanh'))
-            for layer in range(1, self.num_layers):
-                self.rnn_cell_list.append(
-                    RNNBase(self.hidden_size, self.hidden_size, self.bias,
-                            'tanh'))
-
-        elif mode == 'RNN_RELU':
-            self.rnn_cell_list.append(
-                RNNBase(self.input_size, self.hidden_size, self.bias, 'relu'))
-            for layer in range(1, self.num_layers):
-                self.rnn_cell_list.append(
-                    RNNBase(self.hidden_size, self.hidden_size, self.bias,
-                            'relu'))
+            Cell = NaiveGRUCell
+        elif mode == 'RNN':
+            Cell = NaiveRNNTanhCell
         else:
             raise ValueError('Invalid RNN mode selected.')
 
-        self.fc = nn.Linear(self.hidden_size * 2, self.output_size)
+        self.rnn_model = nn.ModuleList(
+            [Cell(input_size, hidden_size) for _ in range(num_layers)])
 
-    def forward(self, input, hx=None):
+    def forward(self, input: torch.Tensor, hidden=None) -> torch.Tensor:
+        """
+        Perform the forward pass of the Bidirectional RNN model.
 
-        # Input of shape (batch_size, sequence length, input_size)
-        #
-        # Output of shape (batch_size, output_size)
+        Args:
+            input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).
+            hx (torch.Tensor, optional): Initial hidden state tensor of shape (num_layers, batch, hidden_size).
+                If not provided, it is initialized with zeros.
 
-        if torch.cuda.is_available():
-            h0 = Variable(
-                torch.zeros(self.num_layers, input.size(0),
-                            self.hidden_size).cuda())
-        else:
-            h0 = Variable(
-                torch.zeros(self.num_layers, input.size(0), self.hidden_size))
+        Returns:
+            torch.Tensor: Output tensor of shape (batch, output_size).
+        """
+        bs, seq_len, _ = input.size()
 
-        if torch.cuda.is_available():
-            hT = Variable(
-                torch.zeros(self.num_layers, input.size(0),
-                            self.hidden_size).cuda())
-        else:
-            hT = Variable(
-                torch.zeros(self.num_layers, input.size(0), self.hidden_size))
-
-        outs = []
-        outs_rev = []
-
-        hidden_forward = list()
-        for layer in range(self.num_layers):
-            if self.mode == 'LSTM':
-                hidden_forward.append((h0[layer, :, :], h0[layer, :, :]))
-            else:
-                hidden_forward.append(h0[layer, :, :])
-
-        hidden_backward = list()
-        for layer in range(self.num_layers):
-            if self.mode == 'LSTM':
-                hidden_backward.append((hT[layer, :, :], hT[layer, :, :]))
-            else:
-                hidden_backward.append(hT[layer, :, :])
-
-        for t in range(input.shape[1]):
-            for layer in range(self.num_layers):
-
+        # 初始化正向和反向的隐藏状态
+        if hidden is None:
+            if self.bidirectional:
+                h_x_fwd, h_x_bwd = (
+                    torch.zeros(bs, self.num_layers,
+                                self.hidden_size).to(input.device),
+                    torch.zeros(bs, self.num_layers,
+                                self.hidden_size).to(input.device),
+                )
                 if self.mode == 'LSTM':
-                    # If LSTM
-                    if layer == 0:
-                        # Forward net
-                        h_forward_l = self.rnn_cell_list[layer](
-                            input[:, t, :], (hidden_forward[layer][0],
-                                             hidden_forward[layer][1]))
-                        # Backward net
-                        h_back_l = self.rnn_cell_list[layer](
-                            input[:, -(t + 1), :], (hidden_backward[layer][0],
-                                                    hidden_backward[layer][1]))
-                    else:
-                        # Forward net
-                        h_forward_l = self.rnn_cell_list[layer](
-                            hidden_forward[layer - 1][0],
-                            (hidden_forward[layer][0],
-                             hidden_forward[layer][1]))
-                        # Backward net
-                        h_back_l = self.rnn_cell_list[layer](
-                            hidden_backward[layer - 1][0],
-                            (hidden_backward[layer][0],
-                             hidden_backward[layer][1]))
-
-                else:
-                    # If RNN{_TANH/_RELU} / GRU
-                    if layer == 0:
-                        # Forward net
-                        h_forward_l = self.rnn_cell_list[layer](
-                            input[:, t, :], hidden_forward[layer])
-                        # Backward net
-                        h_back_l = self.rnn_cell_list[layer](
-                            input[:, -(t + 1), :], hidden_backward[layer])
-                    else:
-                        # Forward net
-                        h_forward_l = self.rnn_cell_list[layer](
-                            hidden_forward[layer - 1], hidden_forward[layer])
-                        # Backward net
-                        h_back_l = self.rnn_cell_list[layer](
-                            hidden_backward[layer - 1], hidden_backward[layer])
-
-                hidden_forward[layer] = h_forward_l
-                hidden_backward[layer] = h_back_l
-
-            if self.mode == 'LSTM':
-
-                outs.append(h_forward_l[0])
-                outs_rev.append(h_back_l[0])
-
+                    h_x_bwd = (h_x_fwd, h_x_fwd)
+                    h_x_bwd = (h_x_bwd, h_x_bwd)
             else:
-                outs.append(h_forward_l)
-                outs_rev.append(h_back_l)
+                h_x_fwd = torch.zeros(bs, self.hidden_size).to(input.device)
+                if self.mode == 'LSTM':
+                    h_x_fwd = (h_x_fwd, h_x_fwd)
+        else:
+            if self.bidirectional:
+                h_x_fwd, h_x_bwd = hidden
+                if self.mode == 'LSTM':
+                    h_x_bwd = (h_x_fwd, h_x_fwd)
+                    h_x_bwd = (h_x_bwd, h_x_bwd)
+            else:
+                h_x_fwd = hidden
+                if self.mode == 'LSTM':
+                    h_x_fwd = (h_x_fwd, h_x_fwd)
 
-        # Take only last time step. Modify for seq to seq
-        out = outs[-1].squeeze()
-        out_rev = outs_rev[0].squeeze()
-        out = torch.cat((out, out_rev), 1)
+        fwd_outputs = []
+        bwd_outputs = []
+        for t in range(seq_len):
+            x_t = input[:, t, :]
+            for layer_idx in range(self.num_layers):
+                rnn_cell = self.rnn_model[layer_idx]
 
-        out = self.fc(out)
-        return out
+                hy_fwd = rnn_cell(x_t, h_x_fwd)
+                fwd_outputs.append(
+                    hy_fwd[0] if isinstance(hy_fwd, tuple) else hy_fwd)
+
+                if self.bidirectional:
+                    x_t_bwd = input[:, -(t + 1), :]
+                    hy_bwd = rnn_cell(x_t_bwd, h_x_bwd)
+
+                    bwd_outputs.insert(
+                        0, hy_bwd[0] if isinstance(hy_bwd, tuple) else hy_bwd)
+
+        # 合并正向和反向的隐藏状态
+        if self.bidirectional:
+            combined_outputs = [
+                torch.cat((fwd, bwd), dim=-1)
+                for fwd, bwd in zip(fwd_outputs, bwd_outputs)
+            ]
+        else:
+            combined_outputs = bwd_outputs
+
+        # 将所有时间步的输出堆叠在一起
+        combined_outputs = torch.cat(combined_outputs,
+                                     dim=0).transpose(0, 1).contiguous()
+
+        # 此时combined_outputs的形状为(seq_len, batch, hidden_size*2)（如果是双向RNN）
+
+        # 可以根据需要添加额外的处理或返回其它形式的输出
+        return combined_outputs
