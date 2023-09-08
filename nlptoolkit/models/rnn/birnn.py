@@ -11,10 +11,9 @@ from typing import Tuple, Union
 
 import torch
 import torch.nn as nn
-
-from .gru import NaiveGRUCell
-from .lstm import NaiveLSTMCell
-from .rnn import NaiveRNNTanhCell
+from gru import NaiveGRUCell
+from lstm import NaiveLSTMCell
+from rnn import NaiveRNNTanhCell
 
 
 class BiRNNModel(nn.Module):
@@ -54,17 +53,25 @@ class BiRNNModel(nn.Module):
             Cell = NaiveLSTMCell
         elif mode == 'GRU':
             Cell = NaiveGRUCell
-        elif mode == 'RNN_TANH':
+        elif mode == 'RNN':
             Cell = NaiveRNNTanhCell
         else:
             raise ValueError('Invalid RNN mode selected.')
 
         # Create a list of RNN cells with the specified number of layers
-        self.rnn_model_fwd = nn.ModuleList(
-            [Cell(input_size, hidden_size) for _ in range(num_layers)])
-        self.rnn_model_bwd = nn.ModuleList(
-            [Cell(input_size, hidden_size)
-             for _ in range(num_layers)]) if bidirectional else None
+        self.rnn_model_fwd = nn.ModuleList()
+        for i in range(num_layers):
+            if i == 0:
+                self.rnn_model_fwd.append(Cell(input_size, hidden_size))
+            else:
+                self.rnn_model_fwd.append(Cell(hidden_size, hidden_size))
+
+        self.rnn_model_bwd = nn.ModuleList()
+        for i in range(num_layers):
+            if i == 0:
+                self.rnn_model_bwd.append(Cell(input_size, hidden_size))
+            else:
+                self.rnn_model_bwd.append(Cell(hidden_size, hidden_size))
 
     def forward(
             self,
@@ -111,22 +118,19 @@ class BiRNNModel(nn.Module):
             x_t_fwd = input[:, t, :]
 
             for layer_idx in range(self.num_layers):
-
                 rnn_cell = self.rnn_model_fwd[layer_idx]
-
                 if self.mode == 'LSTM':
-                    h_x_fwd, c_x_fwd = hidden
+                    h_x_fwd, c_x_fwd = hidden_fwd
                     h_x = h_x_fwd[:, layer_idx]
                     c_x = c_x_fwd[:, layer_idx]
                     h_t_fwd = (h_x, c_x)
                 else:
-                    h_t_fwd = hidden[:, layer_idx]
+                    h_t_fwd = hidden_fwd[:, layer_idx]
 
-                hidden_fwd = rnn_cell(x_t_fwd, h_t_fwd)
-                x_t_fwd = hidden_fwd[0] if isinstance(hidden_fwd,
-                                                      tuple) else hidden_fwd
-                fwd_outputs.append(hidden_fwd[0] if isinstance(
-                    hidden_fwd, tuple) else hidden_fwd)
+                output = rnn_cell(x_t_fwd, h_t_fwd)
+                x_t_fwd = output[0] if isinstance(output, tuple) else output
+                fwd_outputs.append(
+                    output[0] if isinstance(output, tuple) else output)
 
         # Backward pass
         for t in range(seq_len):
@@ -137,19 +141,18 @@ class BiRNNModel(nn.Module):
                 rnn_cell_bwd = self.rnn_model_bwd[layer_idx]
 
                 if self.mode == 'LSTM':
-                    h_x_bwd, c_x_bwd = hidden[:, -layer_idx]
+                    h_x_bwd, c_x_bwd = hidden_bwd
                     h_x = h_x_bwd[:, -layer_idx]
                     c_x = c_x_fwd[:, -layer_idx]
                     h_t_bwd = (h_x, c_x)
                 else:
-                    h_t_bwd = hidden[:, -layer_idx]
+                    h_t_bwd = hidden_bwd[:, -layer_idx]
 
-                hidden_bwd = rnn_cell_bwd(x_t_bwd, h_t_bwd)
-                x_t_bwd = hidden_bwd[0] if isinstance(hidden_bwd,
-                                                      tuple) else hidden_bwd
+                output = rnn_cell_bwd(x_t_bwd, h_t_bwd)
+                x_t_bwd = output[0] if isinstance(output, tuple) else output
 
-                bwd_outputs.append(hidden_bwd[0] if isinstance(
-                    hidden_bwd, tuple) else hidden_bwd)
+                bwd_outputs.append(
+                    output[0] if isinstance(output, tuple) else output)
 
         # Stack the outputs across time steps
         outputs = [
@@ -158,7 +161,19 @@ class BiRNNModel(nn.Module):
         ]
         outputs = torch.cat(outputs, dim=0).transpose(0, 1).contiguous()
         fwd_outputs = torch.cat(fwd_outputs,
-                                dim=0).view(bs, seq_len, self.hidden_size)
+                                dim=0).view(bs, seq_len * 2, self.hidden_size)
         bwd_outputs = torch.cat(bwd_outputs,
-                                dim=0).view(bs, seq_len, self.hidden_size)
+                                dim=0).view(bs, seq_len * 2, self.hidden_size)
         return outputs, (fwd_outputs, bwd_outputs)
+
+
+if __name__ == '__main__':
+    input_data = torch.randn(32, 10, 128)
+    print(input_data.shape)
+    rnn_model = BiRNNModel(mode='LSTM',
+                           input_size=128,
+                           hidden_size=256,
+                           num_layers=2)
+    # Batch size of 32, sequence length of 10, input size of 64
+    outputs, hidden_state = rnn_model(input_data)
+    print(outputs.shape, hidden_state[0].shape)

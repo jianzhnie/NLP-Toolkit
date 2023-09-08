@@ -403,3 +403,12 @@ class LSTMPostag(nn.Module):
             torch.nn.init.uniform_(param,
                                    a=-WEIGHT_INIT_RANGE,
                                    b=WEIGHT_INIT_RANGE)
+
+
+if __name__ == '__main__':
+    input_data = torch.randn(32, 10, 128)
+    print(input_data.shape)
+    rnn_model = LSTMLayer(input_size=128, hidden_size=256)
+    # Batch size of 32, sequence length of 10, input size of 64
+    outputs, hidden_state = rnn_model(input_data)
+    print(outputs.shape, hidden_state[0].shape)
