@@ -45,13 +45,13 @@ Subword tokenization的核心思想是：“**频繁出现了词不应该被切�
 - SentencePiece
 - ...
 
-| Model                                        | Type of Token  |
-| -------------------------------------------- | -------------- |
-| Bert                                         | WordPiece      |
-| GPT, gpt-2                                   | Byte-level BPE |
+|                    Model                     | Type of Token  |
+| :------------------------------------------: | :------------: |
+|                     Bert                     |   WordPiece    |
+|                  GPT, gpt-2                  | Byte-level BPE |
 | T5, ALBERT, CamemBERT, XLM-RoBERTa and XLNet | SentencePiece  |
-| T5                                           | Unigram        |
-|                                              |                |
+|                      T5                      |    Unigram     |
+
 
 这里对BPE做一个简单的介绍，让我们对 sub-word tokenization 的原理有一个基本了解：
 
@@ -65,11 +65,11 @@ BPE  — a frequency-based model
 
 - 优点
 
-  - - 可以有效地平衡词汇表大小和步数(编码句子所需的token数量)。
+  - 可以有效地平衡词汇表大小和步数(编码句子所需的token数量)。
 
 - 缺点
 
-  - - 基于贪婪和确定的符号替换，不能提供带概率的多个分片结果。
+  - 基于贪婪和确定的符号替换，不能提供带概率的多个分片结果。
 
 #### **Step1：首先，我们需要对语料进行一个预分词（pre-tokenization）：**
 

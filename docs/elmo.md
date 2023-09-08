@@ -78,7 +78,7 @@ BiLM(
 ##  3 字符编码层
 这一层即“Char Encode Layer”，它的输入维度是 B ∗ W ∗ C ，输出维度是 B ∗ W ∗ D，经查看源码，它的结构图长这样：
 
-<img src="docs/elmo_1.png" alt="PLMfamily" style="zoom:200%;" />
+<img src="imgs/elmo_1.png" alt="PLMfamily" style="zoom:200%;" />
 
 首先，输入的句子会被reshape成 $B W ∗ C$ ，因其是针对所有的char进行处理。然后会分别经过如下几个层：
 
