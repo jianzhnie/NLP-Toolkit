@@ -108,7 +108,7 @@ class BiRNNModel(nn.Module):
 
         # Forward pass
         for t in range(seq_len):
-            x_t = input[:, t, :]
+            x_t_fwd = input[:, t, :]
 
             for layer_idx in range(self.num_layers):
 
@@ -122,8 +122,9 @@ class BiRNNModel(nn.Module):
                 else:
                     h_t_fwd = hidden[:, layer_idx]
 
-                hidden_fwd = rnn_cell(x_t, h_t_fwd)
-
+                hidden_fwd = rnn_cell(x_t_fwd, h_t_fwd)
+                x_t_fwd = hidden_fwd[0] if isinstance(hidden_fwd,
+                                                      tuple) else hidden_fwd
                 fwd_outputs.append(hidden_fwd[0] if isinstance(
                     hidden_fwd, tuple) else hidden_fwd)
 
@@ -144,6 +145,8 @@ class BiRNNModel(nn.Module):
                     h_t_bwd = hidden[:, -layer_idx]
 
                 hidden_bwd = rnn_cell_bwd(x_t_bwd, h_t_bwd)
+                x_t_bwd = hidden_bwd[0] if isinstance(hidden_bwd,
+                                                      tuple) else hidden_bwd
 
                 bwd_outputs.append(hidden_bwd[0] if isinstance(
                     hidden_bwd, tuple) else hidden_bwd)
