@@ -6,48 +6,79 @@ import torch.nn as nn
 
 class RNNEncoder(nn.Module):
     """
-    The RNN encoder for sequence-to-sequence learning.
+    RNN Encoder module for sequence-to-sequence learning.
+
+    Args:
+        vocab_size (int): The size of the vocabulary.
+        embed_size (int): The size of word embeddings.
+        hidden_size (int): The size of the GRU's hidden state.
+        num_layers (int): The number of GRU layers.
+        dropout (float): Dropout probability (default: 0.5).
+
+    Attributes:
+        hidden_size (int): The size of the hidden state.
+        num_layers (int): The number of GRU layers.
+
     """
     def __init__(self,
-                 vocab_size,
-                 embed_size,
-                 hidden_size,
-                 num_layers,
-                 dropout=0.5):
+                 vocab_size: int,
+                 embed_size: int,
+                 hidden_size: int,
+                 num_layers: int,
+                 dropout: float = 0.5):
         super().__init__()
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
+        # Embedding layer to convert input tokens to dense vectors
         self.embedding = nn.Embedding(vocab_size, embed_size)
 
-        # no dropout as only one layer!
+        # GRU layer with optional dropout
         self.rnn = nn.GRU(input_size=embed_size,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
 
+        # Dropout layer
         self.dropout = nn.Dropout(dropout)
 
-    def init_param(module):
-        """Initialize weights for sequence-to-sequence learning."""
-        if type(module) == nn.Linear:
-            nn.init.xavier_uniform_(module.weight)
-        if type(module) == nn.GRU:
-            for param in module._flat_weights_names:
-                if 'weight' in param:
-                    nn.init.xavier_uniform_(module._parameters[param])
+    def init_param(self, module: nn.Module):
+        """
+        Initialize weights for sequence-to-sequence learning.
 
-    def forward(self, src: torch.Tensor):
-        # src = [batch size, seq_len]
-        # permute to [seq_len, batch size]
+        Args:
+            module (nn.Module): The module for weight initialization.
+
+        """
+        if isinstance(module, nn.Linear):
+            nn.init.xavier_uniform_(module.weight)
+        if isinstance(module, nn.GRU):
+            for param_name, param in module.named_parameters():
+                if 'weight' in param_name:
+                    nn.init.xavier_uniform_(param)
+
+    def forward(self, src: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the encoder.
+
+        Args:
+            src (torch.Tensor): Input sequences with shape [batch_size, seq_len].
+
+        Returns:
+            torch.Tensor: Output sequences with shape [seq_len, batch_size, hidden_size].
+            torch.Tensor: Final hidden state with shape [num_layers, batch_size, hidden_size].
+
+        """
+        # Permute input to [seq_len, batch_size]
         src = src.permute(1, 0)
-        embedded = self.embedding(src)
-        # embedded = [seq_len, batch size, embed_size]
+
+        # Pass input through embedding layer
+        embedded = self.embedding(src)  # [seq_len, batch_size, embed_size]
+
+        # Pass through GRU layers
         outputs, hidden = self.rnn(embedded)
-        # outputs shape: (num_steps, batch_size, num_hiddens)
-        # state shape: (num_layers, batch_size, num_hiddens)
-        # outputs are always from the top hidden layer
+
         return outputs, hidden
 
 
