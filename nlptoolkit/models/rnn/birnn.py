@@ -98,7 +98,7 @@ class BiRNNModel(nn.Module):
         # Initialize forward and backward hidden states
         if hidden is None:
             num_directions = 2 if self.bidirectional else 1
-            hidden_states = torch.zeros(num_directions * self.num_layers, bs,
+            hidden_states = torch.zeros(bs, num_directions * self.num_layers,
                                         self.hidden_size).to(input.device)
         else:
             hidden_states = hidden
@@ -115,17 +115,17 @@ class BiRNNModel(nn.Module):
             # Forward pass
             for layer_idx in range(self.num_layers):
                 rnn_cell_fwd = self.rnn_model_fwd[layer_idx]
-                h_t_fwd = hidden_states[layer_idx]
+                h_t_fwd = hidden_states[:, layer_idx]
                 output_fwd = rnn_cell_fwd(x_t_fwd, h_t_fwd)
-                hidden_state[:, layer_idx] = output_fwd
+                hidden_states[:, layer_idx] = output_fwd
                 x_t_fwd = output_fwd[0] if isinstance(output_fwd,
                                                       tuple) else output_fwd
 
                 # Backward pass
                 rnn_cell_bwd = self.rnn_model_bwd[layer_idx]
-                h_t_bwd = hidden_states[self.num_layers + layer_idx]
+                h_t_bwd = hidden_states[:, self.num_layers + layer_idx]
                 output_bwd = rnn_cell_bwd(x_t_bwd, h_t_bwd)
-                hidden_state[:, self.num_layers + layer_idx] = output_fwd
+                hidden_states[:, self.num_layers + layer_idx] = output_fwd
                 x_t_bwd = output_bwd[0] if isinstance(output_bwd,
                                                       tuple) else output_bwd
 
@@ -153,4 +153,4 @@ if __name__ == '__main__':
                            num_layers=2)
     # Batch size of 32, sequence length of 10, input size of 64
     outputs, hidden_state = rnn_model(input_data)
-    print(outputs.shape, hidden_state[0].shape)
+    print(outputs.shape, hidden_state.shape)
