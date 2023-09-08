@@ -21,7 +21,7 @@ class BiRNNModel(nn.Module):
     Bidirectional Recurrent Model that supports LSTM, GRU, and RNN variants.
 
     Args:
-        mode (str): The RNN cell type ('LSTM', 'GRU', 'RNN_TANH', or 'RNN_RELU').
+        mode (str): The RNN cell type ('LSTM', 'GRU', 'RNN').
         input_size (int): The size of the input features.
         hidden_size (int): The size of the hidden state.
         num_layers (int): The number of RNN layers to stack.
@@ -32,7 +32,7 @@ class BiRNNModel(nn.Module):
         model = BiRNNModel(mode='LSTM', input_size=64, hidden_size=128, num_layers=2, bidirectional=True)
         input_data = torch.randn(32, 10, 64)
         # Batch size of 32, sequence length of 10, input size of 64
-        output = model(input_data)
+        output, hidden_states = model(input_data)
     ```
     """
     def __init__(self,
@@ -58,119 +58,96 @@ class BiRNNModel(nn.Module):
         else:
             raise ValueError('Invalid RNN mode selected.')
 
-        # Create a list of RNN cells with the specified number of layers
+        # Create lists of RNN cells for forward and backward passes
         self.rnn_model_fwd = nn.ModuleList()
-        for i in range(num_layers):
-            if i == 0:
-                self.rnn_model_fwd.append(Cell(input_size, hidden_size))
-            else:
-                self.rnn_model_fwd.append(Cell(hidden_size, hidden_size))
-
         self.rnn_model_bwd = nn.ModuleList()
+
         for i in range(num_layers):
-            if i == 0:
-                self.rnn_model_bwd.append(Cell(input_size, hidden_size))
-            else:
-                self.rnn_model_bwd.append(Cell(hidden_size, hidden_size))
+            # Initialize forward pass cells
+            input_size_fwd = input_size if i == 0 else hidden_size if bidirectional else hidden_size
+            self.rnn_model_fwd.append(Cell(input_size_fwd, hidden_size))
+
+            # Initialize backward pass cells
+            input_size_bwd = input_size if i == 0 else hidden_size if bidirectional else hidden_size
+            self.rnn_model_bwd.append(Cell(input_size_bwd, hidden_size))
 
     def forward(
-            self,
-            input: torch.Tensor,
-            hidden: Union[None, Tuple[torch.Tensor]] = None) -> torch.Tensor:
+        self,
+        input: torch.Tensor,
+        hidden: Union[None, Tuple[torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Perform the forward pass of the Bidirectional RNN model.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).
-            hidden (Tuple[torch.Tensor], optional): Initial hidden state tensor of shape (num_layers, batch, hidden_size).
+            hidden (Tuple[torch.Tensor], optional): Initial hidden state tensor of shape (num_layers * 2, batch, hidden_size)
+                for bidirectional, or (num_layers, batch, hidden_size) for unidirectional.
                 If not provided, it is initialized with zeros.
 
         Returns:
-            torch.Tensor: Output tensor of shape (batch, sequence, hidden_size * 2) if bidirectional, or (batch, sequence, hidden_size) if not bidirectional.
+            Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]: Tuple containing:
+                - output (torch.Tensor): Output tensor of shape (batch, sequence, hidden_size * 2) if bidirectional,
+                  or (batch, sequence, hidden_size) if not bidirectional.
+                - hidden_states (Tuple[torch.Tensor, torch.Tensor]): Tuple containing forward and backward hidden states
+                  of shape (num_layers, batch, hidden_size) for unidirectional, or (num_layers * 2, batch, hidden_size)
+                  for bidirectional.
         """
         bs, seq_len, _ = input.size()
 
         # Initialize forward and backward hidden states
         if hidden is None:
-            h_x_fwd = torch.zeros(bs, self.num_layers,
-                                  self.hidden_size).to(input.device)
-
-            h_x_bwd = torch.zeros(bs, self.num_layers,
-                                  self.hidden_size).to(input.device)
-
-        if self.mode == 'LSTM':
-            c_x_fwd = torch.zeros(bs, self.num_layers,
-                                  self.hidden_size).to(input.device)
-            c_x_bwd = torch.zeros(bs, self.num_layers,
-                                  self.hidden_size).to(input.device)
-            hidden_fwd = (h_x_fwd, c_x_fwd)
-            hidden_bwd = (h_x_bwd, c_x_bwd)
+            num_directions = 2 if self.bidirectional else 1
+            hidden_states = torch.zeros(num_directions * self.num_layers, bs,
+                                        self.hidden_size).to(input.device)
         else:
-            hidden_fwd = h_x_fwd
-            hidden_bwd = h_x_bwd
+            hidden_states = hidden
 
-        # Process input sequence through RNN layers and time steps
+        # Initialize lists to collect forward and backward outputs
         fwd_outputs = []
         bwd_outputs = []
 
-        # Forward pass
+        # Process input sequence through RNN layers and time steps
         for t in range(seq_len):
             x_t_fwd = input[:, t, :]
+            x_t_bwd = input[:, -t, :]  # Reverse the input for backward pass
 
+            # Forward pass
             for layer_idx in range(self.num_layers):
-                rnn_cell = self.rnn_model_fwd[layer_idx]
-                if self.mode == 'LSTM':
-                    h_x_fwd, c_x_fwd = hidden_fwd
-                    h_x = h_x_fwd[:, layer_idx]
-                    c_x = c_x_fwd[:, layer_idx]
-                    h_t_fwd = (h_x, c_x)
-                else:
-                    h_t_fwd = hidden_fwd[:, layer_idx]
+                rnn_cell_fwd = self.rnn_model_fwd[layer_idx]
+                h_t_fwd = hidden_states[layer_idx]
+                output_fwd = rnn_cell_fwd(x_t_fwd, h_t_fwd)
+                hidden_state[:, layer_idx] = output_fwd
+                x_t_fwd = output_fwd[0] if isinstance(output_fwd,
+                                                      tuple) else output_fwd
 
-                output = rnn_cell(x_t_fwd, h_t_fwd)
-                x_t_fwd = output[0] if isinstance(output, tuple) else output
-                fwd_outputs.append(
-                    output[0] if isinstance(output, tuple) else output)
-
-        # Backward pass
-        for t in range(seq_len):
-            x_t_bwd = input[:, -t, :]
-
-            for layer_idx in range(self.num_layers):
-
+                # Backward pass
                 rnn_cell_bwd = self.rnn_model_bwd[layer_idx]
+                h_t_bwd = hidden_states[self.num_layers + layer_idx]
+                output_bwd = rnn_cell_bwd(x_t_bwd, h_t_bwd)
+                hidden_state[:, self.num_layers + layer_idx] = output_fwd
+                x_t_bwd = output_bwd[0] if isinstance(output_bwd,
+                                                      tuple) else output_bwd
 
-                if self.mode == 'LSTM':
-                    h_x_bwd, c_x_bwd = hidden_bwd
-                    h_x = h_x_bwd[:, -layer_idx]
-                    c_x = c_x_fwd[:, -layer_idx]
-                    h_t_bwd = (h_x, c_x)
-                else:
-                    h_t_bwd = hidden_bwd[:, -layer_idx]
+            fwd_outputs.append(
+                output_fwd[0] if isinstance(output_fwd, tuple) else output_fwd)
+            bwd_outputs.append(
+                output_bwd[0] if isinstance(output_bwd, tuple) else output_bwd)
 
-                output = rnn_cell_bwd(x_t_bwd, h_t_bwd)
-                x_t_bwd = output[0] if isinstance(output, tuple) else output
-
-                bwd_outputs.append(
-                    output[0] if isinstance(output, tuple) else output)
-
-        # Stack the outputs across time steps
+        # Stack the outputs across time steps and transpose for correct dimensions
         outputs = [
             torch.cat((fwd, bwd), -1)
             for fwd, bwd in zip(fwd_outputs, reversed(bwd_outputs))
         ]
         outputs = torch.cat(outputs, dim=0).transpose(0, 1).contiguous()
-        fwd_outputs = torch.cat(fwd_outputs,
-                                dim=0).view(bs, seq_len * 2, self.hidden_size)
-        bwd_outputs = torch.cat(bwd_outputs,
-                                dim=0).view(bs, seq_len * 2, self.hidden_size)
-        return outputs, (fwd_outputs, bwd_outputs)
+
+        return outputs, hidden_states
 
 
 if __name__ == '__main__':
     input_data = torch.randn(32, 10, 128)
     print(input_data.shape)
-    rnn_model = BiRNNModel(mode='LSTM',
+    rnn_model = BiRNNModel(mode='RNN',
                            input_size=128,
                            hidden_size=256,
                            num_layers=2)
