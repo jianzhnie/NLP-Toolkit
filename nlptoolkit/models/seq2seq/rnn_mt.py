@@ -5,39 +5,49 @@ import torch.nn as nn
 
 
 class RNNEncoder(nn.Module):
-    def __init__(self, vocab_size, embeb_dim, hidden_size, num_layers,
-                 dropout):
+    """
+    The RNN encoder for sequence-to-sequence learning.
+    """
+    def __init__(self,
+                 vocab_size,
+                 embed_size,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.5):
         super().__init__()
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(vocab_size, embeb_dim)
+        self.embedding = nn.Embedding(vocab_size, embed_size)
 
         # no dropout as only one layer!
-        self.rnn = nn.GRU(input_size=embeb_dim,
+        self.rnn = nn.GRU(input_size=embed_size,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, src):
+    def init_param(module):
+        """Initialize weights for sequence-to-sequence learning."""
+        if type(module) == nn.Linear:
+            nn.init.xavier_uniform_(module.weight)
+        if type(module) == nn.GRU:
+            for param in module._flat_weights_names:
+                if 'weight' in param:
+                    nn.init.xavier_uniform_(module._parameters[param])
 
-        # src = [src len, batch size]
-
-        embedded = self.dropout(self.embedding(src))
-
-        # embedded = [src len, batch size, emb dim]
-
-        # no cell state!
+    def forward(self, src: torch.Tensor):
+        # src = [batch size, seq_len]
+        # permute to [seq_len, batch size]
+        src = src.permute(1, 0)
+        embedded = self.embedding(src)
+        # embedded = [seq_len, batch size, embed_size]
         outputs, hidden = self.rnn(embedded)
-
-        # outputs = [src len, batch size, hid dim * n directions]
-        # hidden = [n layers * n directions, batch size, hid dim]
-
+        # outputs shape: (num_steps, batch_size, num_hiddens)
+        # state shape: (num_layers, batch_size, num_hiddens)
         # outputs are always from the top hidden layer
-
         return outputs, hidden
 
 
