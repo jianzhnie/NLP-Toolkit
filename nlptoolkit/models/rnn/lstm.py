@@ -231,6 +231,87 @@ class LSTMLayer(nn.Module):
         return outputs, (h_x, c_x)
 
 
+class MultiLayerLSTM(nn.Module):
+    """
+    A custom implementation of an LSTM layer.
+    Multi-layer LSTM model implemented using multiple LSTMLayer layers.
+
+    Args:
+        input_size (int): The number of expected features in the input.
+        hidden_size (int): The number of features in the hidden state.
+
+    Reference:
+        https://github.com/piEsposito/pytorch-lstm-by-hand
+    """
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1):
+        super(MultiLayerLSTM, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        # Create a list of LSTM cells for each layer
+        self.rnn_model = nn.ModuleList()
+        for i in range(num_layers):
+            if i == 0:
+                # The first layer takes the input
+                self.rnn_model.append(NaiveLSTMCell(input_size, hidden_size))
+            else:
+                # The other layers take the hidden state of the previous layer
+                self.rnn_model.append(NaiveLSTMCell(hidden_size, hidden_size))
+
+    def forward(
+        self,
+        input: torch.Tensor,
+        hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Forward pass of the multi-layer LSTM layer.
+
+        Args:
+            input (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
+            hidden (tuple, optional): The initial hidden state tensor of shape (batch_size, hidden_size)
+                and cell state tensor of shape (batch_size, hidden_size). If not provided, they are initialized as zeros.
+
+        Returns:
+            outputs (torch.Tensor): The sequence of hidden states of shape (batch_size, sequence_size, hidden_size).
+            (h_x, c_x) (tuple): The final hidden state tensor of shape (batch_size, hidden_size)
+                and cell state tensor of shape (batch_size, hidden_size).
+        """
+        bs, seq_len, _ = input.size()
+
+        if hidden is None:
+            h_x, c_x = (
+                torch.zeros(bs, self.num_layers,
+                            self.hidden_size).to(input.device),
+                torch.zeros(bs, self.num_layers,
+                            self.hidden_size).to(input.device),
+            )
+        else:
+            _, num_layers, _ = hidden[0].size()
+            assert num_layers == self.num_layers, 'Number of layers mismatch'
+            h_x, c_x = hidden
+
+        outputs = []
+
+        for t in range(seq_len):
+            x_t = input[:, t, :]
+
+            # Forward pass through each RNN layer
+            for layer_idx in range(self.num_layers):
+                rnn_cell = self.rnn_model[layer_idx]
+                # Pass the input through the current RNN layer
+                hy, cy = rnn_cell(x_t, (h_x, c_x))
+                h_x[:, layer_idx] = hy
+                c_x[:, layer_idx] = cy
+
+            # Store output
+            outputs.append(hy)
+
+        outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
+
+        return outputs, h_x
+
+
 class BiLSTM_CRF(nn.Module):
     def __init__(self, vocab_size, tag_to_ix, embedding_dim, hidden_dim):
         super(BiLSTM_CRF, self).__init__()
