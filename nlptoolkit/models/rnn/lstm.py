@@ -233,12 +233,12 @@ class LSTMLayer(nn.Module):
 
 class MultiLayerLSTM(nn.Module):
     """
-    A custom implementation of an LSTM layer.
-    Multi-layer LSTM model implemented using multiple LSTMLayer layers.
+    A custom implementation of a multi-layer LSTM model.
 
     Args:
-        input_size (int): The number of expected features in the input.
+        input_size (int): The number of input features.
         hidden_size (int): The number of features in the hidden state.
+        num_layers (int, optional): Number of LSTM layers (default is 1).
 
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
@@ -249,15 +249,16 @@ class MultiLayerLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        # Create a list of LSTM cells for each layer
-        self.rnn_model = nn.ModuleList()
+        # Create a list of LSTM layers
+        self.lstm_layers = nn.ModuleList()
         for i in range(num_layers):
             if i == 0:
                 # The first layer takes the input
-                self.rnn_model.append(NaiveLSTMCell(input_size, hidden_size))
+                self.lstm_layers.append(NaiveLSTMCell(input_size, hidden_size))
             else:
                 # The other layers take the hidden state of the previous layer
-                self.rnn_model.append(NaiveLSTMCell(hidden_size, hidden_size))
+                self.lstm_layers.append(NaiveLSTMCell(hidden_size,
+                                                      hidden_size))
 
     def forward(
         self,
@@ -265,25 +266,26 @@ class MultiLayerLSTM(nn.Module):
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
-        Forward pass of the multi-layer LSTM layer.
+        Forward pass of the multi-layer LSTM.
 
         Args:
-            input (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
-            hidden (tuple, optional): The initial hidden state tensor of shape (batch_size, hidden_size)
-                and cell state tensor of shape (batch_size, hidden_size). If not provided, they are initialized as zeros.
+            input (torch.Tensor): Input tensor of shape (batch_size, sequence_size, input_size).
+            hidden (tuple, optional): Initial hidden state tensor of shape (num_layers, batch_size, hidden_size)
+                and cell state tensor of shape (num_layers, batch_size, hidden_size). Default is None.
 
         Returns:
-            outputs (torch.Tensor): The sequence of hidden states of shape (batch_size, sequence_size, hidden_size).
-            (h_x, c_x) (tuple): The final hidden state tensor of shape (batch_size, hidden_size)
-                and cell state tensor of shape (batch_size, hidden_size).
+            outputs (torch.Tensor): Sequence of hidden states, shape (batch_size, sequence_size, hidden_size).
+            (h_x, c_x) (tuple): Final hidden state tensor of shape (num_layers, batch_size, hidden_size)
+                and cell state tensor of shape (num_layers, batch_size, hidden_size).
         """
-        bs, seq_len, _ = input.size()
+        batch_size, seq_len, _ = input.size()
 
         if hidden is None:
+            # Initialize hidden and cell states as zeros
             h_x, c_x = (
-                torch.zeros(bs, self.num_layers,
+                torch.zeros(self.num_layers, batch_size,
                             self.hidden_size).to(input.device),
-                torch.zeros(bs, self.num_layers,
+                torch.zeros(self.num_layers, batch_size,
                             self.hidden_size).to(input.device),
             )
         else:
@@ -294,22 +296,23 @@ class MultiLayerLSTM(nn.Module):
         for t in range(seq_len):
             x_t = input[:, t, :]
 
-            # Forward pass through each RNN layer
+            # Forward pass through each LSTM layer
             for layer_idx in range(self.num_layers):
-                rnn_cell = self.rnn_model[layer_idx]
-                # Pass the input through the current RNN layer
-                hx, cx = h_x[:, layer_idx], c_x[:, layer_idx]
-                hy, cy = rnn_cell(x_t, (hx, cx))
-                h_x[:, layer_idx] = hy
-                c_x[:, layer_idx] = cy
-                x_t = hy
+                lstm_cell = self.lstm_layers[layer_idx]
+                # hidden and cell states of the current layer
+                h_t, c_t = h_x[layer_idx], c_x[layer_idx]
+                # LSTM cell forward pass
+                h_x[layer_idx], c_x[layer_idx] = lstm_cell(x_t, (h_t, c_t))
+                # Update input for the next layer
+                x_t = h_x[layer_idx]
 
-            # Store output
-            outputs.append(hy)
+            # Store the output for this time step
+            outputs.append(x_t)
 
-        outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
+        # Stack outputs and reshape to match the input shape
+        outputs = torch.stack(outputs, dim=1)
 
-        return outputs, h_x
+        return outputs, (h_x, c_x)
 
 
 class BiLSTM_CRF(nn.Module):
@@ -492,4 +495,4 @@ if __name__ == '__main__':
     rnn_model = MultiLayerLSTM(input_size=128, hidden_size=256, num_layers=2)
     # Batch size of 32, sequence length of 10, input size of 64
     outputs, hidden_state = rnn_model(input_data)
-    print(outputs.shape, hidden_state.shape)
+    print(outputs.shape, hidden_state[0].shape)
