@@ -12,7 +12,6 @@ from typing import Tuple, Union
 import torch
 import torch.nn as nn
 from gru import NaiveGRUCell
-from lstm import NaiveLSTMCell
 from rnn import NaiveRNNTanhCell
 
 
@@ -49,9 +48,7 @@ class BiRNNModel(nn.Module):
         self.bidirectional = bidirectional
 
         # Select the appropriate RNN cell based on the mode
-        if mode == 'LSTM':
-            Cell = NaiveLSTMCell
-        elif mode == 'GRU':
+        if mode == 'GRU':
             Cell = NaiveGRUCell
         elif mode == 'RNN':
             Cell = NaiveRNNTanhCell
@@ -107,40 +104,36 @@ class BiRNNModel(nn.Module):
         fwd_outputs = []
         bwd_outputs = []
 
-        # Process input sequence through RNN layers and time steps
+        # Process input sequence through time steps
         for t in range(seq_len):
             x_t_fwd = input[:, t, :]
             x_t_bwd = input[:, -t, :]  # Reverse the input for backward pass
 
-            # Forward pass
+            # Process input through each RNN layer
             for layer_idx in range(self.num_layers):
+                # Forward pass
                 rnn_cell_fwd = self.rnn_model_fwd[layer_idx]
                 h_t_fwd = hidden_states[:, layer_idx]
-                output_fwd = rnn_cell_fwd(x_t_fwd, h_t_fwd)
-                hidden_states[:, layer_idx] = output_fwd
-                x_t_fwd = output_fwd[0] if isinstance(output_fwd,
-                                                      tuple) else output_fwd
+                hy_fwd = rnn_cell_fwd(x_t_fwd, h_t_fwd)
+                hidden_states[:, layer_idx] = hy_fwd
+                x_t_fwd = hy_fwd
 
                 # Backward pass
                 rnn_cell_bwd = self.rnn_model_bwd[layer_idx]
                 h_t_bwd = hidden_states[:, self.num_layers + layer_idx]
-                output_bwd = rnn_cell_bwd(x_t_bwd, h_t_bwd)
-                hidden_states[:, self.num_layers + layer_idx] = output_fwd
-                x_t_bwd = output_bwd[0] if isinstance(output_bwd,
-                                                      tuple) else output_bwd
+                hy_bwd = rnn_cell_bwd(x_t_bwd, h_t_bwd)
+                hidden_states[:, self.num_layers + layer_idx] = hy_bwd
+                x_t_bwd = hy_bwd
 
-            fwd_outputs.append(
-                output_fwd[0] if isinstance(output_fwd, tuple) else output_fwd)
-            bwd_outputs.append(
-                output_bwd[0] if isinstance(output_bwd, tuple) else output_bwd)
+            fwd_outputs.append(hy_fwd)
+            bwd_outputs.append(hy_bwd)
 
         # Stack the outputs across time steps and transpose for correct dimensions
         outputs = [
             torch.cat((fwd, bwd), -1)
             for fwd, bwd in zip(fwd_outputs, reversed(bwd_outputs))
         ]
-        outputs = torch.cat(outputs, dim=0).transpose(0, 1).contiguous()
-
+        outputs = torch.cat(outputs, dim=0).reshape(bs, seq_len, -1)
         return outputs, hidden_states
 
 
