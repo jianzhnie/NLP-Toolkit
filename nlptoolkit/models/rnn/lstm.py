@@ -287,8 +287,6 @@ class MultiLayerLSTM(nn.Module):
                             self.hidden_size).to(input.device),
             )
         else:
-            _, num_layers, _ = hidden[0].size()
-            assert num_layers == self.num_layers, 'Number of layers mismatch'
             h_x, c_x = hidden
 
         outputs = []
@@ -300,9 +298,11 @@ class MultiLayerLSTM(nn.Module):
             for layer_idx in range(self.num_layers):
                 rnn_cell = self.rnn_model[layer_idx]
                 # Pass the input through the current RNN layer
-                hy, cy = rnn_cell(x_t, (h_x, c_x))
+                hx, cx = h_x[:, layer_idx], c_x[:, layer_idx]
+                hy, cy = rnn_cell(x_t, (hx, cx))
                 h_x[:, layer_idx] = hy
                 c_x[:, layer_idx] = cy
+                x_t = hy
 
             # Store output
             outputs.append(hy)
@@ -489,7 +489,7 @@ class LSTMPostag(nn.Module):
 if __name__ == '__main__':
     input_data = torch.randn(32, 10, 128)
     print(input_data.shape)
-    rnn_model = LSTMLayer(input_size=128, hidden_size=256)
+    rnn_model = MultiLayerLSTM(input_size=128, hidden_size=256, num_layers=2)
     # Batch size of 32, sequence length of 10, input size of 64
     outputs, hidden_state = rnn_model(input_data)
-    print(outputs.shape, hidden_state[0].shape)
+    print(outputs.shape, hidden_state.shape)
