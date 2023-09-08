@@ -199,8 +199,14 @@ class MultiLayerGRU(nn.Module):
         self.num_layers = num_layers
 
         # Create a list of GRU cells for each layer
-        self.rnn_model = nn.ModuleList(
-            [NaiveGRUCell(input_size, hidden_size) for _ in range(num_layers)])
+        self.rnn_model = nn.ModuleList()
+        for i in range(num_layers):
+            if i == 0:
+                # The first layer takes the input
+                self.rnn_model.append(NaiveGRUCell(input_size, hidden_size))
+            else:
+                # The other layers take the hidden state of the previous layer
+                self.rnn_model.append(NaiveGRUCell(hidden_size, hidden_size))
 
     def forward(
         self,
@@ -232,25 +238,30 @@ class MultiLayerGRU(nn.Module):
             assert num_layers == self.num_layers, 'Number of layers mismatch'
 
         outputs = []
-        layer_hidden_states = []
 
         for t in range(seq_len):
             x_t = input[:, t, :]
 
+            # Forward pass through each RNN layer
             for layer_idx in range(self.num_layers):
                 rnn_cell = self.rnn_model[layer_idx]
+                # Pass the input through the current RNN layer
                 hy = rnn_cell(x_t, hidden[:, layer_idx])
                 hidden[:, layer_idx] = hy
-
-                # Store the hidden state of every layer
-                layer_hidden_states.append(hy)
+                x_t = hy  # Update input for the next layer
 
             # Store output
             outputs.append(hy)
 
         # Concatenate and stack the hidden states
         outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
-        # Stack the hidden states at each layer
-        layer_hidden_states = torch.stack(layer_hidden_states, dim=1)
+        return outputs, hidden
 
-        return outputs, layer_hidden_states
+
+if __name__ == '__main__':
+    input_data = torch.randn(32, 10, 128)
+    print(input_data.shape)
+    rnn_model = MultiLayerGRU(input_size=128, hidden_size=256, num_layers=2)
+    # Batch size of 32, sequence length of 10, input size of 64
+    outputs, hidden_state = rnn_model(input_data)
+    print(outputs.shape, hidden_state.shape)

@@ -6,7 +6,7 @@ LastEditors: jianzhnie
 Description:
 
 '''
-from typing import Tuple
+from typing import List, Tuple
 
 import torch
 import torch.nn as nn
@@ -176,7 +176,7 @@ class RNNLayer(nn.Module):
                 - output (torch.Tensor): Output tensor of shape (batch, sequence, hidden_size).
                 - final_hidden (torch.Tensor): Final hidden state tensor of shape (batch, hidden_size).
         """
-        bs, seq_len, hidden_size = input.size()
+        bs, seq_len, _ = input.size()
 
         if hidden is None:
             # Initialize hidden state with zeros
@@ -191,7 +191,7 @@ class RNNLayer(nn.Module):
             output.append(hidden)
 
         # Cat the output
-        output = torch.cat(output, dim=0).view(bs, seq_len, hidden_size)
+        output = torch.cat(output, dim=0).view(bs, seq_len, self.hidden_size)
         return output, hidden
 
 
@@ -219,25 +219,32 @@ class MultiLayerRNN(nn.Module):
         self.num_layers = num_layers
 
         # Create a list of RNN cells for each layer
-        self.rnn_model = nn.ModuleList(
-            [RNNTanhCell(input_size, hidden_size) for _ in range(num_layers)])
+        self.rnn_model = nn.ModuleList()
+        for i in range(num_layers):
+            if i == 0:
+                # The first layer takes the input
+                self.rnn_model.append(RNNTanhCell(input_size, hidden_size))
+            else:
+                # The other layers take the hidden state of the previous layer
+                self.rnn_model.append(RNNTanhCell(hidden_size, hidden_size))
 
     def forward(
-            self,
-            input: torch.Tensor,
-            hidden: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        self,
+        input: torch.Tensor,
+        hidden: List[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, List[torch.Tensor]]:
         """
         Perform the forward pass of the multi-layer RNN model.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).
-            hidden (torch.Tensor, optional): Initial hidden state tensor of shape (batch, num_layers, hidden_size).
-                If not provided, it is initialized with zeros.
+            hidden (List[torch.Tensor], optional): Initial hidden state tensor for each layer.
+                If not provided, it is initialized with zeros for all layers.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Tuple containing:
+            Tuple[torch.Tensor, List[torch.Tensor]]: Tuple containing:
                 - output (torch.Tensor): Output tensor of shape (batch, sequence, hidden_size).
-                - final_hidden (torch.Tensor): Final hidden state tensor of shape (batch, num_layers, hidden_size).
+                - final_hidden (List[torch.Tensor]): Final hidden state tensor for each layer.
         """
         bs, seq_len, _ = input.size()
 
@@ -255,7 +262,6 @@ class MultiLayerRNN(nn.Module):
         # Forward pass through RNN layers
         for t in range(seq_len):
             x_t = input[:, t, :]
-            layer_hidden_states = []
 
             # Forward pass through each RNN layer
             for layer_idx in range(self.num_layers):
@@ -263,26 +269,20 @@ class MultiLayerRNN(nn.Module):
                 rnn_cell = self.rnn_model[layer_idx]
                 hy = rnn_cell(x_t, hidden[:, layer_idx])
                 hidden[:, layer_idx] = hy
-                layer_hidden_states.append(hy)
+                x_t = hy  # Update input for the next layer
 
+            # Store output
             outputs.append(hy)
 
         # Concatenate and stack the hidden states
         outputs = torch.cat(outputs, dim=0).view(bs, seq_len, self.hidden_size)
-        # Stack the hidden states at each layer
-        layer_hidden_states = torch.stack(layer_hidden_states, dim=1)
-        return outputs, layer_hidden_states
+        return outputs, hidden
 
 
 if __name__ == '__main__':
-    rnn_model = RNNLayer(input_size=64, hidden_size=128, output_size=2)
-    input_data = torch.randn(32, 10, 64)
+    input_data = torch.randn(32, 10, 128)
+    print(input_data.shape)
+    rnn_model = MultiLayerRNN(input_size=128, hidden_size=256, num_layers=2)
     # Batch size of 32, sequence length of 10, input size of 64
-    output, final_hidden_state = rnn_model(input_data)
-    print(output.shape, final_hidden_state.shape)
-
-    rnn_model = MultiLayerRNN(input_size=64, hidden_size=128, num_layers=2)
-    input_data = torch.randn(32, 10, 64)
-    # Batch size of 32, sequence length of 10, input size of 64
-    outputs, final_hidden_state = rnn_model(input_data)
-    print(outputs.shape, final_hidden_state.shape)
+    outputs, hidden_state = rnn_model(input_data)
+    print(outputs.shape, hidden_state.shape)
