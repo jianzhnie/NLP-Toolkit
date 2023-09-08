@@ -286,3 +286,8 @@ if __name__ == '__main__':
     # Batch size of 32, sequence length of 10, input size of 64
     outputs, hidden_state = rnn_model(input_data)
     print(outputs.shape, hidden_state.shape)
+
+    rnn = nn.RNN(128, 256, 2)
+    input_data = input_data.permute(1, 0, 2)
+    outputs, hidden_state = rnn(input_data)
+    print(outputs.shape, hidden_state.shape)
