@@ -4,7 +4,7 @@ This example trains a multi-layer RNN (Elman, GRU, or LSTM) or Transformer on a 
 The trained model can then be used by the generate script to generate new text.
 
 ```bash
-python main.py --cuda --epochs 6 --model Transformer --lr 5
+python train_transformer.py --cuda --epochs 6 --model Transformer --lr 5
                                            # Train a Transformer model on Wikitext-2 with CUDA.
 ```
 

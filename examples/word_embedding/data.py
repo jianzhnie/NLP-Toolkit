@@ -46,6 +46,7 @@ class WikiTextDataset(Dataset):
                                        pad_token='<pad>',
                                        bos_token='<bos>',
                                        eos_token='<eos>')
+        self.vocab.save_vocabulary(os.path.join(data_dir, 'vocab.txt'))
 
     def __len__(self) -> int:
         return len(self.data_lst)
@@ -91,7 +92,8 @@ class WikiTextDataset(Dataset):
         # Tokenize file content
         tokenized_sentences = []
         with open(path, 'r', encoding='utf8') as f:
-            for sentence in f:
+            lines = f.readlines()
+            for sentence in lines:
                 split_words = self.tokenizer.tokenize(sentence)
                 if len(split_words) > 0:
                     tokenized_sentences.append(split_words)
