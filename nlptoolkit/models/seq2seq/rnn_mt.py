@@ -14,7 +14,6 @@ class RNNEncoder(nn.Module):
         hidden_size (int): The size of the GRU's hidden state.
         num_layers (int): The number of GRU layers.
         dropout (float): Dropout probability (default: 0.5).
-
     """
     def __init__(self,
                  vocab_size: int,
@@ -46,7 +45,6 @@ class RNNEncoder(nn.Module):
 
         Args:
             module (nn.Module): The module for weight initialization.
-
         """
         if isinstance(module, nn.Linear):
             nn.init.xavier_uniform_(module.weight)
@@ -55,7 +53,7 @@ class RNNEncoder(nn.Module):
                 if 'weight' in param_name:
                     nn.init.xavier_uniform_(param)
 
-    def forward(self, src: torch.Tensor) -> torch.Tensor:
+    def forward(self, src: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass of the encoder.
 
@@ -65,7 +63,6 @@ class RNNEncoder(nn.Module):
         Returns:
             torch.Tensor: Output sequences with shape [seq_len, batch_size, hidden_size].
             torch.Tensor: Final hidden state with shape [num_layers, batch_size, hidden_size].
-
         """
         # Permute input to [seq_len, batch_size]
         src = src.permute(1, 0)
@@ -89,7 +86,6 @@ class RNNDecoder(nn.Module):
         hidden_size (int): Size of the RNN hidden state.
         num_layers (int): Number of RNN layers.
         dropout (float): Dropout probability (default: 0.5).
-
     """
     def __init__(self,
                  vocab_size: int,
@@ -140,18 +136,16 @@ class RNNDecoder(nn.Module):
         Forward pass of the RNN Decoder.
 
         Args:
-            input (Tensor): Input tokens (batch_size, seq_len).
-            hidden (Tensor): Initial hidden state (num_layers, batch_size, hidden_size).
-            context (Tensor): Context information (batch_size, seq_len, context_size).
+            input (torch.Tensor): Input tokens (batch_size, seq_len).
+            hidden (torch.Tensor): Initial hidden state (num_layers, batch_size, hidden_size).
+            context (torch.Tensor): Context information (batch_size, seq_len, context_size).
 
         Returns:
-            outputs (Tensor): Output logits (batch_size, seq_len, vocab_size).
-            hidden (Tensor): Updated hidden state (num_layers, batch_size, hidden_size).
+            torch.Tensor: Output logits (batch_size, seq_len, vocab_size).
+            torch.Tensor: Updated hidden state (num_layers, batch_size, hidden_size).
         """
         input = input.permute(1, 0)  # Transpose for RNN input
-        print(input.shape)
         embed = self.embedding(input)
-        print(embed.shape, context.shape)
         embed_context = torch.cat((embed, context), dim=2)
         outputs, hidden = self.rnn(embed_context, hidden)
         outputs = self.fc_out(outputs)
@@ -200,17 +194,17 @@ class RNNSeq2Seq(nn.Module):
         Forward pass of the Seq2Seq model.
 
         Args:
-            src (Tensor): Source input tensor of shape (batch_size, src_seq_len).
-            tgt (Tensor): Target input tensor of shape (batch_size, tgt_seq_len).
+            src (torch.Tensor): Source input tensor of shape (batch_size, src_seq_len).
+            tgt (torch.Tensor): Target input tensor of shape (batch_size, tgt_seq_len).
 
         Returns:
-            dec_outputs (Tensor): Decoder outputs tensor of shape (batch_size, tgt_seq_len, trg_vocab_size).
+            dec_outputs (torch.Tensor): Decoder outputs tensor of shape (batch_size, tgt_seq_len, trg_vocab_size).
         """
         # Encode the source sequence
         enc_outputs, enc_state = self.encoder(src)
 
         # Get the target sequence length and batch size
-        batch_size, tgt_seq_len, = tgt.shape
+        batch_size, tgt_seq_len = tgt.shape
 
         # Use the last encoder output as context
         context = enc_outputs[-1]
