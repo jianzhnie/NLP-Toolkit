@@ -15,10 +15,6 @@ class RNNEncoder(nn.Module):
         num_layers (int): The number of GRU layers.
         dropout (float): Dropout probability (default: 0.5).
 
-    Attributes:
-        hidden_size (int): The size of the hidden state.
-        num_layers (int): The number of GRU layers.
-
     """
     def __init__(self,
                  vocab_size: int,
@@ -42,6 +38,7 @@ class RNNEncoder(nn.Module):
 
         # Dropout layer
         self.dropout = nn.Dropout(dropout)
+        self.apply(self.init_param)
 
     def init_param(self, module: nn.Module):
         """
@@ -83,78 +80,63 @@ class RNNEncoder(nn.Module):
 
 
 class RNNDecoder(nn.Module):
+    """The RNN decoder for sequence to sequence learning."""
     def __init__(self,
                  vocab_size,
-                 embed_dim,
+                 embed_size,
                  hidden_size,
                  num_layers,
-                 dropout=0.):
+                 dropout=0.5):
         super().__init__()
 
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        self.embedding = nn.Embedding(vocab_size, embed_dim)
+        self.embedding = nn.Embedding(vocab_size, embed_size)
 
-        self.rnn = nn.GRU(embed_dim + hidden_size,
+        self.rnn = nn.GRU(embed_size + hidden_size,
                           hidden_size,
                           num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
 
-        self.fc_out = nn.Linear(embed_dim + hidden_size * 2, vocab_size)
+        self.fc_out = nn.LazyLinear(vocab_size)
 
         self.dropout = nn.Dropout(dropout)
 
+        self.apply(self.init_param)
+
+    def init_param(self, module: nn.Module):
+        """
+        Initialize weights for sequence-to-sequence learning.
+
+        Args:
+            module (nn.Module): The module for weight initialization.
+
+        """
+        if isinstance(module, nn.Linear):
+            nn.init.xavier_uniform_(module.weight)
+        if isinstance(module, nn.GRU):
+            for param_name, param in module.named_parameters():
+                if 'weight' in param_name:
+                    nn.init.xavier_uniform_(param)
+
     def forward(self, input, hidden, context):
-
-        # input = [batch size]
-        # hidden = [n layers * n directions, batch size, hid dim]
-        # context = [n layers * n directions, batch size, hid dim]
-
-        # n layers and n directions in the decoder will both always be 1, therefore:
-        # hidden = [1, batch size, hid dim]
-        # context = [1, batch size, hid dim]
-
-        input = input.unsqueeze(0)
-
-        # input = [1, batch size]
-
-        embedded = self.dropout(self.embedding(input))
-
-        # embedded = [1, batch size, emb dim]
-
-        emb_con = torch.cat((embedded, context), dim=2)
-
-        # emb_con = [1, batch size, emb dim + hid dim]
-
-        output, hidden = self.rnn(emb_con, hidden)
-
-        # output = [seq len, batch size, hid dim * n directions]
-        # hidden = [n layers * n directions, batch size, hid dim]
-
-        # seq len, n layers and n directions will always be 1 in the decoder, therefore:
-        # output = [1, batch size, hid dim]
-        # hidden = [1, batch size, hid dim]
-
-        output = torch.cat(
-            (embedded.squeeze(0), hidden.squeeze(0), context.squeeze(0)),
-            dim=1)
-
-        # output = [batch size, emb dim + hid dim * 2]
-
-        prediction = self.fc_out(output)
-
-        # prediction = [batch size, output dim]
-
-        return prediction, hidden
+        input = input.permute(1, 0)
+        embed = self.embedding(input)
+        embed_context = torch.cat((embed, context), dim=2)
+        outputs, hidden = self.rnn(embed_context, hidden)
+        outputs = self.fc_out(outputs).swapaxes(0, 1)
+        # outputs shape: (batch_size, num_steps, vocab_size)
+        # hidden shape: (num_layers, batch_size, num_hiddens)
+        return outputs, hidden
 
 
 class RNNSeq2Seq(nn.Module):
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,
-                 embed_dim,
+                 embed_size,
                  hidden_size,
                  num_layers,
                  dropout=0.,
@@ -168,9 +150,9 @@ class RNNSeq2Seq(nn.Module):
         self.num_layers = num_layers
         self.device = device
 
-        self.encoder = RNNEncoder(src_vocab_size, embed_dim, hidden_size,
+        self.encoder = RNNEncoder(src_vocab_size, embed_size, hidden_size,
                                   num_layers, dropout)
-        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, hidden_size,
+        self.decoder = RNNDecoder(trg_vocab_size, embed_size, hidden_size,
                                   num_layers, dropout)
 
     def forward(self, src, trg, teacher_forcing_ratio=0.5):
@@ -224,3 +206,13 @@ class RNNSeq2Seq(nn.Module):
                 nn.init.normal_(param.data, mean=0, std=0.01)
             else:
                 nn.init.constant_(param.data, 0)
+
+
+if __name__ == '__main__':
+    vocab_size, embed_size, num_hiddens, num_layers = 10, 8, 16, 2
+    batch_size, num_steps = 4, 5
+    encoder = RNNEncoder(vocab_size, embed_size, num_hiddens, num_layers)
+    input = torch.LongTensor([[1, 2, 4, 5, 3], [4, 3, 2, 9, 2],
+                              [1, 2, 3, 4, 4], [4, 3, 2, 1, 6]])
+    enc_outputs, enc_state = encoder(input)
+    print(enc_outputs.shape, enc_state.shape)
