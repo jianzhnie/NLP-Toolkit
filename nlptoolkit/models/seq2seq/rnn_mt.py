@@ -1,4 +1,5 @@
 import random
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -80,30 +81,44 @@ class RNNEncoder(nn.Module):
 
 
 class RNNDecoder(nn.Module):
-    """The RNN decoder for sequence to sequence learning."""
+    """
+    The RNN decoder for sequence-to-sequence learning.
+
+    Args:
+        vocab_size (int): Size of the vocabulary.
+        embed_size (int): Size of word embeddings.
+        hidden_size (int): Size of the RNN hidden state.
+        num_layers (int): Number of RNN layers.
+        dropout (float): Dropout probability (default: 0.5).
+
+    """
     def __init__(self,
-                 vocab_size,
-                 embed_size,
-                 hidden_size,
-                 num_layers,
-                 dropout=0.5):
+                 vocab_size: int,
+                 embed_size: int,
+                 hidden_size: int,
+                 num_layers: int,
+                 dropout: float = 0.5):
         super().__init__()
 
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
+        # Embedding layer for input tokens
         self.embedding = nn.Embedding(vocab_size, embed_size)
 
+        # GRU RNN layer
         self.rnn = nn.GRU(embed_size + hidden_size,
                           hidden_size,
                           num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
 
-        self.fc_out = nn.LazyLinear(vocab_size)
+        # Linear layer for output projection
+        self.fc_out = nn.Linear(hidden_size, vocab_size)
 
         self.dropout = nn.Dropout(dropout)
 
+        # Initialize model parameters
         self.apply(self.init_param)
 
     def init_param(self, module: nn.Module):
@@ -112,7 +127,6 @@ class RNNDecoder(nn.Module):
 
         Args:
             module (nn.Module): The module for weight initialization.
-
         """
         if isinstance(module, nn.Linear):
             nn.init.xavier_uniform_(module.weight)
@@ -121,14 +135,28 @@ class RNNDecoder(nn.Module):
                 if 'weight' in param_name:
                     nn.init.xavier_uniform_(param)
 
-    def forward(self, input, hidden, context):
-        input = input.permute(1, 0)
+    def forward(self, input: torch.Tensor, hidden: torch.Tensor,
+                context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass of the RNN Decoder.
+
+        Args:
+            input (Tensor): Input tokens (batch_size, seq_len).
+            hidden (Tensor): Initial hidden state (num_layers, batch_size, hidden_size).
+            context (Tensor): Context information (batch_size, seq_len, context_size).
+
+        Returns:
+            outputs (Tensor): Output logits (batch_size, seq_len, vocab_size).
+            hidden (Tensor): Updated hidden state (num_layers, batch_size, hidden_size).
+        """
+        input = input.permute(1, 0)  # Transpose for RNN input
         embed = self.embedding(input)
         embed_context = torch.cat((embed, context), dim=2)
         outputs, hidden = self.rnn(embed_context, hidden)
-        outputs = self.fc_out(outputs).swapaxes(0, 1)
-        # outputs shape: (batch_size, num_steps, vocab_size)
-        # hidden shape: (num_layers, batch_size, num_hiddens)
+        outputs = self.fc_out(outputs)
+        outputs = outputs.permute(1, 0, 2)
+        # Transpose back to (batch_size, seq_len, vocab_size)
+
         return outputs, hidden
 
 
