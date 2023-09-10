@@ -1,22 +1,18 @@
-import sys
-
 import torch
 
 from nlptoolkit.data.vocab import Vocab
-
-sys.path.append('../../')
 
 
 class NMTDatasets():
     """Defined in :numref:`sec_machine_translation`"""
     def __init__(self,
                  root='data',
-                 num_steps=10,
+                 max_seq_len=10,
                  num_train=1000,
                  num_val=1000):
         super(NMTDatasets, self).__init__()
         self.root = root
-        self.num_steps = num_steps
+        self.max_seq_len = max_seq_len
         self.num_train = num_train
         self.num_val = num_val
 
@@ -54,25 +50,23 @@ class NMTDatasets():
                 tgt.append(parts[1].split(' '))
         return src, tgt
 
-    def _truncate_pad(self, line, num_steps, padding_token):
+    def _truncate_pad(self, line, max_seq_len, padding_token):
         """Truncate or pad sequences."""
 
-        if len(line) > num_steps:
-            return line[:num_steps]  # Truncate
-        return line + [padding_token] * (num_steps - len(line))  # Pad
+        if len(line) > max_seq_len:
+            return line[:max_seq_len]  # Truncate
+        return line + [padding_token] * (max_seq_len - len(line))  # Pad
 
-    def _bulid_array_nmt(self, tokens, vocab=None, num_steps=10):
+    def _bulid_array_nmt(self, tokens, vocab=None, max_seq_len=10):
         """Transform text sequences of machine translation into minibatches."""
         if vocab is None:
-            vocab = Vocab(tokens,
-                          min_freq=2,
-                          reserved_tokens=['<pad>', '<bos>', '<eos>'])
+            vocab = Vocab.build_vocab(tokens, min_freq=2)
 
         text_tokens = [vocab[token] for token in tokens]
         text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
                        for token in text_tokens]
         text_tokens = [
-            self._truncate_pad(l, num_steps, vocab['<pad>'])
+            self._truncate_pad(l, max_seq_len, vocab['<pad>'])
             for l in text_tokens
         ]
         return text_tokens, vocab
@@ -109,7 +103,7 @@ class NMTDatasets():
 
 
 if __name__ == '__main__':
-    root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
+    root = 'data'
     nmtdataset = NMTDatasets(root=root)
     print(nmtdataset)
     # arrays, src_vocab, tgt_vocab = nmtdataset._build_arrays(
