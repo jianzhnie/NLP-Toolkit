@@ -160,6 +160,42 @@ class RNNDecoder(nn.Module):
         return outputs, hidden
 
 
+class EncoderDecoder(nn.Module):
+    """The base class for the encoder--decoder architecture.
+
+    Defined in :numref:`sec_encoder-decoder`"""
+    def __init__(self,
+                 src_vocab_size,
+                 trg_vocab_size,
+                 embed_size,
+                 hidden_size,
+                 num_layers,
+                 dropout=0.,
+                 device='cpu'):
+        super().__init__()
+        self.src_vocab_size = src_vocab_size
+        self.trg_vocab_size = trg_vocab_size
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.device = device
+
+        self.encoder = RNNEncoder(src_vocab_size, embed_size, hidden_size,
+                                  num_layers, dropout)
+        self.decoder = RNNDecoder(trg_vocab_size, embed_size, hidden_size,
+                                  num_layers, dropout)
+
+    def forward(self, src, tgt):
+        enc_outputs, enc_state = self.encoder(src)
+        tgt_len, tgt_bs = tgt.shape
+        # context: [batch_size, num_hiddens]
+        context = enc_outputs[-1]
+        # Broadcast context to (num_steps, batch_size, num_hiddens)
+        context = context.repeat(tgt_len, 1, 1)
+        dec_outputs, dec_state = self.decoder(tgt, enc_state, context)
+        return dec_outputs
+
+
 class RNNSeq2Seq(nn.Module):
     def __init__(self,
                  src_vocab_size,
@@ -190,12 +226,11 @@ class RNNSeq2Seq(nn.Module):
         # teacher_forcing_ratio is probability to use teacher forcing
         # e.g. if teacher_forcing_ratio is 0.75 we use ground-truth inputs 75% of the time
 
-        batch_size = trg.shape[1]
-        trg_len = trg.shape[0]
+        batch_size, trg_seq_len, _ = src.shape
         trg_vocab_size = self.trg_vocab_size
 
         # tensor to store decoder outputs
-        outputs = torch.zeros(trg_len, batch_size,
+        outputs = torch.zeros(trg_seq_len, batch_size,
                               trg_vocab_size).to(self.device)
 
         # last hidden state of the encoder is the context
@@ -207,7 +242,7 @@ class RNNSeq2Seq(nn.Module):
         # first input to the decoder is the <sos> tokens
         input = trg[0, :]
 
-        for t in range(1, trg_len):
+        for t in range(1, trg_seq_len):
 
             # insert input token embedding, previous hidden state and the context state
             # receive output tensor (predictions) and new hidden state
@@ -237,10 +272,25 @@ class RNNSeq2Seq(nn.Module):
 
 
 if __name__ == '__main__':
-    vocab_size, embed_size, num_hiddens, num_layers = 10, 8, 16, 2
-    batch_size, num_steps = 4, 5
+    vocab_size = 10
+    embed_size = 8
+    num_hiddens = 16
+    num_layers = 2
+    batch_size = 4
+    num_steps = 5
     encoder = RNNEncoder(vocab_size, embed_size, num_hiddens, num_layers)
     input = torch.LongTensor([[1, 2, 4, 5, 3], [4, 3, 2, 9, 2],
                               [1, 2, 3, 4, 4], [4, 3, 2, 1, 6]])
+    # input: [batch_size, num_steps]
     enc_outputs, enc_state = encoder(input)
+    # enc_outputs: [num_steps, batch_size, num_hiddens]
+    # enc_state: [num_layers, batch_size, num_hiddens]
     print(enc_outputs.shape, enc_state.shape)
+
+    decoder = RNNDecoder(vocab_size, embed_size, num_hiddens, num_layers)
+    # context: [batch_size, num_hiddens]
+    context = enc_outputs[-1]
+    # Broadcast context to (num_steps, batch_size, num_hiddens)
+    context = context.repeat(num_steps, 1, 1)
+    dec_outputs, state = decoder(input, enc_state, context)
+    print(dec_outputs.shape, state.shape)
