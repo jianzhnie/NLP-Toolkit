@@ -1,119 +1,109 @@
+import sys
+
 import torch
 
-from nlptoolkit.data.vocab import Vocab
+sys.path.append('../../')
+from typing import List, Tuple
+
+from nlptoolkit.data.tokenizer import Tokenizer
+from nlptoolkit.data.utils.utils import truncate_pad
+from nlptoolkit.data.vocab import (BOS_TOKEN, EOS_TOKEN, PAD_TOKEN, UNK_TOKEN,
+                                   Vocab)
 
 
 class NMTDatasets():
-    """Defined in :numref:`sec_machine_translation`"""
-    def __init__(self,
-                 root='data',
-                 max_seq_len=10,
-                 num_train=1000,
-                 num_val=1000):
+    """Machine translation dataset.
+
+    Args:
+        file_path (str): The path to the  machine translation data file.
+
+    """
+    def __init__(self, file_path: str = 'data', max_seq_len: int = 10):
         super(NMTDatasets, self).__init__()
-        self.root = root
+        self.file_path = file_path
         self.max_seq_len = max_seq_len
-        self.num_train = num_train
-        self.num_val = num_val
+        self.tokenizer = Tokenizer()
+        self.src_txt, self.tgt_tx = self.load_and_preprocess_data(
+            self.file_path)
+        self.src_sentences, self.tgt_sentences = self._tokenize(
+            self.src_txt, self.tgt_tx)
+        self.src_vocab = Vocab.build_vocab(self.src_sentences,
+                                           min_freq=2,
+                                           pad_token=PAD_TOKEN,
+                                           unk_token=UNK_TOKEN,
+                                           bos_token=BOS_TOKEN,
+                                           eos_token=EOS_TOKEN)
+        self.tgt_vocab = Vocab.build_vocab(self.tgt_sentences,
+                                           min_freq=2,
+                                           pad_token=PAD_TOKEN,
+                                           unk_token=UNK_TOKEN,
+                                           bos_token=BOS_TOKEN,
+                                           eos_token=EOS_TOKEN)
 
-    def _read_data(self):
-        """Load the English-French dataset."""
-        with open(self.root + '/fra-eng/fra.txt', encoding='utf-8') as f:
-            return f.read()
+    def load_and_preprocess_data(
+            self, file_path: str) -> Tuple[List[List[str]], List[List[str]]]:
+        """
+        Load and preprocess the machine translation dataset.
 
-    def _preprocess(self, text):
-        """Preprocess the English-French dataset."""
+        Returns:
+            Tuple[List[List[str]], List[List[str]]]: A tuple containing two lists.
+                - The first list contains source sentences.
+                - The second list contains target sentences.
+        """
+        source_texts = []
+        target_texts = []
+        with open(file_path, encoding='utf-8') as f:
+            for line in f.readlines():
+                line = line.replace('\u202f', ' ').replace('\xa0', ' ')
+                parts = line.split('\t')
+                if len(parts):
+                    source_texts.append(parts[0])
+                    target_texts.append(parts[1])
+        assert len(source_texts) == len(
+            target_texts
+        ), 'The number of source sentences and target sentences does not match.'
 
-        # Insert space between words and punctuation marks
-        def no_space(char, prev_char):
-            return char in set(',.!?') and prev_char != ' '
+        return source_texts, target_texts
 
-        # Replace non-breaking space with space
-        text = text.replace('\u202f', ' ').replace('\xa0', ' ')
-        # Insert space between words and punctuation marks
-        out = [
-            ' ' + char if i > 0 and no_space(char, text[i - 1]) else char
-            for i, char in enumerate(text.lower())
-        ]
-        return ''.join(out)
+    def _tokenize(self, src_texts, tgt_texts):
+        """Tokenize the  dataset."""
+        src_sentences = []
+        tgt_sentences = []
+        for src_text, tgt_text in zip(src_texts, tgt_texts):
+            src_tokens = self.tokenizer.tokenize(src_text)
+            tgt_tokens = self.tokenizer.tokenize(tgt_text)
+            src_sentences.append(src_tokens)
+            tgt_sentences.append(tgt_tokens)
+        assert len(src_sentences) == len(
+            tgt_sentences
+        ), 'The number of source sentences and target sentences does not match.'
 
-    def _tokenize(self, text, max_examples=None):
-        """Tokenize the English-French dataset."""
-        src, tgt = [], []
-        for i, line in enumerate(text.split('\n')):
-            if max_examples and i > max_examples:
-                break
-            parts = line.split('\t')
-            if len(parts) == 2:
-                # Skip empty tokens
-                src.append(parts[0].split(' '))
-                tgt.append(parts[1].split(' '))
-        return src, tgt
+        return src_sentences, tgt_sentences
 
-    def _truncate_pad(self, line, max_seq_len, padding_token):
-        """Truncate or pad sequences."""
+    def __getitem__(self, idx):
+        src_txt = self.src_sentences[idx]
+        tgt_txt = self.tgt_sentences[idx]
+        src_tokens = self.src_vocab.to_index(src_txt)
+        src_tokens = truncate_pad(src_tokens, self.max_seq_len,
+                                  self.src_vocab['<pad>'])
+        tgt_tokens = self.tgt_vocab.to_index(tgt_txt)
+        tgt_tokens = truncate_pad(tgt_tokens, self.max_seq_len,
+                                  self.tgt_vocab['<pad>'])
+        src_tensor, tgt_tensor = self._to_tensor(src_tokens, tgt_tokens)
+        return src_tensor, tgt_tensor
 
-        if len(line) > max_seq_len:
-            return line[:max_seq_len]  # Truncate
-        return line + [padding_token] * (max_seq_len - len(line))  # Pad
+    def __len__(self):
+        return len(self.src_txt)
 
-    def _bulid_array_nmt(self, tokens, vocab=None, max_seq_len=10):
-        """Transform text sequences of machine translation into minibatches."""
-        if vocab is None:
-            vocab = Vocab.build_vocab(tokens, min_freq=2)
-
-        text_tokens = [vocab[token] for token in tokens]
-        text_tokens = [[vocab['<bos>']] + token + [vocab['<eos>']]
-                       for token in text_tokens]
-        text_tokens = [
-            self._truncate_pad(l, max_seq_len, vocab['<pad>'])
-            for l in text_tokens
-        ]
-        return text_tokens, vocab
-
-    def get_dataset_tokens(self,
-                           raw_text=None,
-                           src_vocab=None,
-                           tgt_vocab=None):
-        """Defined in :numref:`sec_machine_translation`"""
-        if raw_text is None:
-            raw_text = self._read_data()
-
-        src, tgt = self._tokenize(self._preprocess(raw_text),
-                                  self.num_train + self.num_val)
-        src_tokens, src_vocab = self._bulid_array_nmt(src, src_vocab)
-        tgt_tokens, tgt_vocab = self._bulid_array_nmt(tgt, tgt_vocab)
-        return src_tokens, tgt_tokens, src_vocab, tgt_vocab
-
-    def get_tensor_dataset(self, src_tokens, tgt_tokens, train=True):
-        indices = slice(0, self.num_train) if train else slice(
-            self.num_train, None)
-
-        src_tokens, tgt_tokens = tuple(datasets[indices]
-                                       for datasets in (src_tokens,
-                                                        tgt_tokens))
-        data = []
-        for (src_token, tgt_token) in zip(src_tokens, tgt_tokens):
-            src_tensor_ = torch.tensor([token for token in src_token],
-                                       dtype=torch.long)
-            tgt_tensor_ = torch.tensor([token for token in tgt_token],
-                                       dtype=torch.long)
-            data.append((src_tensor_, tgt_tensor_))
-        return data
+    def _to_tensor(self, src_tokens, tgt_tokens):
+        src_tensor = torch.tensor(src_tokens, dtype=torch.long)
+        tgt_tensor = torch.tensor(tgt_tokens, dtype=torch.long)
+        return src_tensor, tgt_tensor
 
 
 if __name__ == '__main__':
-    root = 'data'
-    nmtdataset = NMTDatasets(root=root)
-    print(nmtdataset)
-    # arrays, src_vocab, tgt_vocab = nmtdataset._build_arrays(
-    #     nmtdataset._read_data())
-    data1 = nmtdataset._read_data()
-    data2 = nmtdataset._preprocess(data1)
-    src, tgt = nmtdataset._tokenize(data2)
-    # print(src, tgt)
-    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset._build_tokens(
-        data1)
-    data_train = nmtdataset.get_tensor_dataset(src_tokens, tgt_tokens)
-    print(src_tokens[0], tgt_tokens[0])
-    print(data_train[0])
+    root = '/home/robin/work_dir/llm/nlp-toolkit/data/nmt/fra-eng/fra.txt'
+    nmtdataset = NMTDatasets(file_path=root)
+    for idx in range(10):
+        src_tensor, tgt_tensor = nmtdataset[idx]
+        print(src_tensor, tgt_tensor)
