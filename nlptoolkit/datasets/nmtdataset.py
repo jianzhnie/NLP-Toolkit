@@ -61,18 +61,35 @@ class NMTDataset(Dataset):
 
         return source_texts, target_texts
 
-    def _tokenize(self, source_texts, target_texts):
-        """Tokenize the  dataset."""
+    def _tokenize(
+            self, source_texts: List[str], target_texts: List[str]
+    ) -> Tuple(List[List[str]], List[List[str]]):
+        """Tokenize source and target texts.
+
+        Args:
+            source_texts (List[str]): List of source language texts.
+            target_texts (List[str]): List of target language texts.
+
+        Returns:
+            Tuple[List[List[str]], List[List[str]]]: A tuple containing two lists.
+                - The first list contains tokenized source sentences.
+                - The second list contains tokenized target sentences.
+
+        Raises:
+            AssertionError: If the number of source and target sentences does not match.
+        """
         src_sentences = []
         tgt_sentences = []
+
         for src_text, tgt_text in zip(source_texts, target_texts):
             src_tokens = self.tokenizer.tokenize(src_text)
             tgt_tokens = self.tokenizer.tokenize(tgt_text)
             src_sentences.append(src_tokens)
             tgt_sentences.append(tgt_tokens)
+
         assert len(src_sentences) == len(
             tgt_sentences
-        ), 'The number of source sentences and target sentences does not match.'
+        ), 'The number of source and target sentences does not match.'
 
         return src_sentences, tgt_sentences
 
