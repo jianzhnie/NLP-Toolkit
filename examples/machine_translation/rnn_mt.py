@@ -11,28 +11,26 @@ sys.path.append('../../')
 from torch.utils.data.dataset import random_split
 
 from nlptoolkit.datasets.nmtdataset import NMTDataset
+from nlptoolkit.losses import MaskedSoftmaxCELoss
 from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
 
 
 def train(model: nn.Module, dataloader: DataLoader, optimizer: optim.Optimizer,
-          criterion: nn.Module, clip: float):
+          criterion: MaskedSoftmaxCELoss, clip: float):
 
     model.train()
 
     epoch_loss = 0
 
-    for _, (src, trg) in enumerate(dataloader):
-        src, trg = src.to(device), trg.to(device)
+    for idx, batch in enumerate(dataloader):
+
+        src, src_len, trg, trg_len = [t.to(device) for t in batch]
 
         optimizer.zero_grad()
 
         output = model(src, trg)
-        print(output.shape)
-        print(trg.shape)
-        output = output[1:].view(-1, output.shape[-1])
-        trg = trg[1:].view(-1)
 
-        loss = criterion(output, trg)
+        loss = criterion(output, trg, trg_len)
 
         loss.backward()
 
@@ -42,10 +40,13 @@ def train(model: nn.Module, dataloader: DataLoader, optimizer: optim.Optimizer,
 
         epoch_loss += loss.item()
 
+        print(f'Batch {idx} loss: {loss.item()}', end='\n')
+
     return epoch_loss / len(dataloader)
 
 
-def evaluate(model: nn.Module, iterator: DataLoader, criterion: nn.Module):
+def evaluate(model: nn.Module, iterator: DataLoader,
+             criterion: MaskedSoftmaxCELoss):
 
     model.eval()
 
@@ -53,15 +54,12 @@ def evaluate(model: nn.Module, iterator: DataLoader, criterion: nn.Module):
 
     with torch.no_grad():
 
-        for _, (src, trg) in enumerate(iterator):
-            src, trg = src.to(device), trg.to(device)
+        for _, batch in enumerate(iterator):
 
-            output = model(src, trg, 0)  # turn off teacher forcing
+            src, src_len, trg, trg_len = [t.to(device) for t in batch]
 
-            output = output[1:].view(-1, output.shape[-1])
-            trg = trg[1:].view(-1)
-
-            loss = criterion(output, trg)
+            output = model(src, trg)
+            loss = criterion(output, trg, trg_len)
 
             epoch_loss += loss.item()
 
@@ -108,7 +106,7 @@ if __name__ == '__main__':
 
     print(f'The model has {count_parameters(model):,} trainable parameters')
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = MaskedSoftmaxCELoss()
 
     best_valid_loss = float('inf')
 
