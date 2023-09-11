@@ -11,42 +11,61 @@ import torch
 import torch.nn as nn
 
 
-def sequence_mask(X, valid_len, value=0):
-    """Mask irrelevant entries in sequences."""
-    maxlen = X.size(1)
-    mask = torch.arange((maxlen), dtype=torch.float32,
-                        device=X.device)[None, :] < valid_len[:, None]
-    X[~mask] = value
-    return X
+class MaskedSoftmaxCELoss(nn.Module):
+    """
+    The softmax cross-entropy loss with masks.
 
+    This loss is suitable for sequence-to-sequence models where sequences have varying lengths.
+    It applies a mask to ignore padding elements when computing the loss.
 
-class MaskedSoftmaxCELoss(nn.CrossEntropyLoss):
-    """The softmax cross-entropy loss with masks."""
+    Args:
+        ignore_index (int, optional): Index to ignore when computing the loss. Defaults to -100.
 
-    # `pred` shape: (`batch_size`, `num_steps`, `vocab_size`)
-    # `label` shape: (`batch_size`, `num_steps`)
-    # `valid_len` shape: (`batch_size`,)
-    def forward(self, pred, label, valid_len):
-        weights = torch.ones_like(label)
-        weights = sequence_mask(weights, valid_len)
-        self.reduction = 'none'
-        unweighted_loss = super(MaskedSoftmaxCELoss,
-                                self).forward(pred.permute(0, 2, 1), label)
-        weighted_loss = (unweighted_loss * weights).mean(dim=1)
+    Attributes:
+        ignore_index (int): Index to ignore when computing the loss.
+        criterion (nn.CrossEntropyLoss): Cross-entropy loss criterion with predefined settings.
+
+    """
+    def __init__(self, ignore_index: int = -100):
+        super(MaskedSoftmaxCELoss, self).__init__()
+        self.ignore_index = ignore_index
+        self.criterion = nn.CrossEntropyLoss(reduction='none',
+                                             ignore_index=ignore_index)
+
+    def forward(self, pred: torch.Tensor, label: torch.Tensor,
+                valid_len: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the masked softmax cross-entropy loss.
+
+        Args:
+            pred (torch.Tensor): Predicted scores (logits) of shape (batch_size, seq_len, vocab_size).
+            label (torch.Tensor): Ground truth labels of shape (batch_size, seq_len).
+            valid_len (torch.Tensor): Lengths of valid elements in each sequence of shape (batch_size,).
+
+        Returns:
+            weighted_loss (torch.Tensor): Weighted loss of shape (batch_size,).
+
+        """
+        mask = self.generate_mask(label, valid_len)
+        loss = self.criterion(pred.permute(0, 2, 1), label)
+        weighted_loss = torch.sum(loss * mask) / torch.sum(mask)
         return weighted_loss
 
+    def generate_mask(self, label: torch.Tensor,
+                      valid_len: torch.Tensor) -> torch.Tensor:
+        """
+        Generate a mask to ignore padding elements.
 
-def masked_softmax(X, valid_lens):
-    """通过在最后一个轴上掩蔽元素来执行softmax操作."""
-    # X:3D张量，valid_lens:1D或2D张量
-    if valid_lens is None:
-        return nn.functional.softmax(X, dim=-1)
-    else:
-        shape = X.shape
-        if valid_lens.dim() == 1:
-            valid_lens = torch.repeat_interleave(valid_lens, shape[1])
-        else:
-            valid_lens = valid_lens.reshape(-1)
-        # 最后一轴上被掩蔽的元素使用一个非常大的负值替换，从而其softmax输出为0
-        X = sequence_mask(X.reshape(-1, shape[-1]), valid_lens, value=-1e6)
-        return nn.functional.softmax(X.reshape(shape), dim=-1)
+        Args:
+            label (torch.Tensor): Ground truth labels of shape (batch_size, seq_len).
+            valid_len (torch.Tensor): Lengths of valid elements in each sequence of shape (batch_size,).
+
+        Returns:
+            mask (torch.Tensor): Mask of shape (batch_size, seq_len) where padding elements are set to 0.
+
+        """
+        batch_size, seq_len = label.size()
+        mask = torch.arange(seq_len,
+                            dtype=torch.float32, device=label.device).expand(
+                                batch_size, seq_len) < valid_len.unsqueeze(1)
+        return mask.float()

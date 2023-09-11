@@ -8,6 +8,7 @@ Description:
 '''
 import random
 import sys
+from typing import List
 
 import torch
 from torch.utils.data import DataLoader
@@ -22,6 +23,19 @@ EOS_TOKEN = '<eos>'
 PAD_TOKEN = '<pad>'
 BOW_TOKEN = '<bow>'
 EOW_TOKEN = '<eow>'
+
+
+def truncate_pad(inputs: List[int],
+                 max_seq_len: int,
+                 padding_token_id: int = 0) -> List[int]:
+    """
+    Truncate and pad sequence to max sequence length.
+    """
+    if len(inputs) > max_seq_len:
+        inputs = inputs[:max_seq_len]
+    else:
+        inputs = inputs + [padding_token_id] * (max_seq_len - len(inputs))
+    return inputs
 
 
 def generate_ngram_dataset(sentence, context_size):

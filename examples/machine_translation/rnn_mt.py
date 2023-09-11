@@ -7,26 +7,28 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from nlptoolkit.datasets.nmtdataset import NMTDatasets
+sys.path.append('../../')
+from torch.utils.data.dataset import random_split
+
+from nlptoolkit.datasets.nmtdataset import NMTDataset
 from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
 
-sys.path.append('../../')
 
-
-def train(model: nn.Module, iterator: torch.utils.data.DataLoader,
-          optimizer: optim.Optimizer, criterion: nn.Module, clip: float):
+def train(model: nn.Module, dataloader: DataLoader, optimizer: optim.Optimizer,
+          criterion: nn.Module, clip: float):
 
     model.train()
 
     epoch_loss = 0
 
-    for _, (src, trg) in enumerate(iterator):
+    for _, (src, trg) in enumerate(dataloader):
         src, trg = src.to(device), trg.to(device)
 
         optimizer.zero_grad()
 
         output = model(src, trg)
-
+        print(output.shape)
+        print(trg.shape)
         output = output[1:].view(-1, output.shape[-1])
         trg = trg[1:].view(-1)
 
@@ -40,11 +42,10 @@ def train(model: nn.Module, iterator: torch.utils.data.DataLoader,
 
         epoch_loss += loss.item()
 
-    return epoch_loss / len(iterator)
+    return epoch_loss / len(dataloader)
 
 
-def evaluate(model: nn.Module, iterator: torch.utils.data.DataLoader,
-             criterion: nn.Module):
+def evaluate(model: nn.Module, iterator: DataLoader, criterion: nn.Module):
 
     model.eval()
 
@@ -76,43 +77,30 @@ def epoch_time(start_time: int, end_time: int):
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
-    nmtdataset = NMTDatasets(root=root, num_train=1600, num_val=1000)
-    src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
+    device = 'cpu'
+    file_path = '/home/robin/work_dir/llm/nlp-toolkit/data/nmt/fra-eng/fra.txt'
+    nmtdataset = NMTDataset(file_path=file_path, max_seq_len=30)
+    src_vocab = nmtdataset.src_vocab
+    tgt_vocab = nmtdataset.tgt_vocab
+    data_train, data_val = random_split(nmtdataset, [0.7, 0.3])
+    batch_size = 128
+    train_iter = DataLoader(
+        data_train,
+        batch_size=batch_size,
+        shuffle=True,
     )
-
-    def get_dataloader(train_data, val_data, batch_size=128):
-
-        train_iter = DataLoader(
-            train_data,
-            batch_size=batch_size,
-            shuffle=True,
-        )
-        valid_iter = DataLoader(
-            val_data,
-            batch_size=batch_size,
-            shuffle=True,
-        )
-        return train_iter, valid_iter
-
-    data_train = nmtdataset.get_tensor_dataset(src_tokens,
-                                               tgt_tokens,
-                                               train=True)
-    data_val = nmtdataset.get_tensor_dataset(src_tokens,
-                                             tgt_tokens,
-                                             train=False)
-
-    train_iter, valid_iter = get_dataloader(data_train,
-                                            data_val,
-                                            batch_size=128)
-
+    valid_iter = DataLoader(
+        data_val,
+        batch_size=batch_size,
+        shuffle=True,
+    )
     model = RNNSeq2Seq(src_vocab_size=len(src_vocab),
                        trg_vocab_size=len(tgt_vocab),
-                       embed_dim=32,
+                       embed_size=32,
                        hidden_size=64,
                        num_layers=1,
-                       dropout=0.5)
+                       dropout=0.5,
+                       device=device).to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
     def count_parameters(model: nn.Module):

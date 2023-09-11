@@ -63,7 +63,7 @@ class NMTDataset(Dataset):
 
     def _tokenize(
             self, source_texts: List[str], target_texts: List[str]
-    ) -> Tuple(List[List[str]], List[List[str]]):
+    ) -> Tuple[List[List[str]], List[List[str]]]:
         """Tokenize source and target texts.
 
         Args:
