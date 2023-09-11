@@ -170,22 +170,21 @@ class RNNSeq2Seq(nn.Module):
         hidden_size (int): Size of the RNN hidden state.
         num_layers (int): Number of RNN layers.
         dropout (float, optional): Dropout probability (default: 0.0).
-        device (str, optional): Device for computation (default: 'cpu').
     """
-    def __init__(self,
-                 src_vocab_size: int,
-                 trg_vocab_size: int,
-                 embed_size: int,
-                 hidden_size: int,
-                 num_layers: int,
-                 dropout: float = 0.0,
-                 device: str = 'cpu'):
+    def __init__(
+        self,
+        src_vocab_size: int,
+        trg_vocab_size: int,
+        embed_size: int,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float = 0.0,
+    ):
         super().__init__()
         self.src_vocab_size = src_vocab_size
         self.trg_vocab_size = trg_vocab_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.device = device
 
         # Initialize the encoder and decoder
         self.encoder = RNNEncoder(src_vocab_size, embed_size, hidden_size,
