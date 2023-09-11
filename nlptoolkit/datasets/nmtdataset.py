@@ -121,7 +121,9 @@ class NMTDataset(Dataset):
 
         src_tensor = self.to_tensor(src_tokens)
         tgt_tensor = self.to_tensor(tgt_tokens)
-        return src_tensor, tgt_tensor
+        src_len = src_tensor.ne(self.src_vocab['<pad>']).sum()
+        tgt_len = tgt_tensor.ne(self.tgt_vocab['<pad>']).sum()
+        return src_tensor, src_len, tgt_tensor, tgt_len
 
     def __len__(self) -> int:
         return len(self.src_sentences)
