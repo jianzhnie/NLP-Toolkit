@@ -146,12 +146,16 @@ class RNNDecoder(nn.Module):
         """
         input = input.permute(1, 0)  # Transpose for RNN input
         embed = self.embedding(input)
+        # embed: [seq_len, batch_size, embed_size]
+        # context: [seq_len, batch_size, context_size]
         embed_context = torch.cat((embed, context), dim=2)
+        # embed_context: [seq_len, batch_size, embed_size + context_size]
         outputs, hidden = self.rnn(embed_context, hidden)
+        # outputs: [seq_len, batch_size, hidden_size]
         outputs = self.fc_out(outputs)
+        # outputs: [seq_len, batch_size, vocab_size]
         outputs = outputs.permute(1, 0, 2)
-        # Transpose back to (batch_size, seq_len, vocab_size)
-
+        # outputs: [batch_size, seq_len, vocab_size]
         return outputs, hidden
 
 
