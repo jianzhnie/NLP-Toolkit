@@ -1,4 +1,5 @@
 import math
+import sys
 import time
 
 import torch
@@ -6,6 +7,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
+sys.path.append('../../')
+from nlptoolkit.data.tokenizer import Tokenizer
+from nlptoolkit.data.vocab import Vocab
+from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
+from nlptoolkit.utils.data_utils import truncate_pad
 from nlptoolkit.utils.model_utils import save_model_checkpoints
 from nlptoolkit.utils.train_utils import epoch_time
 
@@ -104,6 +110,73 @@ def evaluate(model: nn.Module,
                       'loss {:5.2f} '.format(idx, len(dataloader), cur_loss))
                 moving_loss = 0
     return epoch_loss / len(dataloader)
+
+
+def predict_seq2seq(model: RNNSeq2Seq,
+                    tokenizer: Tokenizer,
+                    src_sentence: str,
+                    src_vocab: Vocab,
+                    tgt_vocab: Vocab,
+                    max_seq_len: int = None,
+                    device: str = 'cpu') -> str:
+    """
+    Predict the target sentence for a given source sentence.
+
+    Args:
+        model (RNNSeq2Seq): The sequence-to-sequence model.
+        tokenizer (Tokenizer): Tokenizer for source sentence.
+        src_sentence (str): The source sentence.
+        src_vocab (Vocab): Vocabulary for source language.
+        tgt_vocab (Vocab): Vocabulary for target language.
+        max_seq_len (int, optional): Maximum sequence length for prediction.
+        device (str): Device to run prediction ('cpu' or 'cuda').
+
+    Returns:
+        str: The predicted target sentence.
+    """
+    model.eval()  # Set the model to evaluation mode
+
+    # Tokenize the source sentence and add <eos> token
+    src_tokens = tokenizer.tokenize(src_sentence) + ['<eos>']
+
+    # Convert source tokens to indices using the source vocabulary
+    src_indices = src_vocab.to_index(src_tokens)
+
+    # Truncate or pad the source sequence to the specified max_seq_len
+    src_indices = truncate_pad(src_indices, max_seq_len, src_vocab['<pad>'])
+
+    # Convert source indices to a tensor and move it to the specified device
+    src_tensor = torch.tensor(src_indices,
+                              dtype=torch.long).unsqueeze(0).to(device)
+    tgt_indices = [tgt_vocab['<bos>']]
+    tgt_indices = truncate_pad(tgt_indices, max_seq_len, tgt_vocab['<pad>'])
+    # Initialize the decoder input with <bos> token
+    dec_inputs = torch.tensor(tgt_indices,
+                              dtype=torch.long).unsqueeze(0).to(device)
+    with torch.no_grad():
+        # Encode the source sequence
+        enc_outputs, enc_state = model.encoder(src_tensor)
+        # Use the last encoder output as context for the decoder
+        context = enc_outputs[-1].repeat(max_seq_len, 1, 1)
+        # Initialize the decoder hidden state with the encoder hidden state
+        output_seq = []
+
+        for _ in range(max_seq_len):
+            # Decode one step at a time
+            outputs, dec_state = model.decoder(dec_inputs, enc_state, context)
+            # Get the predicted token with the highest probability
+            dec_inputs = outputs.argmax(dim=2)
+            pred = dec_inputs.squeeze(dim=0).type(torch.int32).item()
+            # If the predicted token is <eos>, stop predicting
+            if pred == tgt_vocab['<eos>']:
+                break
+
+            output_seq.append(pred)
+
+    # Convert the predicted token indices to text using the target vocabulary
+    pred_text = ' '.join(tgt_vocab.to_tokens(output_seq))
+
+    return pred_text
 
 
 def train_and_evaluate(

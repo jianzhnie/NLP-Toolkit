@@ -72,7 +72,8 @@ class RNNEncoder(nn.Module):
 
         # Pass through GRU layers
         outputs, hidden = self.rnn(embedded)
-
+        # outputs: [seq_len, batch_size, hidden_size]
+        # hidden:  [num_layers, batch_size, hidden_size]
         return outputs, hidden
 
 
@@ -225,33 +226,33 @@ if __name__ == '__main__':
     src_vocab_size = 10
     tgt_vocab_size = 20
     embed_size = 8
-    num_hiddens = 16
+    hiddens_size = 16
     num_layers = 2
     batch_size = 4
-    num_steps = 5
-    encoder = RNNEncoder(src_vocab_size, embed_size, num_hiddens, num_layers)
+    max_seq_len = 5
+    encoder = RNNEncoder(src_vocab_size, embed_size, hiddens_size, num_layers)
     input = torch.LongTensor([[1, 2, 4, 5, 3], [4, 3, 2, 9, 2],
                               [1, 2, 3, 4, 4], [4, 3, 2, 1, 6]])
 
     target = torch.LongTensor([[1, 3, 4, 5, 3], [4, 3, 2, 9, 2],
                                [1, 2, 3, 4, 4], [4, 3, 2, 1, 6]])
-    # input: [batch_size, num_steps]
+    # input: [batch_size, max_seq_len]
     enc_outputs, enc_state = encoder(input)
-    # enc_outputs: [num_steps, batch_size, num_hiddens]
-    # enc_state: [num_layers, batch_size, num_hiddens]
+    # enc_outputs: [max_seq_len, batch_size, hiddens_size]
+    # enc_state: [num_layers, batch_size, hiddens_size]
     print(enc_outputs.shape, enc_state.shape)
 
-    decoder = RNNDecoder(tgt_vocab_size, embed_size, num_hiddens, num_layers)
-    # context: [batch_size, num_hiddens]
+    decoder = RNNDecoder(tgt_vocab_size, embed_size, hiddens_size, num_layers)
+    # context: [batch_size, hiddens_size]
     context = enc_outputs[-1]
-    # Broadcast context to (num_steps, batch_size, num_hiddens)
-    context = context.repeat(num_steps, 1, 1)
+    # Broadcast context to (max_seq_len, batch_size, hiddens_size)
+    context = context.repeat(max_seq_len, 1, 1)
     dec_outputs, state = decoder(target, enc_state, context)
     print(dec_outputs.shape, state.shape)
 
     print('seq2seq')
     seq2seq = RNNSeq2Seq(src_vocab_size, tgt_vocab_size, embed_size,
-                         num_hiddens, num_layers)
+                         hiddens_size, num_layers)
 
     output = seq2seq(input, target)
     print(output.shape)

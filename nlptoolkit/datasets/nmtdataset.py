@@ -109,18 +109,25 @@ class NMTDataset(Dataset):
                                  bos_token='<bos>',
                                  eos_token='<eos>')
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
-        src_tokens = self.src_vocab.to_index(self.src_sentences[idx])
-        tgt_tokens = self.tgt_vocab.to_index(self.tgt_sentences[idx])
+    def __getitem__(
+            self, idx
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Get a single item from the dataset."""
+        # Convert tokens to indices
+        src_txt = ['<bos>'] + self.src_sentences[idx] + ['<eos>']
+        src_tokens = self.src_vocab.to_index(src_txt)
+        tgt_txt = ['<bos>'] + self.tgt_sentences[idx] + ['<eos>']
+        tgt_tokens = self.tgt_vocab.to_index(tgt_txt)
 
         # Ensure the sequences have the maximum sequence length
         src_tokens = self.truncate_pad(src_tokens, self.max_seq_len,
                                        self.src_vocab['<pad>'])
         tgt_tokens = self.truncate_pad(tgt_tokens, self.max_seq_len,
                                        self.tgt_vocab['<pad>'])
-
+        # Convert to tensors
         src_tensor = self.to_tensor(src_tokens)
         tgt_tensor = self.to_tensor(tgt_tokens)
+        # Get the valid lengths of the sequences
         src_len = src_tensor.ne(self.src_vocab['<pad>']).sum()
         tgt_len = tgt_tensor.ne(self.tgt_vocab['<pad>']).sum()
         return src_tensor, src_len, tgt_tensor, tgt_len
