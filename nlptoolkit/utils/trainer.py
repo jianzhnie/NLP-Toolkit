@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from nlptoolkit.utils.train_utils import epoch_time
+from nlptoolkit.utils.train_utils import epoch_time, save_model_checkpoints
 
 
 # Function to train the seq2seq model
@@ -114,7 +114,7 @@ def train_and_evaluate(
     num_epochs: int = 100,
     clip: float = 0.25,
     log_interval: int = 10,
-    save_model_path: str = 'model.pt',
+    save_model_path: str = 'rnn_nmt',
 ):
     """
     Train and evaluate the seq2seq model.
@@ -155,8 +155,7 @@ def train_and_evaluate(
             f'Val. Loss: {val_loss:.3f} | Val. PPL: {math.exp(val_loss):7.3f}')
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
-            with open(save_model_path, 'wb') as f:
-                torch.save(model, f)
+            save_model_checkpoints(model, epoch, save_model_path)
             best_val_loss = val_loss
     # Evaluate the model on the test set
     test_loss = evaluate(model, eval_loader, criterion, log_interval)
