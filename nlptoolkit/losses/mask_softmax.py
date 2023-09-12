@@ -147,7 +147,7 @@ def masked_softmax(inputs: torch.Tensor,
         inputs = inputs.reshape(-1, shape[-1])
         inputs = sequence_mask(inputs, valid_lens, value=-1e6)
         # Reshape the masked tensor back to its original shape and perform softmax
-        return nn.functional.softmax.softmax(inputs.reshape(shape), dim=-1)
+        return nn.functional.softmax(inputs.reshape(shape), dim=-1)
 
 
 if __name__ == '__main__':
