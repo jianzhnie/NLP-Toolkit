@@ -12,7 +12,7 @@ import sys
 import torch
 import torch.nn as nn
 
-sys.path.append('../../../')
+sys.path.append('../../../../')
 import math
 from typing import Optional
 
@@ -220,14 +220,11 @@ class MultiHeadAttentionD2L(nn.Module):
 
 
 if __name__ == '__main__':
-    queries, keys = torch.normal(0, 1, (2, 1, 20)), torch.ones((2, 10, 2))
-    # queries : torch.Size([2, 1, 20])
-    # keys:     torch.Size([2, 10, 2])
-    # values:  torch.Size([2, 10, 4])
-    # values的小批量，两个值矩阵是相同的
+    queries = torch.normal(0, 1, (2, 1, 20))
+    keys = torch.ones((2, 10, 2))
     values = torch.arange(40, dtype=torch.float32).reshape(1, 10,
                                                            4).repeat(2, 1, 1)
-    valid_lens = None
+    valid_lens = torch.tensor([2, 6])
 
     attention1 = AdditiveAttention(key_size=2,
                                    query_size=20,
