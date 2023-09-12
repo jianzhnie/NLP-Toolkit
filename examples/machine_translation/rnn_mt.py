@@ -28,13 +28,13 @@ if __name__ == '__main__':
     tgt_vocab = nmtdataset.tgt_vocab
 
     # Split the dataset into training and validation sets
-    data_train, data_val = random_split(nmtdataset, [0.7, 0.3])
+    data_train, data_val = random_split(nmtdataset, [0.99, 0.01])
 
     # Define batch size for DataLoader
     batch_size = 128
 
     # Create DataLoader for training and validation sets
-    train_iter = DataLoader(data_train, batch_size=batch_size, shuffle=True)
+    train_iter = DataLoader(data_val, batch_size=batch_size, shuffle=True)
     valid_iter = DataLoader(data_val, batch_size=batch_size, shuffle=True)
 
     # Initialize the seq2seq model

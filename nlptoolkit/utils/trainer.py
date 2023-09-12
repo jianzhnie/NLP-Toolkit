@@ -100,7 +100,7 @@ def evaluate(model: nn.Module,
 
             if idx % log_interval == 0 and idx > 0:
                 cur_loss = moving_loss / log_interval
-                print('Val: {:5d}/{:5d} batches |'
+                print('Val: |{:5d}/{:5d} batches |'
                       'loss {:5.2f} '.format(idx, len(dataloader), cur_loss))
                 moving_loss = 0
     return epoch_loss / len(dataloader)
@@ -150,16 +150,19 @@ def train_and_evaluate(
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
         # Print epoch information
         print('-' * 89)
-        print(f'Epoch: {epoch:02} | Time: {epoch_mins} m {epoch_secs} s')
+        print(f'Epoch: {epoch} | Time: {epoch_mins}m {epoch_secs}s')
         print(
             f'Train Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}'
         )
-        print(f'Val Loss: {val_loss:.3f} | Val PPL: {math.exp(val_loss):7.3f}')
-        print('-' * 89)
+        print(
+            f'Valid Loss: {val_loss:.3f} | Valid PPL: {math.exp(val_loss):7.3f}'
+        )
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
             save_model_checkpoints(model, epoch, save_model_path)
             best_val_loss = val_loss
+        print(f'Best val loss: {best_val_loss:.3f}')
+        print('-' * 89)
     # Evaluate the model on the test set
     test_loss = evaluate(model, eval_loader, criterion, log_interval)
     print('End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
