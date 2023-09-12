@@ -22,7 +22,7 @@ def train_one_epoch(
     dataloader: DataLoader,
     optimizer: optim.Optimizer,
     criterion: nn.CrossEntropyLoss,
-    clip: float = None,
+    clip_ratio: float = None,
     epoch: int = 100,
     device: str = 'cpu',
     log_interval: int = 10,
@@ -35,7 +35,7 @@ def train_one_epoch(
         dataloader (DataLoader): DataLoader for the training data.
         optimizer (optim.Optimizer): The optimizer for gradient updates.
         criterion (nn.CrossEntropyLoss): The loss criterion.
-        clip (float): Gradient clipping threshold.
+        clip_ratio (float): Gradient clipping threshold.
         epoch (int): Current epoch number.
         log_interval (int): Log interval for printing progress.
 
@@ -55,8 +55,8 @@ def train_one_epoch(
         loss.backward()
 
         # Gradient clipping to prevent exploding gradients
-        if clip is not None:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+        if clip_ratio is not None:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), clip_ratio)
 
         optimizer.step()
         epoch_loss += loss.item()
@@ -186,7 +186,7 @@ def train_and_evaluate(
     optimizer: optim.Optimizer,
     criterion: nn.CrossEntropyLoss,
     num_epochs: int = 100,
-    clip: float = 0.25,
+    clip_ratio: float = 0.25,
     device: str = 'cpu',
     log_interval: int = 10,
     save_model_path: str = 'rnn_nmt',
@@ -201,7 +201,7 @@ def train_and_evaluate(
         optimizer (optim.Optimizer): The optimizer for gradient updates.
         criterion (nn.CrossEntropyLoss): The loss criterion.
         num_epochs (int): Number of training epochs.
-        clip (float): Gradient clipping threshold.
+        clip_ratio (float): Gradient clipping threshold.
         log_interval (int): Log interval for printing progress.
         save_model_path (str): Path to save the best model.
 
@@ -214,7 +214,7 @@ def train_and_evaluate(
         start_time = time.time()
         # Train the model
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion,
-                                     clip, epoch, device, log_interval)
+                                     clip_ratio, epoch, device, log_interval)
         # Evaluate the model on the validation set
         val_loss = evaluate(model, eval_loader, criterion, device,
                             log_interval)
