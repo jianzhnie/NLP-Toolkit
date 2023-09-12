@@ -7,10 +7,16 @@ Description:
 
 '''
 
-import math
+import sys
 
 import torch
 import torch.nn as nn
+
+sys.path.append('../../../')
+import math
+from typing import Optional
+
+from torch import Tensor
 
 from nlptoolkit.losses.mask_softmax import masked_softmax
 
@@ -40,49 +46,126 @@ def transpose_output(X, num_heads):
 
 
 class AdditiveAttention(nn.Module):
-    """加性注意力."""
-    def __init__(self, key_size, query_size, num_hiddens, dropout, **kwargs):
-        super(AdditiveAttention, self).__init__(**kwargs)
+    """
+    Additive Attention mechanism.
+
+    Args:
+        key_size (int): Size of the key vectors.
+        query_size (int): Size of the query vectors.
+        num_hiddens (int): Number of hidden units in the attention mechanism.
+        dropout (float): Dropout probability for regularization.
+
+
+    Methods:
+        forward(queries, keys, values, valid_lens):
+            Perform additive attention and return the attention-weighted values.
+
+    """
+    def __init__(self, key_size: int, query_size: int, num_hiddens: int,
+                 dropout: float):
+        """
+        Initialize the AdditiveAttention module.
+
+        Args:
+            key_size (int): Size of the key vectors.
+            query_size (int): Size of the query vectors.
+            num_hiddens (int): Number of hidden units in the attention mechanism.
+            dropout (float): Dropout probability for regularization.
+
+        """
+        super(AdditiveAttention, self).__init__()
         self.W_k = nn.Linear(key_size, num_hiddens, bias=False)
         self.W_q = nn.Linear(query_size, num_hiddens, bias=False)
         self.w_v = nn.Linear(num_hiddens, 1, bias=False)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, queries, keys, values, valid_lens):
+    def forward(self, queries: Tensor, keys: Tensor, values: Tensor,
+                valid_lens: Optional[Tensor]) -> Tensor:
+        """
+        Compute additive attention.
+
+        Args:
+            queries (Tensor): The query tensor of shape (batch_size, num_queries, query_size).
+            keys (Tensor): The key tensor of shape (batch_size, num_key_value_pairs, key_size).
+            values (Tensor): The value tensor of shape (batch_size, num_key_value_pairs, value_dimension).
+            valid_lens (Optional[Tensor]): An optional tensor of shape (batch_size,) or (batch_size, num_queries).
+
+        Returns:
+            Tensor: The attention-weighted output tensor.
+
+        """
         queries, keys = self.W_q(queries), self.W_k(keys)
-        # 在维度扩展后，
-        # queries的形状：(batch_size，查询的个数，1，num_hidden)
-        # key的形状：(batch_size，1，“键－值”对的个数，num_hiddens)
-        # 使用广播方式进行求和
+
+        # Broadcast the queries and keys to calculate the attention scores
+        # features shape: (batch_size, num_queries, num_key_value_pairs, num_hiddens)
         features = queries.unsqueeze(2) + keys.unsqueeze(1)
         features = torch.tanh(features)
-        # self.w_v仅有一个输出，因此从形状中移除最后那个维度。
-        # scores的形状：(batch_size，查询的个数，“键-值”对的个数)
+
+        # Calculate attention scores and apply masking if valid_lens is provided
+        # scores shape: (batch_size, num_queries, num_key_value_pairs)
         scores = self.w_v(features).squeeze(-1)
-        p_attn = masked_softmax(scores, valid_lens)
-        # values的形状：(batch_size，“键－值”对的个数，值的维度)
-        p_attn = self.dropout(p_attn)
-        output = torch.bmm(p_attn, values)
+        # Calculate the attention-weighted values
+        scores = masked_softmax(scores, valid_lens)
+        # Apply dropout
+        output = self.dropout(scores)
+        # output shape: (batch_size, num_queries, value_dimension)
+        output = torch.bmm(scores, values)
         return output
 
 
 class DotProductAttention(nn.Module):
-    """缩放点积注意力."""
-    def __init__(self, dropout, **kwargs):
-        super(DotProductAttention, self).__init__(**kwargs)
+    """
+    Scaled Dot Product Attention.
+
+    Args:
+        dropout (float): Dropout probability for regularization.
+
+    Methods:
+        forward(queries, keys, values, valid_lens=None):
+            Perform scaled dot product attention and return the attention-weighted values.
+
+    """
+    def __init__(self, dropout: float):
+        """
+        Initialize the DotProductAttention module.
+
+        Args:
+            dropout (float): Dropout probability for regularization.
+
+        """
+        super(DotProductAttention, self).__init__()
         self.dropout = nn.Dropout(dropout)
 
-    # queries的形状：(batch_size，查询的个数，d)
-    # keys的形状：(batch_size，“键－值”对的个数，d)
-    # values的形状：(batch_size，“键－值”对的个数，值的维度)
-    # valid_lens的形状:(batch_size，)或者(batch_size，查询的个数)
-    def forward(self, queries, keys, values, valid_lens=None):
+    def forward(self,
+                queries: torch.Tensor,
+                keys: torch.Tensor,
+                values: torch.Tensor,
+                valid_lens: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """
+        Compute scaled dot product attention.
+
+        Args:
+            queries (torch.Tensor): The query tensor of shape (batch_size, num_queries, d).
+            keys (torch.Tensor): The key tensor of shape (batch_size, num_key_value_pairs, d).
+            values (torch.Tensor): The value tensor of shape (batch_size, num_key_value_pairs, value_dimension).
+            valid_lens (Optional[torch.Tensor]): An optional tensor of shape (batch_size,) or (batch_size, num_queries).
+
+        Returns:
+            Tensor: The attention-weighted output tensor.
+
+        """
         d = queries.shape[-1]
-        # 设置transpose_b=True为了交换keys的最后两个维度
+
+        # Compute attention scores using dot product
         scores = torch.bmm(queries, keys.transpose(1, 2)) / math.sqrt(d)
+
+        # Calculate attention weights and apply dropout
         p_attn = masked_softmax(scores, valid_lens)
         p_attn = self.dropout(p_attn)
+
+        # Calculate the attention-weighted values
         output = torch.bmm(p_attn, values)
+        # outputs: (batch_size, num_queries, value_dimension)
         return output
 
 
