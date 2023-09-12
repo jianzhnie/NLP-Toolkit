@@ -9,6 +9,7 @@ from torch.utils.data.dataset import random_split
 from nlptoolkit.datasets.nmtdataset import NMTDataset
 from nlptoolkit.losses import MaskedSoftmaxCELoss
 from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
+from nlptoolkit.utils.logger_utils import get_outdir
 from nlptoolkit.utils.model_utils import count_parameters
 from nlptoolkit.utils.trainer import train_and_evaluate
 
@@ -18,7 +19,8 @@ if __name__ == '__main__':
     device = torch.device('cpu')
     # Define file paths and model paths
     file_path = '/home/robin/work_dir/llm/nlp-toolkit/data/nmt/fra-eng/fra.txt'
-    model_path = '/home/robin/work_dir/llm/nlp-toolkit/nmt/best_model.pth'
+    work_dir = '/home/robin/work_dir/llm/nlp-toolkit/work_dirs'
+    model_path = get_outdir(work_dir, 'rnn_mt', inc=True)
 
     # Create an instance of NMTDataset
     nmtdataset = NMTDataset(file_path=file_path, max_seq_len=30)
@@ -44,7 +46,7 @@ if __name__ == '__main__':
                        dropout=0.5).to(device)
 
     # Initialize the optimizer
-    optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     print(f'The model has {count_parameters(model):,} trainable parameters')
 
@@ -58,5 +60,6 @@ if __name__ == '__main__':
                        criterion,
                        num_epochs=10,
                        clip=0.25,
+                       device=device,
                        log_interval=10,
                        save_model_path=model_path)

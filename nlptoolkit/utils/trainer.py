@@ -6,7 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from nlptoolkit.utils.train_utils import epoch_time, save_model_checkpoints
+from nlptoolkit.utils.model_utils import save_model_checkpoints
+from nlptoolkit.utils.train_utils import epoch_time
 
 
 # Function to train the seq2seq model
@@ -59,7 +60,7 @@ def train_one_epoch(
             cur_loss = moving_loss / log_interval
             elapsed = time.time() - start_time
             print(
-                'Train: epoch {:3d} | {:5d}/{:5d} batches | ms/batch {:5.2f} | '
+                'Train: | epoch {:3d} | {:5d}/{:5d} batches | ms/batch {:5.2f} | '
                 'loss {:5.2f}'.format(epoch, idx, len(dataloader),
                                       elapsed * 1000 / log_interval, cur_loss))
             moving_loss = 0
@@ -113,6 +114,7 @@ def train_and_evaluate(
     criterion: nn.CrossEntropyLoss,
     num_epochs: int = 100,
     clip: float = 0.25,
+    device: str = 'cpu',
     log_interval: int = 10,
     save_model_path: str = 'rnn_nmt',
 ):
@@ -139,9 +141,10 @@ def train_and_evaluate(
         start_time = time.time()
         # Train the model
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion,
-                                     clip, epoch, log_interval)
+                                     clip, epoch, device, log_interval)
         # Evaluate the model on the validation set
-        val_loss = evaluate(model, eval_loader, criterion, log_interval)
+        val_loss = evaluate(model, eval_loader, criterion, device,
+                            log_interval)
         end_time = time.time()
         # Calculate elapsed time for the epoch
         epoch_mins, epoch_secs = epoch_time(start_time, end_time)
@@ -151,8 +154,8 @@ def train_and_evaluate(
         print(
             f'Train Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):7.3f}'
         )
-        print(
-            f'Val. Loss: {val_loss:.3f} | Val. PPL: {math.exp(val_loss):7.3f}')
+        print(f'Val Loss: {val_loss:.3f} | Val PPL: {math.exp(val_loss):7.3f}')
+        print('-' * 89)
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
             save_model_checkpoints(model, epoch, save_model_path)
