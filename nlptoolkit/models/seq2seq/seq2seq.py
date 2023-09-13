@@ -1,0 +1,80 @@
+import sys
+
+import torch.nn as nn
+
+sys.path.append('../../')
+from nlptoolkit.data.embeddings import PositionalEncoding
+from nlptoolkit.transformers.vanilla import Transformer
+
+
+class Seq2SeqTransformer(nn.Module):
+    """
+    Sequence-to-Sequence Transformer model for machine translation.
+
+    Args:
+        src_vocab_size (int): Size of the source vocabulary.
+        tgt_vocab_size (int): Size of the target vocabulary.
+        d_model (int): Dimensionality of the model.
+        num_heads (int): Number of attention heads in the transformer.
+        num_layers (int): Number of transformer encoder/decoder layers.
+        dim_feedforward (int): Dimensionality of the hidden layer in the feedforward network.
+        dropout (float, optional): Dropout probability. Default is 0.1.
+    """
+    def __init__(self,
+                 src_vocab_size: int,
+                 tgt_vocab_size: int,
+                 d_model: int,
+                 num_heads: int,
+                 num_layers: int,
+                 dim_feedforward: int,
+                 dropout: float = 0.1):
+        super(Seq2SeqTransformer, self).__init__()
+
+        # Source word embedding and positional encoding
+        self.src_word_embedding = nn.Embedding(src_vocab_size, d_model)
+        self.src_pos_encoding = PositionalEncoding(d_model, dropout)
+
+        # Target word embedding and positional encoding
+        self.tgt_word_embedding = nn.Embedding(tgt_vocab_size, d_model)
+        self.tgt_pos_encoding = PositionalEncoding(d_model, dropout)
+
+        # Transformer model
+        self.transformer = Transformer(d_model=d_model,
+                                       nhead=num_heads,
+                                       num_encoder_layers=num_layers,
+                                       num_decoder_layers=num_layers,
+                                       dim_feedforward=dim_feedforward,
+                                       dropout=dropout)
+
+        # Fully connected layer for output
+        self.fc = nn.Linear(d_model, tgt_vocab_size)
+
+    def forward(self, src, tgt, src_mask, tgt_mask):
+        """
+        Forward pass of the Seq2SeqTransformer.
+
+        Args:
+            src (torch.Tensor): Source input tensor.
+            tgt (torch.Tensor): Target input tensor.
+            src_mask (torch.Tensor): Source mask tensor.
+            tgt_mask (torch.Tensor): Target mask tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        # Embedding and positional encoding for source
+        src_emb = self.src_word_embedding(src)
+        src_emb = self.src_pos_encoding(src_emb)
+
+        # Embedding and positional encoding for target
+        tgt_emb = self.tgt_word_embedding(tgt)
+        tgt_emb = self.tgt_pos_encoding(tgt_emb)
+
+        # Transformer forward pass
+        seq2seq_outputs = self.transformer(src_emb, tgt_emb, src_mask,
+                                           tgt_mask)
+
+        # Linear layer for output
+        outputs = self.fc(seq2seq_outputs)
+
+        return outputs

@@ -631,19 +631,20 @@ if __name__ == '__main__':
     src = torch.rand(10, 32, 512)
     out = encoder_layer(src)
     print(out.shape)
+
     decoder_layer = TransformerDecoderLayer(d_model=512, nhead=8)
     memory = torch.rand(10, 32, 512)
     tgt = torch.rand(20, 32, 512)
     out = decoder_layer(tgt, memory)
     print(out.shape)
 
-    transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=6)
+    transformer_decoder = TransformerDecoder(decoder_layer, num_layers=6)
     memory = torch.rand(10, 32, 512)
     tgt = torch.rand(20, 32, 512)
     out = transformer_decoder(tgt, memory)
     print(out.shape)
 
-    transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=6)
+    transformer_encoder = TransformerEncoder(encoder_layer, num_layers=6)
     src = torch.rand(10, 32, 512)
     out = transformer_encoder(src)
     print(out.shape)
