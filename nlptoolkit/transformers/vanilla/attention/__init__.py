@@ -7,7 +7,6 @@ Description:
 
 '''
 
-from attn_function import (AdditiveAttention, DotProductAttention,
-                           MultiHeadAttention)
+from .attn_function import AdditiveAttention, DotProductAttention
 
-__all__ = ['AdditiveAttention', 'DotProductAttention', 'MultiHeadAttention']
+__all__ = ['AdditiveAttention', 'DotProductAttention']

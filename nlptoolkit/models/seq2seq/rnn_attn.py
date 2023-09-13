@@ -1,16 +1,22 @@
+import sys
 from typing import Tuple
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
+sys.path.append('../../../')
 from nlptoolkit.models.seq2seq.rnn_mt import RNNEncoder
 from nlptoolkit.transformers.vanilla.attention import AdditiveAttention
 
 
 class RNNAttentionDecoder(nn.Module):
-    def __init__(self, vocab_size: int, embed_size: int, hidden_size: int,
-                 num_layers: int, dropout: int):
+    def __init__(self,
+                 vocab_size: int,
+                 embed_size: int,
+                 hidden_size: int,
+                 num_layers: int,
+                 dropout: float = 0.0):
         super(RNNAttentionDecoder, self).__init__()
 
         self.vocab_size = vocab_size
@@ -21,7 +27,7 @@ class RNNAttentionDecoder(nn.Module):
 
         self.embedding = nn.Embedding(vocab_size, embed_size)
 
-        self.rnn = nn.GRU(inputs_szie=embed_size + hidden_size,
+        self.rnn = nn.GRU(input_size=embed_size + hidden_size,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
@@ -44,7 +50,7 @@ class RNNAttentionDecoder(nn.Module):
         inputs = inputs.permute(1, 0)
         embedded = self.embedding(inputs)
         # embeded shape: [seq_len, batch_size, embed_size]
-        outputs, attention_weights = [], []
+        outputs = []
         seq_len = embedded.shape[0]
         for idx in range(seq_len):
             input = embedded[idx]
@@ -63,14 +69,15 @@ class RNNAttentionDecoder(nn.Module):
             # decoder_outputs shape: [1, batch_size, hidden_size]
             # decoder_hidden_state shape: [num_layers, batch_size, hidden_size]
             outputs.append(decoder_outputs)
-            attention_weights.append(self.attention.attention_weights)
+
+        # attention_weights shape: [seq_len, batch_size, seq_len]
         outputs = torch.cat(outputs, dim=0)
         # outputs shape: [seq_len, batch_size, hidden_size]
         outputs = self.fc_out(outputs)
         # outputs shape: [seq_len, batch_size, vocab_size]
         outputs = outputs.permute(1, 0, 2)
         # outputs shape: [batch_size, seq_len, vocab_size]
-        return outputs, decoder_hidden_state, attention_weights
+        return outputs, decoder_hidden_state
 
 
 class RNNeq2SeqModel(nn.Module):
@@ -119,14 +126,11 @@ class RNNeq2SeqModel(nn.Module):
         # Get the target sequence length and batch size
         batch_size, tgt_seq_len = tgt.shape
 
-        # Use the last encoder output as context
-        context = enc_outputs[-1]
-
-        # Broadcast context to (tgt_seq_len, batch_size, hidden_size)
-        context = context.repeat(tgt_seq_len, 1, 1)
-
+        enc_outputs = enc_outputs.permute(1, 0, 2)
+        # enc_outputs shape: [batch_size, src_seq_len, hidden_size]
         # Decode the target sequence
-        dec_outputs, _ = self.decoder(tgt, enc_state, context)
+
+        dec_outputs, _ = self.decoder(tgt, enc_outputs, enc_state, None)
 
         return dec_outputs
 
@@ -153,12 +157,10 @@ if __name__ == '__main__':
 
     decoder = RNNAttentionDecoder(tgt_vocab_size, embed_size, hiddens_size,
                                   num_layers)
-    # context: [batch_size, hiddens_size]
-    context = enc_outputs[-1]
-    # Broadcast context to (max_seq_len, batch_size, hiddens_size)
-    context = context.repeat(max_seq_len, 1, 1)
-    dec_outputs, state = decoder(target, enc_state, context)
-    print(dec_outputs.shape, state.shape)
+    enc_outputs = enc_outputs.permute(1, 0, 2)
+    dec_outputs, decoder_hidden_state = decoder(target, enc_outputs, enc_state,
+                                                None)
+    print(dec_outputs.shape, decoder_hidden_state.shape)
 
     print('seq2seq')
     seq2seq = RNNeq2SeqModel(src_vocab_size, tgt_vocab_size, embed_size,
