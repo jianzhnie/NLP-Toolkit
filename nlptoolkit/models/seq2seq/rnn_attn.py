@@ -17,6 +17,16 @@ class RNNAttentionDecoder(nn.Module):
                  hidden_size: int,
                  num_layers: int,
                  dropout: float = 0.0):
+        """
+        Initialize the RNN Attention Decoder.
+
+        Args:
+            vocab_size (int): Size of the target vocabulary.
+            embed_size (int): Size of word embeddings.
+            hidden_size (int): Size of the decoder's hidden states.
+            num_layers (int): Number of GRU layers in the decoder.
+            dropout (float, optional): Dropout probability (default: 0.0).
+        """
         super(RNNAttentionDecoder, self).__init__()
 
         self.vocab_size = vocab_size
@@ -32,6 +42,7 @@ class RNNAttentionDecoder(nn.Module):
                           num_layers=num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
 
+        # Assuming you have an AdditiveAttention module
         self.attention = AdditiveAttention(hidden_size, hidden_size,
                                            hidden_size, dropout)
 
@@ -40,44 +51,68 @@ class RNNAttentionDecoder(nn.Module):
 
     def forward(self, inputs: Tensor, encoder_outputs: Tensor,
                 encoder_hidden_states: Tensor,
-                encoder_valid_lens) -> Tuple[Tensor]:
+                encoder_valid_lens: Tensor) -> Tuple[Tensor, Tensor]:
+        """
+        Forward pass of the RNN Attention Decoder.
 
-        # input shape: [batch_size, seq_len]
-        # enc_outputs shape: [seq_len, batch_size, hidden_size]
-        # enc_hidden_states shape: [num_layers, batch_size, hidden_size]
-        # enc_valid_lens shape: [batch_size]
+        Args:
+            inputs (Tensor): Target sequences (word indices) for decoding,
+                             shape [seq_len, batch_size].
+            encoder_outputs (Tensor): Encoder outputs, shape
+                                      [seq_len, batch_size, hidden_size].
+            encoder_hidden_states (Tensor): Hidden states of the encoder's GRU,
+                                            shape [num_layers, batch_size, hidden_size].
+            encoder_valid_lens (Tensor): Valid lengths of the encoder input sequences,
+                                         shape [batch_size].
 
+        Returns:
+            Tuple[Tensor, Tensor]: Tuple containing:
+                - outputs (Tensor): Decoder outputs, shape
+                                   [batch_size, seq_len, vocab_size].
+                - decoder_hidden_state (Tensor): Final decoder hidden state,
+                                                shape [num_layers, batch_size, hidden_size].
+        """
+        # Transpose inputs for batch processing
         inputs = inputs.permute(1, 0)
         embedded = self.embedding(inputs)
-        # embeded shape: [seq_len, batch_size, embed_size]
+        # embedded shape: [seq_len, batch_size, embed_size]
+
         outputs = []
         seq_len = embedded.shape[0]
+
         for idx in range(seq_len):
             input = embedded[idx]
             # input shape: [batch_size, embed_size]
+
             query = torch.unsqueeze(encoder_hidden_states[-1], dim=1)
             # query shape: [batch_size, 1, hidden_size]
+
             context = self.attention(query, encoder_outputs, encoder_outputs,
                                      encoder_valid_lens)
             # context shape: [batch_size, 1, hidden_size]
+
             input = torch.unsqueeze(input, dim=1)
             # input shape: [batch_size, 1, embed_size]
-            concate_features = torch.cat((context, input), dim=-1)
-            concate_features = concate_features.permute(1, 0, 2)
-            # concate_features shape: [batch_size, 1, embed_size + hidden_size]
+
+            concatenated_features = torch.cat((context, input), dim=-1)
+            concatenated_features = concatenated_features.permute(1, 0, 2)
+            # concatenated_features shape: [batch_size, 1, embed_size + hidden_size]
+
             decoder_outputs, decoder_hidden_state = self.rnn(
-                concate_features, encoder_hidden_states)
+                concatenated_features, encoder_hidden_states)
             # decoder_outputs shape: [1, batch_size, hidden_size]
             # decoder_hidden_state shape: [num_layers, batch_size, hidden_size]
+
             outputs.append(decoder_outputs)
 
-        # attention_weights shape: [seq_len, batch_size, seq_len]
+        # Concatenate and process decoder outputs
         outputs = torch.cat(outputs, dim=0)
         # outputs shape: [seq_len, batch_size, hidden_size]
         outputs = self.fc_out(outputs)
         # outputs shape: [seq_len, batch_size, vocab_size]
         outputs = outputs.permute(1, 0, 2)
         # outputs shape: [batch_size, seq_len, vocab_size]
+
         return outputs, decoder_hidden_state
 
 
@@ -86,8 +121,12 @@ class RNNeq2SeqModel(nn.Module):
     The Seq2Seq model with attention for sequence-to-sequence learning.
 
     Args:
-        encoder (nn.Module): The encoder module.
-        decoder (nn.Module): The decoder module.
+        src_vocab_size (int): Source vocabulary size.
+        trg_vocab_size (int): Target vocabulary size.
+        embed_size (int): Size of word embeddings.
+        hidden_size (int): Size of hidden states in the encoder and decoder.
+        num_layers (int): Number of RNN layers in the encoder and decoder.
+        dropout (float, optional): Dropout probability (default: 0.0).
     """
     def __init__(
         self,
@@ -128,8 +167,8 @@ class RNNeq2SeqModel(nn.Module):
 
         enc_outputs = enc_outputs.permute(1, 0, 2)
         # enc_outputs shape: [batch_size, src_seq_len, hidden_size]
-        # Decode the target sequence
 
+        # Decode the target sequence
         dec_outputs, _ = self.decoder(tgt, enc_outputs, enc_state, None)
 
         return dec_outputs
