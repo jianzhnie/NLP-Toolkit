@@ -38,8 +38,8 @@ def transpose_qkv(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
     # inputs shape: (batch_size, num_queries or num_key_value_pairs, num_heads, num_hiddens / num_heads)
     inputs = inputs.permute(0, 2, 1, 3)
     # inputs shape: (batch_size, num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
-    # inputs shape: (batch_size * num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
     inputs = inputs.reshape(-1, inputs.shape[2], inputs.shape[3])
+    # inputs shape: (batch_size * num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
     return inputs
 
 
@@ -256,19 +256,24 @@ class MultiHeadAttention(nn.Module):
         """
         # Linear transformations for queries, keys, and values
         queries = transpose_qkv(self.W_q(queries), self.num_heads)
+        # queries shape: (batch_size * num_heads, num_queries, num_hiddens / num_heads)
         keys = transpose_qkv(self.W_k(keys), self.num_heads)
+        # keys shape: (batch_size * num_heads, num_key_value_pairs, num_hiddens / num_heads)
         values = transpose_qkv(self.W_v(values), self.num_heads)
+        # values shape: (batch_size * num_heads, num_key_value_pairs, num_hiddens / num_heads)
 
         if valid_lens is not None:
             # Repeat valid_lens to match the shape of transformed queries, keys, and values
             valid_lens = torch.repeat_interleave(valid_lens,
                                                  repeats=self.num_heads,
                                                  dim=0)
-        # output shape: (batch_size * num_heads, num_queries, num_hiddens / num_heads)
         output = self.attention(queries, keys, values, valid_lens)
-        # output_concat shape: (batch_size, num_queries, num_hiddens)
+        # (batch_size * num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
         output = transpose_output(output, self.num_heads)
-        return self.W_o(output)
+        # output shape: (batch_size, num_queries, num_hiddens)
+        output = self.W_o(output)
+        # output shape: (batch_size, num_queries, num_hiddens)
+        return output
 
 
 if __name__ == '__main__':
