@@ -63,9 +63,10 @@ class RNNAttentionDecoder(nn.Module):
             input = torch.unsqueeze(input, dim=1)
             # input shape: [batch_size, 1, embed_size]
             concate_features = torch.cat((context, input), dim=-1)
+            concate_features = concate_features.permute(1, 0, 2)
             # concate_features shape: [batch_size, 1, embed_size + hidden_size]
             decoder_outputs, decoder_hidden_state = self.rnn(
-                concate_features.permute(1, 0, 2), encoder_hidden_states)
+                concate_features, encoder_hidden_states)
             # decoder_outputs shape: [1, batch_size, hidden_size]
             # decoder_hidden_state shape: [num_layers, batch_size, hidden_size]
             outputs.append(decoder_outputs)
