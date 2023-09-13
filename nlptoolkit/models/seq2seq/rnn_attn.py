@@ -11,6 +11,21 @@ from nlptoolkit.transformers.vanilla.attention import AdditiveAttention
 
 
 class RNNAttentionDecoder(nn.Module):
+    """
+    RNN-based decoder with Bahdanau attention for sequence-to-sequence learning.
+
+    带有Bahdanau注意力的循环神经网络解码器。
+
+    首先，初始化解码器的状态，需要下面的输入：
+
+    - 编码器在所有时间步的最终层隐状态，将作为注意力的键和值；
+
+    - 上一时间步的编码器全层隐状态，将作为初始化解码器的隐状态；
+
+    - 编码器有效长度（排除在注意力池中填充词元）。
+
+    在每个解码时间步骤中，解码器上一个时间步的最终层隐状态将用作查询。 因此，注意力输出和输入嵌入都连结为循环神经网络解码器的输入。
+    """
     def __init__(self,
                  vocab_size: int,
                  embed_size: int,
@@ -35,14 +50,16 @@ class RNNAttentionDecoder(nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout
 
+        # Initialize the embedding layer
         self.embedding = nn.Embedding(vocab_size, embed_size)
 
+        # Initialize the GRU cell
         self.rnn = nn.GRU(input_size=embed_size + hidden_size,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
                           dropout=dropout if num_layers > 1 else 0.)
 
-        # Assuming you have an AdditiveAttention module
+        # Initialize the Bahdanau attention module
         self.attention = AdditiveAttention(hidden_size, hidden_size,
                                            hidden_size, dropout)
 
