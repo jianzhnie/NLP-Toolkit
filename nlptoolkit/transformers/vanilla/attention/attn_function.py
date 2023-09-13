@@ -21,28 +21,48 @@ from torch import Tensor
 from nlptoolkit.losses.mask_softmax import masked_softmax
 
 
-def transpose_qkv(X, num_heads):
-    """为了多注意力头的并行计算而变换形状."""
-    # 输入X的形状:(batch_size，查询或者“键－值”对的个数，num_hiddens)
-    # 输出X的形状:(batch_size，查询或者“键－值”对的个数，num_heads，num_hiddens/num_heads)
-    X = X.reshape(X.shape[0], X.shape[1], num_heads, -1)
+def transpose_qkv(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
+    """
+    Transpose input tensor inputs for multi-head attention.
 
-    # 输出X的形状:(batch_size，num_heads，查询或者“键－值”对的个数, num_hiddens/num_heads)
-    X = X.permute(0, 2, 1, 3)
+    Args:
+        inputs (torch.Tensor): Input tensor.
+        num_heads (int): Number of attention heads.
 
-    # 最终输出的形状:(batch_size*num_heads,查询或者“键－值”对的个数, num_hiddens/num_heads)
-    return X.reshape(-1, X.shape[2], X.shape[3])
+    Returns:
+        torch.Tensor: Transposed tensor.
+
+    """
+    # inputs shape: (batch_size, num_queries or num_key_value_pairs, num_hiddens)
+    inputs = inputs.reshape(inputs.shape[0], inputs.shape[1], num_heads, -1)
+    # inputs shape: (batch_size, num_queries or num_key_value_pairs, num_heads, num_hiddens / num_heads)
+    inputs = inputs.permute(0, 2, 1, 3)
+    # inputs shape: (batch_size, num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
+    # inputs shape: (batch_size * num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
+    inputs = inputs.reshape(-1, inputs.shape[2], inputs.shape[3])
+    return inputs
 
 
-def transpose_output(X, num_heads):
-    """逆转transpose_qkv函数的操作."""
-    # 输入X的形状: (batch_size*num_heads,查询或者“键－值”对的个数, num_hiddens/num_heads)
-    # 输出X的形状: (batch_size，num_heads，查询或者“键－值”对的个数, num_hiddens/num_heads)
-    X = X.reshape(-1, num_heads, X.shape[1], X.shape[2])
-    # 输出的形状: (batch_size，查询或者“键－值”对的个数，num_heads, num_hiddens/num_heads)
-    X = X.permute(0, 2, 1, 3)
-    # 输出的形状: (batch_size，查询或者“键－值”对的个数，num_hiddens)
-    return X.reshape(X.shape[0], X.shape[1], -1)
+def transpose_output(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
+    """
+    Transpose and reshape output tensor from multi-head attention.
+
+    Args:
+        inputs (torch.Tensor): Output tensor.
+        num_heads (int): Number of attention heads.
+
+    Returns:
+        torch.Tensor: Transposed and reshaped tensor.
+
+    """
+    # inputs shape: (batch_size * num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
+    inputs = inputs.reshape(-1, num_heads, inputs.shape[1], inputs.shape[2])
+    # inputs shape: (batch_size, num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
+    inputs = inputs.permute(0, 2, 1, 3)
+    # inputs shape: (batch_size, num_queries or num_key_value_pairs, num_heads, num_hiddens / num_heads)
+    inputs = inputs.reshape(inputs.shape[0], inputs.shape[1], -1)
+    # inputs shape: (batch_size, num_queries or num_key_value_pairs, num_hiddens)
+    return inputs
 
 
 class AdditiveAttention(nn.Module):
@@ -178,23 +198,35 @@ class DotProductAttention(nn.Module):
         return output
 
 
-class MultiHeadAttentionD2L(nn.Module):
-    """多头注意力.
-
-    1. 为了避免计算代价和参数代价的大幅增长， 我们设定 𝑝𝑞=𝑝𝑘=𝑝𝑣=𝑝𝑜/ℎ 。
-    2. 值得注意的是，如果我们将查询、键和值的线性变换的输出数量设置为  𝑝𝑞ℎ=𝑝𝑘ℎ=𝑝𝑣ℎ=𝑝𝑜 ， 则可以并行计算 ℎ 个头。
-    3. 在下面的实现中， 𝑝𝑜 是通过参数num_hiddens指定的。
+class MultiHeadAttention(nn.Module):
     """
-    def __init__(self,
-                 key_size,
-                 query_size,
-                 value_size,
-                 num_hiddens,
-                 num_heads,
-                 dropout,
-                 bias=False,
-                 **kwargs):
-        super(MultiHeadAttentionD2L, self).__init__(**kwargs)
+    Multi-Head Attention Layer.
+
+    1. 为了避免计算代价和参数代价的大幅增长， 我们设定 𝑝_𝑞=𝑝_𝑘=𝑝_𝑣=𝑝_𝑜/ℎ$ 。
+    2. 值得注意的是，如果我们将查询、键和值的线性变换的输出数量设置为  𝑝_𝑞ℎ=𝑝_𝑘ℎ=𝑝_𝑣ℎ=𝑝_𝑜 ， 则可以并行计算 ℎ 个头。
+    3. 在下面的实现中，𝑝_𝑜 是通过参数num_hiddens指定的。
+
+    Args:
+        key_size (int): Size of the key vectors.
+        query_size (int): Size of the query vectors.
+        value_size (int): Size of the value vectors.
+        num_hiddens (int): Size of the hidden vectors.
+        num_heads (int): Number of attention heads.
+        dropout (float): Dropout probability for attention scores.
+        bias (bool, optional): Whether to include bias terms in linear transformations.
+
+    """
+    def __init__(
+        self,
+        key_size: int,
+        query_size: int,
+        value_size: int,
+        num_hiddens: int,
+        num_heads: int,
+        dropout: float,
+        bias: Optional[bool] = False,
+    ):
+        super(MultiHeadAttention, self).__init__()
         self.num_heads = num_heads
         self.attention = DotProductAttention(dropout)
         self.W_q = nn.Linear(query_size, num_hiddens, bias=bias)
@@ -202,30 +234,41 @@ class MultiHeadAttentionD2L(nn.Module):
         self.W_v = nn.Linear(value_size, num_hiddens, bias=bias)
         self.W_o = nn.Linear(num_hiddens, num_hiddens, bias=bias)
 
-    def forward(self, queries, keys, values, valid_lens):
-        # queries，keys，values的形状:
-        # (batch_size，查询或者“键－值”对的个数，num_hiddens)
-        # valid_lens　的形状:
-        # (batch_size，)或(batch_size，查询的个数)
-        # 经过变换后，输出的queries，keys，values　的形状:
-        # (batch_size*num_heads，查询或者“键－值”对的个数，num_hiddens/num_heads)
+    def forward(
+        self,
+        queries: torch.Tensor,
+        keys: torch.Tensor,
+        values: torch.Tensor,
+        valid_lens: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Forward pass of the multi-head attention layer.
+
+        Args:
+            queries (torch.Tensor): Query vectors. Shape: [batch_size, num_queries, query_size]
+            keys (torch.Tensor): Key vectors.  Shape: [batch_size, num_key_value_pairs, key_size]
+            values (torch.Tensor): Value vectors.  Shape: [batch_size, num_key_value_pairs, value_size]
+            valid_lens (torch.Tensor, optional): Valid sequence lengths for masking. Shape: [batch_size,]
+
+        Returns:
+            torch.Tensor: Output of the multi-head attention layer.
+
+        """
+        # Linear transformations for queries, keys, and values
         queries = transpose_qkv(self.W_q(queries), self.num_heads)
         keys = transpose_qkv(self.W_k(keys), self.num_heads)
         values = transpose_qkv(self.W_v(values), self.num_heads)
 
         if valid_lens is not None:
-            # 在轴0，将第一项（标量或者矢量）复制num_heads次，
-            # 然后如此复制第二项，然后诸如此类。
+            # Repeat valid_lens to match the shape of transformed queries, keys, and values
             valid_lens = torch.repeat_interleave(valid_lens,
                                                  repeats=self.num_heads,
                                                  dim=0)
-
-        # output的形状:(batch_size*num_heads，查询的个数，num_hiddens/num_heads)
+        # output shape: (batch_size * num_heads, num_queries, num_hiddens / num_heads)
         output = self.attention(queries, keys, values, valid_lens)
-
-        # output_concat的形状:(batch_size，查询的个数，num_hiddens)
-        output_concat = transpose_output(output, self.num_heads)
-        return self.W_o(output_concat)
+        # output_concat shape: (batch_size, num_queries, num_hiddens)
+        output = transpose_output(output, self.num_heads)
+        return self.W_o(output)
 
 
 if __name__ == '__main__':
@@ -249,10 +292,12 @@ if __name__ == '__main__':
 
     # D2l.ai  MultiHeadAttentionD2L
     num_hiddens, num_heads = 100, 5
-    attention3 = MultiHeadAttentionD2L(num_hiddens, num_hiddens, num_hiddens,
-                                       num_hiddens, num_heads, 0.5)
-    batch_size, num_queries = 2, 4
-    num_kvpairs, valid_lens = 6, torch.tensor([3, 2])
+    attention3 = MultiHeadAttention(num_hiddens, num_hiddens, num_hiddens,
+                                    num_hiddens, num_heads, 0.5)
+    batch_size = 2
+    num_queries = 4
+    num_kvpairs = 6
+    valid_lens = torch.tensor([3, 2])
     X = torch.ones((batch_size, num_queries, num_hiddens))
     Y = torch.ones((batch_size, num_kvpairs, num_hiddens))
     res = attention3(X, Y, Y, valid_lens)
