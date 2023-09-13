@@ -79,16 +79,16 @@ class AdditiveAttention(nn.Module):
         self.w_v = nn.Linear(num_hiddens, 1, bias=False)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, queries: Tensor, keys: Tensor, values: Tensor,
-                valid_lens: Optional[Tensor]) -> Tensor:
+    def forward(self, queries: torch.Tensor, keys: torch.Tensor,
+                values: torch.Tensor, valid_lens: Optional[Tensor]) -> Tensor:
         """
         Compute additive attention.
 
         Args:
-            queries (Tensor): The query tensor of shape (batch_size, num_queries, query_size).
-            keys (Tensor): The key tensor of shape (batch_size, num_key_value_pairs, key_size).
-            values (Tensor): The value tensor of shape (batch_size, num_key_value_pairs, value_dimension).
-            valid_lens (Optional[Tensor]): An optional tensor of shape (batch_size,) or (batch_size, num_queries).
+            queries (torch.Tensor): The query tensor of shape (batch_size, num_queries, d).
+            keys (torch.Tensor): The key tensor of shape (batch_size, num_key_value_pairs, d).
+            values (torch.Tensor): The value tensor of shape (batch_size, num_key_value_pairs, value_dimension).
+            valid_lens (Optional[torch.Tensor]): An optional tensor of shape (batch_size,) or (batch_size, num_queries).
 
         Returns:
             Tensor: The attention-weighted output tensor.
@@ -96,20 +96,26 @@ class AdditiveAttention(nn.Module):
         """
         queries, keys = self.W_q(queries), self.W_k(keys)
 
+        # queries shape: (batch_size, num_queries, num_hiddens)
+        # keys shape: (batch_size, num_key_value_pairs, num_hiddens)
         # Broadcast the queries and keys to calculate the attention scores
+        # queries shape: (batch_size, num_queries, 1, num_hiddens)
+        # keys shape: (batch_size, 1, num_key_value_pairs, num_hiddens)
         # features shape: (batch_size, num_queries, num_key_value_pairs, num_hiddens)
         features = queries.unsqueeze(2) + keys.unsqueeze(1)
         features = torch.tanh(features)
 
         # Calculate attention scores and apply masking if valid_lens is provided
+        # scores shape: (batch_size, num_queries, num_key_value_pairs, 1)
         # scores shape: (batch_size, num_queries, num_key_value_pairs)
         scores = self.w_v(features).squeeze(-1)
         # Calculate the attention-weighted values
-        scores = masked_softmax(scores, valid_lens)
-        # Apply dropout
-        output = self.dropout(scores)
+        p_attn = masked_softmax(scores, valid_lens)
+        # Apply dropout to the attention weights
+        p_attn = self.dropout(p_attn)
         # output shape: (batch_size, num_queries, value_dimension)
-        output = torch.bmm(scores, values)
+        output = torch.bmm(p_attn, values)
+        self.attention_weights = p_attn
         return output
 
 
@@ -157,6 +163,9 @@ class DotProductAttention(nn.Module):
         d = queries.shape[-1]
 
         # Compute attention scores using dot product
+        # quries shape: (batch_size, num_queries, d)
+        # keys shape: (batch_size, num_key_value_pairs, d)
+        # scores shape: (batch_size, num_queries, num_key_value_pairs)
         scores = torch.bmm(queries, keys.transpose(1, 2)) / math.sqrt(d)
 
         # Calculate attention weights and apply dropout

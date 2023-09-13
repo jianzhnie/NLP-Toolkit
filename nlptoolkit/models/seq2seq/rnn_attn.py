@@ -1,259 +1,168 @@
-import random
 from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
 
+from nlptoolkit.models.seq2seq.rnn_mt import RNNEncoder
+from nlptoolkit.transformers.vanilla.attention import AdditiveAttention
 
-class RNNEncoder(nn.Module):
-    def __init__(self, vocab_size: int, embeb_dim: int, enc_hidden_size: int,
-                 num_layers: int, dec_hidden_size: int, dropout: float):
-        super().__init__()
+
+class RNNAttentionDecoder(nn.Module):
+    def __init__(self, vocab_size: int, embed_size: int, hidden_size: int,
+                 num_layers: int, dropout: int):
+        super(RNNAttentionDecoder, self).__init__()
 
         self.vocab_size = vocab_size
-        self.embeb_dim = embeb_dim
-        self.enc_hidden_size = enc_hidden_size
-        self.dec_hidden_size = dec_hidden_size
+        self.embed_size = embed_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
         self.dropout = dropout
 
-        self.embedding = nn.Embedding(vocab_size, embeb_dim)
+        self.embedding = nn.Embedding(vocab_size, embed_size)
 
-        self.rnn = nn.GRU(input_size=embeb_dim,
-                          hidden_size=enc_hidden_size,
+        self.rnn = nn.GRU(inputs_szie=embed_size + hidden_size,
+                          hidden_size=hidden_size,
                           num_layers=num_layers,
-                          bidirectional=True,
-                          dropout=dropout if num_layers > 1 else 0)
+                          dropout=dropout if num_layers > 1 else 0.)
 
-        self.fc = nn.Linear(enc_hidden_size * 2, dec_hidden_size)
-
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, src):
-
-        # src = [src len, batch size]
-
-        embedded = self.dropout(self.embedding(src))
-
-        # embedded = [src len, batch size, emb dim]
-
-        outputs, hidden = self.rnn(embedded)
-
-        # outputs = [src len, batch size, hid dim * num directions]
-        # hidden = [n layers * num directions, batch size, hid dim]
-
-        # hidden is stacked [forward_1, backward_1, forward_2, backward_2, ...]
-        # outputs are always from the last layer
-
-        # hidden [-2, :, : ] is the last of the forwards RNN
-        # hidden [-1, :, : ] is the last of the backwards RNN
-
-        # initial decoder hidden is final hidden state of the forwards and backwards
-        # encoder RNNs fed through a linear layer
-        hidden = torch.cat((hidden[-2, :, :], hidden[-1, :, :]), dim=1)
-        hidden = self.fc(hidden)
-        hidden = torch.tanh(hidden)
-
-        # outputs = [src len, batch size, enc hid dim * 2]
-        # hidden = [batch size, dec hid dim]
-
-        return outputs, hidden
-
-
-class Attention(nn.Module):
-    def __init__(self, enc_hidden_size: int, dec_hidden_size: int,
-                 attn_dim: int):
-        super().__init__()
-
-        self.enc_hid_dim = enc_hidden_size
-        self.dec_hid_dim = dec_hidden_size
-
-        self.attn = nn.Linear((enc_hidden_size * 2) + dec_hidden_size,
-                              attn_dim)
-        self.fc = nn.Linear(attn_dim, 1, bias=False)
-
-    def forward(self, hidden, encoder_outputs):
-
-        # hidden = [batch size, dec hid dim]
-        # encoder_outputs = [src len, batch size, enc hid dim * 2]
-
-        src_len = encoder_outputs.shape[0]
-
-        # repeat decoder hidden state src_len times
-        hidden = hidden.unsqueeze(1).repeat(1, src_len, 1)
-
-        encoder_outputs = encoder_outputs.permute(1, 0, 2)
-
-        # hidden = [batch size, src len, dec hid dim]
-        # encoder_outputs = [batch size, src len, enc hid dim * 2]
-
-        energy = torch.cat((hidden, encoder_outputs), dim=2)
-        energy = self.attn(energy)
-        energy = torch.tanh(energy)
-
-        # energy = [batch size, src len, dec hid dim]
-
-        attention = self.fc(energy).squeeze(2)
-        # attention = torch.sum(energy, dim=2)
-
-        # attention= [batch size, src len]
-
-        return F.softmax(attention, dim=1)
-
-
-class RNNDecoder(nn.Module):
-    def __init__(self, vocab_size: int, embed_dim: int, enc_hidden_size: int,
-                 dec_hidden_size: int, attn_dim: int, dropout: int):
-        super().__init__()
-
-        self.embed_dim = embed_dim
-        self.enc_hidden_dim = enc_hidden_size
-        self.dec_hidden_dim = dec_hidden_size
-        self.vocab_size = vocab_size
-        self.dropout = dropout
-
-        self.embedding = nn.Embedding(vocab_size, embed_dim)
-
-        self.rnn = nn.GRU((enc_hidden_size * 2) + embed_dim, dec_hidden_size)
-
-        self.attention = Attention(enc_hidden_size=enc_hidden_size,
-                                   dec_hidden_size=dec_hidden_size,
-                                   attn_dim=attn_dim)
-        self.fc_out = nn.Linear(
-            (enc_hidden_size * 2) + dec_hidden_size + embed_dim, vocab_size)
+        self.attention = AdditiveAttention(hidden_size, hidden_size,
+                                           hidden_size, dropout)
 
         self.dropout = nn.Dropout(dropout)
+        self.fc_out = nn.Linear(hidden_size, vocab_size)
 
-    def _weighted_attn(self, decoder_hidden: Tensor,
-                       encoder_outputs: Tensor) -> Tensor:
-        # attn: batch_size * seq_len
-        attn = self.attention(decoder_hidden, encoder_outputs)
+    def forward(self, inputs: Tensor, encoder_outputs: Tensor,
+                encoder_hidden_states: Tensor,
+                encoder_valid_lens) -> Tuple[Tensor]:
 
-        attn = attn.unsqueeze(1)
+        # input shape: [batch_size, seq_len]
+        # enc_outputs shape: [seq_len, batch_size, hidden_size]
+        # enc_hidden_states shape: [num_layers, batch_size, hidden_size]
+        # enc_valid_lens shape: [batch_size]
 
-        # attn = [batch size, 1, src len]
-
-        # encoder_outputs = [batch size, src len, enc hid dim * 2]
-        encoder_outputs = encoder_outputs.permute(1, 0, 2)
-
-        # weighted = [batch size, 1, enc hid dim * 2]
-        weighted = torch.bmm(attn, encoder_outputs)
-        # weighted = [1, batch size, enc hid dim * 2]
-        weighted = weighted.permute(1, 0, 2)
-        return weighted
-
-    def forward(self, input: Tensor, decoder_hidden: Tensor,
-                encoder_outputs: Tensor) -> Tuple[Tensor]:
-
-        # input = [batch size]
-        # hidden = [batch size, dec hid dim]
-        # encoder_outputs = [src len, batch size, enc hid dim * 2]
-
-        input = input.unsqueeze(0)
-
-        # input = [1, batch size]
-        embedded = self.dropout(self.embedding(input))
-        # embedded = [1, batch size, emb dim]
-
-        # weighted = [1, batch size, enc_hid_dim * 2]
-        weighted = self._weighted_attn(decoder_hidden, encoder_outputs)
-
-        # rnn_input = [1, batch size, (enc_hid_dim * 2) + emb dim]
-        rnn_input = torch.cat((embedded, weighted), dim=2)
-
-        output, decoder_hidden = self.rnn(rnn_input,
-                                          decoder_hidden.unsqueeze(0))
-
-        # output = [seq len, batch size, dec hid dim * n directions]
-        # hidden = [n layers * n directions, batch size, dec hid dim]
-
-        # seq len, n layers and n directions will always be 1 in this decoder, therefore:
-        # output = [1, batch size, dec hid dim]
-        # hidden = [1, batch size, dec hid dim]
-        # this also means that output == hidden
-
-        embedded = embedded.squeeze(0)
-        output = output.squeeze(0)
-        weighted = weighted.squeeze(0)
-
-        output = self.fc_out(torch.cat((output, weighted, embedded), dim=1))
-
-        return output, decoder_hidden.squeeze(0)
+        inputs = inputs.permute(1, 0)
+        embedded = self.embedding(inputs)
+        # embeded shape: [seq_len, batch_size, embed_size]
+        outputs, attention_weights = [], []
+        seq_len = embedded.shape[0]
+        for idx in range(seq_len):
+            input = embedded[idx]
+            # input shape: [batch_size, embed_size]
+            query = torch.unsqueeze(encoder_hidden_states[-1], dim=1)
+            # query shape: [batch_size, 1, hidden_size]
+            context = self.attention(query, encoder_outputs, encoder_outputs,
+                                     encoder_valid_lens)
+            # context shape: [batch_size, 1, hidden_size]
+            input = torch.unsqueeze(input, dim=1)
+            # input shape: [batch_size, 1, embed_size]
+            concate_features = torch.cat((context, input), dim=-1)
+            # concate_features shape: [batch_size, 1, embed_size + hidden_size]
+            decoder_outputs, decoder_hidden_state = self.rnn(
+                concate_features.permute(1, 0, 2), encoder_hidden_states)
+            # decoder_outputs shape: [1, batch_size, hidden_size]
+            # decoder_hidden_state shape: [num_layers, batch_size, hidden_size]
+            outputs.append(decoder_outputs)
+            attention_weights.append(self.attention.attention_weights)
+        outputs = torch.cat(outputs, dim=0)
+        # outputs shape: [seq_len, batch_size, hidden_size]
+        outputs = self.fc_out(outputs)
+        # outputs shape: [seq_len, batch_size, vocab_size]
+        outputs = outputs.permute(1, 0, 2)
+        # outputs shape: [batch_size, seq_len, vocab_size]
+        return outputs, decoder_hidden_state, attention_weights
 
 
-class RNNSeq2SeqAttnModel(nn.Module):
-    def __init__(self,
-                 src_vocab_size,
-                 trg_vocab_size,
-                 embed_dim,
-                 enc_hidden_size,
-                 dec_hidden_size,
-                 attm_dim,
-                 num_layers,
-                 dropout=0.,
-                 device='cpu'):
+class RNNeq2SeqModel(nn.Module):
+    """
+    The Seq2Seq model with attention for sequence-to-sequence learning.
+
+    Args:
+        encoder (nn.Module): The encoder module.
+        decoder (nn.Module): The decoder module.
+    """
+    def __init__(
+        self,
+        src_vocab_size: int,
+        trg_vocab_size: int,
+        embed_size: int,
+        hidden_size: int,
+        num_layers: int,
+        dropout: float = 0.0,
+    ):
         super().__init__()
-
         self.src_vocab_size = src_vocab_size
         self.trg_vocab_size = trg_vocab_size
-        self.enc_hidden_size = enc_hidden_size
-        self.dec_hidden_size = dec_hidden_size
+        self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.device = device
-        self.init_weights()
 
-        self.encoder = RNNEncoder(src_vocab_size, embed_dim, enc_hidden_size,
-                                  num_layers, enc_hidden_size, dropout)
-        self.decoder = RNNDecoder(trg_vocab_size, embed_dim, enc_hidden_size,
-                                  dec_hidden_size, attm_dim, dropout)
+        # Initialize the encoder and decoder
+        self.encoder = RNNEncoder(src_vocab_size, embed_size, hidden_size,
+                                  num_layers, dropout)
+        self.decoder = RNNAttentionDecoder(trg_vocab_size, embed_size,
+                                           hidden_size, num_layers, dropout)
 
-    def forward(self,
-                src: Tensor,
-                trg: Tensor,
-                teacher_forcing_ratio: float = 0.5) -> Tensor:
+    def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the Seq2Seq model.
 
-        # src = [src len, batch size]
-        # trg = [trg len, batch size]
-        # teacher_forcing_ratio is probability to use teacher forcing
-        # e.g. if teacher_forcing_ratio is 0.75 we use teacher forcing 75% of the time
+        Args:
+            src (torch.Tensor): Source input tensor of shape (batch_size, src_seq_len).
+            tgt (torch.Tensor): Target input tensor of shape (batch_size, tgt_seq_len).
 
-        batch_size = src.shape[1]
-        max_len = trg.shape[0]
-        trg_vocab_size = self.trg_vocab_size
+        Returns:
+            dec_outputs (torch.Tensor): Decoder outputs tensor of shape (batch_size, tgt_seq_len, trg_vocab_size).
+        """
+        # Encode the source sequence
+        enc_outputs, enc_state = self.encoder(src)
 
-        # tensor to store decoder outputs
-        outputs = torch.zeros(max_len, batch_size,
-                              trg_vocab_size).to(self.device)
+        # Get the target sequence length and batch size
+        batch_size, tgt_seq_len = tgt.shape
 
-        # encoder_outputs is all hidden states of the input sequence, back and forwards
-        # hidden is the final forward and backward hidden states, passed through a linear layer
-        encoder_outputs, hidden = self.encoder(src)
+        # Use the last encoder output as context
+        context = enc_outputs[-1]
 
-        # first input to the decoder is the <sos> token
-        input = trg[0, :]
+        # Broadcast context to (tgt_seq_len, batch_size, hidden_size)
+        context = context.repeat(tgt_seq_len, 1, 1)
 
-        for t in range(1, max_len):
-            # insert input token embedding, previous hidden state and all encoder hidden states
-            # receive output tensor (predictions) and new hidden state
-            output, hidden = self.decoder(input, hidden, encoder_outputs)
-            # place predictions in a tensor holding predictions for each token
+        # Decode the target sequence
+        dec_outputs, _ = self.decoder(tgt, enc_state, context)
 
-            outputs[t] = output
-            # decide if we are going to use teacher forcing or not
+        return dec_outputs
 
-            teacher_force = random.random() < teacher_forcing_ratio
-            # get the highest predicted token from our predictions
-            top1 = output.max(1)[1]
-            # if teacher forcing, use actual next token as next input
-            # if not, use predicted token
-            input = (trg[t] if teacher_force else top1)
 
-        return outputs
+if __name__ == '__main__':
+    src_vocab_size = 10
+    tgt_vocab_size = 20
+    embed_size = 8
+    hiddens_size = 16
+    num_layers = 2
+    batch_size = 4
+    max_seq_len = 5
+    encoder = RNNEncoder(src_vocab_size, embed_size, hiddens_size, num_layers)
+    input = torch.LongTensor([[1, 2, 4, 5, 3], [4, 3, 2, 9, 2],
+                              [1, 2, 3, 4, 4], [4, 3, 2, 1, 6]])
 
-    def init_weights(self):
-        for name, param in self.named_parameters():
-            if 'weight' in name:
-                nn.init.normal_(param.data, mean=0, std=0.01)
-            else:
-                nn.init.constant_(param.data, 0)
+    target = torch.LongTensor([[1, 3, 4, 5, 3], [4, 3, 2, 9, 2],
+                               [1, 2, 3, 4, 4], [4, 3, 2, 1, 6]])
+    # input: [batch_size, max_seq_len]
+    enc_outputs, enc_state = encoder(input)
+    # enc_outputs: [max_seq_len, batch_size, hiddens_size]
+    # enc_state: [num_layers, batch_size, hiddens_size]
+    print(enc_outputs.shape, enc_state.shape)
+
+    decoder = RNNAttentionDecoder(tgt_vocab_size, embed_size, hiddens_size,
+                                  num_layers)
+    # context: [batch_size, hiddens_size]
+    context = enc_outputs[-1]
+    # Broadcast context to (max_seq_len, batch_size, hiddens_size)
+    context = context.repeat(max_seq_len, 1, 1)
+    dec_outputs, state = decoder(target, enc_state, context)
+    print(dec_outputs.shape, state.shape)
+
+    print('seq2seq')
+    seq2seq = RNNeq2SeqModel(src_vocab_size, tgt_vocab_size, embed_size,
+                             hiddens_size, num_layers)
+
+    output = seq2seq(input, target)
+    print(output.shape)
