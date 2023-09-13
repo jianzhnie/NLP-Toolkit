@@ -123,9 +123,8 @@ class RNNeq2SeqModel(nn.Module):
         """
         # Encode the source sequence
         enc_outputs, enc_state = self.encoder(src)
-
-        # Get the target sequence length and batch size
-        batch_size, tgt_seq_len = tgt.shape
+        # enc_state shape: [num_layers, batch_size, hidden_size]
+        # enc_outputs shape: [src_seq_len, batch_size, hidden_size]
 
         enc_outputs = enc_outputs.permute(1, 0, 2)
         # enc_outputs shape: [batch_size, src_seq_len, hidden_size]
