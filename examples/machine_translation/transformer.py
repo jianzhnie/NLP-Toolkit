@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from nlptoolkit.data.vocab import truncate_pad
 from nlptoolkit.datasets.nmtdataset import NMTDatasets
-from nlptoolkit.transformers.transformer.torch_transformer import \
+from nlptoolkit.transformers.vanilla.torch_transformer import \
     Seq2SeqTransformer
 
 sys.path.append('../../')
