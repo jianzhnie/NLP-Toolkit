@@ -382,21 +382,36 @@ def generate_cbow_dataset(sentence: List[str],
 
     Returns:
         List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
+
+    Example:
+        >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
+        >>> context_size = 2
+        >>> data = generate_cbow_dataset(sentence, context_size)
+        >>> print(data)
+        [(['love', 'to'], 'I'),
+        (['I', 'to', 'eat'], 'love'),
+        (['I', 'love', 'eat', 'ice'], 'to'),
+        (['love', 'to', 'ice', 'cream'], 'eat'),
+        (['to', 'eat', 'cream'], 'ice'),
+        (['eat', 'ice'], 'cream')]
     """
     cbow_data = []
-    if len(sentence) < context_size * 2 + 1:
-        return cbow_data
-    for i in range(context_size, len(sentence) - context_size):
-        # Extract context words before and after the target word
-        context_before = [sentence[i - j - 1]
-                          for j in range(context_size)][::-1]
-        context_after = [sentence[i + j + 1] for j in range(context_size)]
-
+    sentence_length = len(sentence)
+    if sentence_length < 2:
+        return []
+    for i in range(sentence_length):
+        # Determine the context word indices within the window
+        left_idx = max(0, i - context_size)
+        right_idx = min(sentence_length, i + 1 + context_size)
+        context_indices = list(range(left_idx, right_idx))
         # Get the target word
-        target = sentence[i]
+        center_words = sentence[i]
+        # Exclude the target word from the context words
+        context_indices.remove(i)
+        context_words = [sentence[idx] for idx in context_indices]
 
         # Append the context and target as a tuple to the dataset
-        cbow_data.append((context_before + context_after, target))
+        cbow_data.append((context_words, center_words))
 
     return cbow_data
 
@@ -413,13 +428,20 @@ def generate_skipgram_dataset(
         context_size (int): The maximum window size for context words.
 
     Returns:
-        Tuple[List[str], List[List[str]]]: A tuple containing two lists: centers (center words) and contexts (corresponding context words).
+        List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
 
-    ### Example usage:
+    Example:
     ```python
-        corpus = ["I", "love", "to", "eat", "ice", "cream"]
-        context_size = 2
-        skipgram_data = generate_skipgram_dataset(corpus, context_size)
+        >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
+        >>> context_size = 2
+        >>> data = generate_skipgram_dataset(sentence, context_size)
+        >>> print(data)
+        [(['love', 'to'], 'I'),
+        (['I', 'to', 'eat'], 'love'),
+        (['I', 'love', 'eat', 'ice'], 'to'),
+        (['love', 'to', 'ice', 'cream'], 'eat'),
+        (['to', 'eat', 'cream'], 'ice'),
+        (['eat', 'ice'], 'cream')]
     ```
     """
     skipgram_data = []
@@ -496,11 +518,12 @@ if __name__ == '__main__':
     corpus = ['I', 'love', 'to', 'eat', 'ice', 'cream']
     print(corpus)
     context_size = 2
-    skip = generate_skipgram_dataset(corpus, context_size)
-    print(skip)
 
     ngrm = generate_ngram_dataset(corpus, context_size)
     print(ngrm)
 
     cbow = generate_cbow_dataset(corpus, context_size)
     print(cbow)
+
+    skip = generate_skipgram_dataset(corpus, context_size)
+    print(skip)
