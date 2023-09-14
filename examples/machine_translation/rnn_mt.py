@@ -22,31 +22,39 @@ if __name__ == '__main__':
     work_dir = '/home/robin/work_dir/llm/nlp-toolkit/work_dirs'
     model_path = get_outdir(work_dir, 'rnn_mt', inc=True)
 
+    embed_size = 32
+    hiddens_size = 32
+    num_layers = 2
+    dropout = 0.1
+    batch_size = 64
+    max_seq_len = 10
+    learning_rate = 0.005
+    num_epochs = 300
+    clip_ratio = 1.0
+
     # Create an instance of NMTDataset
-    nmtdataset = NMTDataset(file_path=file_path, max_seq_len=30)
+    nmtdataset = NMTDataset(file_path=file_path, max_seq_len=max_seq_len)
     src_vocab = nmtdataset.src_vocab
     tgt_vocab = nmtdataset.tgt_vocab
 
     # Split the dataset into training and validation sets
-    data_train, data_val = random_split(nmtdataset, [0.99, 0.01])
-
-    # Define batch size for DataLoader
-    batch_size = 128
+    data_train, data_val = random_split(
+        nmtdataset, [0.8, 0.2], generator=torch.Generator().manual_seed(42))
 
     # Create DataLoader for training and validation sets
-    train_iter = DataLoader(data_val, batch_size=batch_size, shuffle=True)
-    valid_iter = DataLoader(data_val, batch_size=batch_size, shuffle=True)
+    train_iter = DataLoader(data_train, batch_size=batch_size, shuffle=True)
+    valid_iter = DataLoader(data_val, batch_size=batch_size, shuffle=False)
 
     # Initialize the seq2seq model
     model = RNNSeq2Seq(src_vocab_size=len(src_vocab),
                        trg_vocab_size=len(tgt_vocab),
-                       embed_size=32,
-                       hidden_size=64,
-                       num_layers=1,
-                       dropout=0.5).to(device)
+                       embed_size=embed_size,
+                       hidden_size=hiddens_size,
+                       num_layers=num_layers,
+                       dropout=dropout).to(device)
 
     # Initialize the optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     print(f'The model has {count_parameters(model):,} trainable parameters')
 
@@ -58,8 +66,8 @@ if __name__ == '__main__':
                        valid_iter,
                        optimizer,
                        criterion,
-                       num_epochs=10,
-                       clip=0.25,
+                       num_epochs=num_epochs,
+                       clip_ratio=clip_ratio,
                        device=device,
                        log_interval=10,
                        save_model_path=model_path)
