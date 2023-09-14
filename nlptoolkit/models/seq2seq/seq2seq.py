@@ -1,5 +1,6 @@
 import sys
 
+import torch
 import torch.nn as nn
 
 sys.path.append('../../')
@@ -49,7 +50,16 @@ class Seq2SeqTransformer(nn.Module):
         # Fully connected layer for output
         self.fc = nn.Linear(d_model, tgt_vocab_size)
 
-    def forward(self, src, tgt, src_mask, tgt_mask):
+    def forward(
+        self,
+        src: torch.Tensor,
+        tgt: torch.Tensor,
+        src_mask: torch.Tensor,
+        tgt_mask: torch.Tensor,
+        src_padding_mask: torch.Tensor,
+        tgt_padding_mask: torch.Tensor,
+        memory_key_padding_mask: torch.Tensor,
+    ) -> torch.Tensor:
         """
         Forward pass of the Seq2SeqTransformer.
 
@@ -58,6 +68,9 @@ class Seq2SeqTransformer(nn.Module):
             tgt (torch.Tensor): Target input tensor.
             src_mask (torch.Tensor): Source mask tensor.
             tgt_mask (torch.Tensor): Target mask tensor.
+            src_padding_mask (torch.Tensor): Source padding mask tensor.
+            tgt_padding_mask (torch.Tensor): Target padding mask tensor.
+            memory_key_padding_mask (torch.Tensor): Memory key padding mask tensor.
 
         Returns:
             torch.Tensor: Output tensor.
@@ -72,7 +85,9 @@ class Seq2SeqTransformer(nn.Module):
 
         # Transformer forward pass
         seq2seq_outputs = self.transformer(src_emb, tgt_emb, src_mask,
-                                           tgt_mask)
+                                           tgt_mask, None, src_padding_mask,
+                                           tgt_padding_mask,
+                                           memory_key_padding_mask)
 
         # Linear layer for output
         outputs = self.fc(seq2seq_outputs)
