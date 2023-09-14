@@ -40,12 +40,13 @@ class Seq2SeqTransformer(nn.Module):
         self.tgt_pos_encoding = PositionalEncoding(d_model, dropout)
 
         # Transformer model
-        self.transformer = Transformer(d_model=d_model,
-                                       nhead=num_heads,
-                                       num_encoder_layers=num_layers,
-                                       num_decoder_layers=num_layers,
-                                       dim_feedforward=dim_feedforward,
-                                       dropout=dropout)
+        self.transformer: Transformer = Transformer(
+            d_model=d_model,
+            nhead=num_heads,
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout)
 
         # Fully connected layer for output
         self.fc = nn.Linear(d_model, tgt_vocab_size)
@@ -76,18 +77,26 @@ class Seq2SeqTransformer(nn.Module):
             torch.Tensor: Output tensor.
         """
         # Embedding and positional encoding for source
-        src_emb = self.src_word_embedding(src)
-        src_emb = self.src_pos_encoding(src_emb)
+        src_word_emb = self.src_word_embedding(src)
+        src_pos_emb = self.src_pos_encoding(src)
+        src_emb = src_word_emb + src_pos_emb
 
         # Embedding and positional encoding for target
-        tgt_emb = self.tgt_word_embedding(tgt)
-        tgt_emb = self.tgt_pos_encoding(tgt_emb)
+        tgt_word_emb = self.tgt_word_embedding(tgt)
+        tgt_pos_emb = self.tgt_pos_encoding(tgt)
+        tgt_emb = tgt_word_emb + tgt_pos_emb
 
         # Transformer forward pass
-        seq2seq_outputs = self.transformer(src_emb, tgt_emb, src_mask,
-                                           tgt_mask, None, src_padding_mask,
-                                           tgt_padding_mask,
-                                           memory_key_padding_mask)
+        seq2seq_outputs = self.transformer.forward(
+            src=src_emb,
+            tgt=tgt_emb,
+            src_mask=src_mask,
+            tgt_mask=tgt_mask,
+            memory_mask=None,
+            src_key_padding_mask=src_padding_mask,
+            tgt_key_padding_mask=tgt_padding_mask,
+            memory_key_padding_mask=memory_key_padding_mask,
+        )
 
         # Linear layer for output
         outputs = self.fc(seq2seq_outputs)

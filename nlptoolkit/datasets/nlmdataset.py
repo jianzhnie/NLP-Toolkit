@@ -6,14 +6,21 @@ LastEditors: jianzhnie
 Description:
 
 '''
+import collections
+import math
+import random
+import sys
 from collections import defaultdict
+from typing import List, Tuple
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.utils.utils import BOS_TOKEN, EOS_TOKEN, PAD_TOKEN
+sys.path.append('../../')
+from nlptoolkit.utils.data_utils import (BOS_TOKEN, EOS_TOKEN, PAD_TOKEN,
+                                         UNK_TOKEN)
 
 
 class RNNlmDataset(Dataset):
@@ -222,3 +229,278 @@ class GloveDataset(Dataset):
         contexts = torch.tensor([ex[1] for ex in examples])
         counts = torch.tensor([ex[2] for ex in examples])
         return (words, contexts, counts)
+
+
+class WordSubsampler:
+    def __init__(self,
+                 raw_texts: List[List[str]],
+                 unk_token: str = UNK_TOKEN,
+                 threshold: float = 1e-4):
+        """
+        Initialize the WordSubsampler.
+
+        Args:
+            raw_texts (List[List[str]]): A list of lists containing tokenized sentences.
+            unk_token (str): The token representing unknown words.
+            threshold (float): The subsampling threshold.
+        """
+        self.raw_texts = raw_texts
+        self.unk_token = unk_token
+        self.threshold = threshold
+        self.counter = None
+
+    def exclude_unknown_tokens(self, raw_texts) -> List[List[str]]:
+        """
+        Exclude unknown tokens ('<unk>') from the raw texts.
+        Args:
+            raw_texts (List[List[str]]): List of sentences with unknown tokens removed.
+
+        Returns:
+            List[List[str]]: List of sentences with unknown tokens removed.
+        """
+        return [[token for token in line if token != self.unk_token]
+                for line in raw_texts]
+
+    def calculate_word_frequencies(
+            self, raw_texts: List[List[str]]) -> collections.Counter:
+        """
+        Calculate word frequencies from the raw texts.
+
+        Args:
+            raw_texts (List[List[str]]): List of sentences with unknown tokens removed.
+
+        Returns:
+            collections.Counter: Counter object with word frequencies.
+        """
+        return collections.Counter(
+            [token for line in raw_texts for token in line])
+
+    def keep(self, token: str, counter: collections.Counter) -> bool:
+        """
+        Determine whether to keep a token based on word frequencies and threshold.
+
+        Args:
+            token (str): The token to evaluate.
+            counter (collections.Counter): Counter object with word frequencies.
+
+        Returns:
+            bool: True if the token should be kept, False otherwise.
+        """
+        if counter is None:
+            raise ValueError(
+                'Word frequencies not calculated. Call calculate_word_frequencies() first.'
+            )
+        num_tokens = sum(counter.values())
+        ratio = counter[token] / num_tokens
+        keep_flag = (random.uniform(0, 1) < math.sqrt(self.threshold / ratio))
+        return keep_flag
+
+    def subsample_words(self) -> List[List[str]]:
+        """
+        Perform word subsampling based on word frequencies and threshold.
+
+        Returns:
+            List[List[str]]: List of sentences with subsampled words.
+        """
+        self.sentences = self.exclude_unknown_tokens(self.raw_texts)
+        self.counter = self.calculate_word_frequencies(self.sentences)
+        self.subsampled_words = [[
+            token for token in line if self.keep(token, self.counter)
+        ] for line in self.raw_texts]
+        return self.subsampled_words
+
+    def get_word_frequencies(self, token: str):
+        """
+        Get the frequency of a specific token.
+
+        Args:
+            token (str): The token to query.
+
+        Returns:
+            int: The frequency count of the token.
+        """
+        if self.counter is None:
+            raise ValueError(
+                'Word frequencies not calculated. Call calculate_word_frequencies() first.'
+            )
+        origin_counts = sum(
+            [sentence.count(token) for sentence in self.sentences])
+        subsampled_counts = sum(
+            [sentence.count(token) for sentence in self.subsampled_words])
+
+        return origin_counts, subsampled_counts
+
+    def get_word_counter(self):
+        if self.counter is None:
+            raise ValueError(
+                'Word frequencies not calculated. Call calculate_word_frequencies() first.'
+            )
+        return self.counter
+
+
+def generate_ngram_dataset(sentence: List[str],
+                           context_size: int) -> List[Tuple[List[str], str]]:
+    """
+    Generate an n-gram dataset from a given sentence.
+
+    Args:
+        sentence (List[str]): The input sentence as a list of words.
+        context_size (int): The size of the context for each n-gram.
+
+    Returns:
+        List[Tuple[List[str], str]]: A list of tuples, each containing a context list and a target word.
+
+    Example:
+        >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
+        >>> context_size = 2
+        >>> data = generate_ngram_dataset(sentence, context_size)
+        >>> print(data)
+        [(['I', 'love'], 'to'), (['love', 'to'], 'eat'), (['to', 'eat'], 'ice'), (['eat', 'ice'], 'cream')]
+    """
+    ngram_data = []
+    sentence_length = len(sentence)
+    if sentence_length < context_size:
+        return []
+
+    for i in range(context_size, sentence_length):
+        # Construct the context for the current n-gram
+        context = sentence[i - context_size:i]
+        target = sentence[i]
+        ngram_data.append((context, target))
+
+    return ngram_data
+
+
+def generate_cbow_dataset(sentence: List[str],
+                          context_size: int) -> List[Tuple[List[str], str]]:
+    """
+    Generate a CBOW (Continuous Bag of Words) dataset from a given sentence.
+
+    Args:
+        sentence (List[str]): The input sentence as a list of words.
+        context_size (int): The context window size, determining the number of words to consider before and after the target word.
+
+    Returns:
+        List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
+    """
+    cbow_data = []
+    if len(sentence) < context_size * 2 + 1:
+        return cbow_data
+    for i in range(context_size, len(sentence) - context_size):
+        # Extract context words before and after the target word
+        context_before = [sentence[i - j - 1]
+                          for j in range(context_size)][::-1]
+        context_after = [sentence[i + j + 1] for j in range(context_size)]
+
+        # Get the target word
+        target = sentence[i]
+
+        # Append the context and target as a tuple to the dataset
+        cbow_data.append((context_before + context_after, target))
+
+    return cbow_data
+
+
+def generate_skipgram_dataset(
+        sentence: List[str],
+        context_size: int) -> Tuple[List[str], List[List[str]]]:
+    """
+    Generate an Skip-gram dataset from a given sentence.
+    返回跳元模型中的中心词和上下文词.
+
+    Args:
+        sentence (List[str]): The input sentence as a list of words.
+        context_size (int): The maximum window size for context words.
+
+    Returns:
+        Tuple[List[str], List[List[str]]]: A tuple containing two lists: centers (center words) and contexts (corresponding context words).
+
+    ### Example usage:
+    ```python
+        corpus = ["I", "love", "to", "eat", "ice", "cream"]
+        context_size = 2
+        skipgram_data = generate_skipgram_dataset(corpus, context_size)
+    ```
+    """
+    skipgram_data = []
+
+    sentence_length = len(sentence)
+    # To form "center word - context word" pairs, a sentence should have at least 2 words.
+    if sentence_length < 2:
+        return []
+
+    for i in range(sentence_length):
+        # Determine the context word indices within the window
+        left_idx = max(0, i - context_size)
+        right_idx = min(sentence_length, i + 1 + context_size)
+        context_indices = list(range(left_idx, right_idx))
+        center_word = sentence[i]
+        # Exclude the center word from the context words
+        context_indices.remove(i)
+        context_words = [sentence[idx] for idx in context_indices]
+        # Append the center word and context words as a tuple to the dataset
+        skipgram_data.append((center_word, context_words))
+
+    return skipgram_data
+
+
+class RandomSampler:
+    """
+    Randomly sample integers from a population based on given weights.
+
+    This class allows you to sample integers from 1 to n based on provided sampling weights.
+
+    Args:
+        sampling_weights (List[float]): A list of sampling weights for each integer in the population.
+
+
+    Example:
+        >>> sampler = RandomSampler([0.2, 0.3, 0.5])
+        >>> sample = sampler.draw()
+    """
+    def __init__(self, sampling_weights: List[float]):
+        """
+        Initialize the RandomSampler with sampling weights.
+
+        Args:
+            sampling_weights (List[float]): A list of sampling weights for each integer in the population.
+        """
+        self.population = list(range(1, len(sampling_weights) + 1))
+        self.sampling_weights = sampling_weights
+        self.candidates = []
+        self.i = 0
+
+    def draw(self) -> int:
+        """
+        Draw a random sample based on the provided weights.
+
+        Returns:
+            int: A randomly sampled integer.
+        """
+        if self.i == len(self.candidates):
+            # Cache k random samples
+            self.candidates = random.choices(self.population,
+                                             self.sampling_weights,
+                                             k=10000)
+            self.i = 0
+        self.i += 1
+        return self.candidates[self.i - 1]
+
+
+# Example usage:
+if __name__ == '__main__':
+    sampler = RandomSampler([0.2, 0.3, 0.5])
+    sample = sampler.draw()
+    print(f'Randomly sampled value: {sample}')
+
+    corpus = ['I', 'love', 'to', 'eat', 'ice', 'cream']
+    print(corpus)
+    context_size = 2
+    skip = generate_skipgram_dataset(corpus, context_size)
+    print(skip)
+
+    ngrm = generate_ngram_dataset(corpus, context_size)
+    print(ngrm)
+
+    cbow = generate_cbow_dataset(corpus, context_size)
+    print(cbow)

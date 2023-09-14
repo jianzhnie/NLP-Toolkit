@@ -6,7 +6,7 @@ LastEditors: jianzhnie
 Description:
 
 '''
-import random
+import os
 import sys
 from typing import List
 
@@ -21,8 +21,7 @@ sys.path.append('../../../')
 BOS_TOKEN = '<bos>'
 EOS_TOKEN = '<eos>'
 PAD_TOKEN = '<pad>'
-BOW_TOKEN = '<bow>'
-EOW_TOKEN = '<eow>'
+UNK_TOKEN = '<unk>'
 
 
 def truncate_pad(inputs: List[int],
@@ -38,44 +37,17 @@ def truncate_pad(inputs: List[int],
     return inputs
 
 
-def generate_ngram_dataset(sentence, context_size):
-    data = []
-    for i in range(context_size, len(sentence)):
-        context = [sentence[i - j - 1] for j in range(context_size)]
-        context = context[::-1]
-        target = sentence[i]
-        data.append((context, target))
-    return data
+def read_ptb_data(data_dir, split='train'):
+    """Penn Tree Bank（PTB）。该语料库取自“华尔街日报”的文章，分为训练集、验证集和测试集。
+    在原始格式中，文本文件的每一行表示由空格分隔的一句话, 函数 `read_ptb_data` 将PTB数据集加载到文本行的列表中
+    data_url: http://d2l-data.s3-accelerate.amazonaws.com/ptb.zip
+    """
+    # Readthetrainingset.
+    file_path = os.path.join(data_dir, 'ptb.{}.txt'.format(split))
 
-
-def generate_cbow_dataset(sentence, context_size):
-    data = []
-    for i in range(context_size, len(sentence) - context_size):
-        context_befor = [sentence[i - j - 1] for j in range(context_size)]
-        context_befor = context_befor[::-1]
-        context_after = [sentence[i + j + 1] for j in range(context_size)]
-        target = sentence[i]
-        data.append((context_befor + context_after, target))
-    return data
-
-
-def get_centers_and_contexts(corpus, max_window_size):
-    """返回跳元模型中的中心词和上下文词."""
-    centers, contexts = [], []
-    for line in corpus:
-        # 要形成“中心词-上下文词”对，每个句子至少需要有2个词
-        if len(line) < 2:
-            continue
-        centers += line
-        for i in range(len(line)):  # 上下文窗口中间i
-            window_size = random.randint(1, max_window_size)
-            indices = list(
-                range(max(0, i - window_size),
-                      min(len(line), i + 1 + window_size)))
-            # 从上下文词中排除中心词
-            indices.remove(i)
-            contexts.append([line[idx] for idx in indices])
-    return centers, contexts
+    with open(file_path) as f:
+        raw_text = f.read()
+    return [line.split() for line in raw_text.split('\n')]
 
 
 def load_sentence_polarity():
@@ -169,22 +141,6 @@ def get_loader(dataset, batch_size, shuffle=True):
 
 
 if __name__ == '__main__':
-    CONTEXT_SIZE = 4  # 2 words to the left, 2 to the right
-    raw_text = """We are about to study the idea of a computational process.
-    Computational processes are abstract beings that inhabit computers.
-    As they evolve, processes manipulate other abstract things called data.
-    The evolution of a process is directed by a pattern of rules
-    called a program. People create programs to direct processes. In effect,
-    we conjure the spirits of the computer with our spells.""".split()
-
-    ngram_data = generate_ngram_dataset(raw_text, CONTEXT_SIZE)
-    print(ngram_data)
-
-    cbow_data = generate_cbow_dataset(raw_text, CONTEXT_SIZE)
-    print(cbow_data)
-
-    centers, contexts = get_centers_and_contexts(raw_text, 2)
-
     train_data, test_data, vocab = load_sentence_polarity()
     print(train_data[:10])
 
