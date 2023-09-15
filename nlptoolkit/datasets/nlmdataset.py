@@ -6,7 +6,6 @@ LastEditors: jianzhnie
 Description:
 
 '''
-import collections
 import math
 import random
 import sys
@@ -19,6 +18,7 @@ from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
 sys.path.append('../../')
+from nlptoolkit.data.vocab import Vocab
 from nlptoolkit.utils.data_utils import (BOS_TOKEN, EOS_TOKEN, PAD_TOKEN,
                                          UNK_TOKEN)
 
@@ -231,85 +231,54 @@ class GloveDataset(Dataset):
         return (words, contexts, counts)
 
 
-class WordSubsampler:
-    def __init__(self,
-                 raw_texts: List[List[str]],
-                 unk_token: str = UNK_TOKEN,
-                 threshold: float = 1e-4):
+class Word2VecToolkit:
+    def __init__(self, sentences: List[List[str]], threshold: float = 1e-4):
         """
         Initialize the WordSubsampler.
 
         Args:
-            raw_texts (List[List[str]]): A list of lists containing tokenized sentences.
-            unk_token (str): The token representing unknown words.
+            sentences (List[List[str]]): A list of lists containing tokenized sentences.
             threshold (float): The subsampling threshold.
         """
-        self.raw_texts = raw_texts
-        self.unk_token = unk_token
+        self.sentences = sentences
+        self.vocab = Vocab.build_vocab(
+            sentences,
+            min_freq=10,
+            unk_token=UNK_TOKEN,
+            pad_token=PAD_TOKEN,
+            bos_token=BOS_TOKEN,
+            eos_token=EOS_TOKEN,
+        )
+        self.counter = self.vocab.get_token_freq()
         self.threshold = threshold
-        self.counter = None
 
-    def exclude_unknown_tokens(self, raw_texts) -> List[List[str]]:
-        """
-        Exclude unknown tokens ('<unk>') from the raw texts.
-        Args:
-            raw_texts (List[List[str]]): List of sentences with unknown tokens removed.
-
-        Returns:
-            List[List[str]]: List of sentences with unknown tokens removed.
-        """
-        return [[token for token in line if token != self.unk_token]
-                for line in raw_texts]
-
-    def calculate_word_frequencies(
-            self, raw_texts: List[List[str]]) -> collections.Counter:
-        """
-        Calculate word frequencies from the raw texts.
-
-        Args:
-            raw_texts (List[List[str]]): List of sentences with unknown tokens removed.
-
-        Returns:
-            collections.Counter: Counter object with word frequencies.
-        """
-        return collections.Counter(
-            [token for line in raw_texts for token in line])
-
-    def keep(self, token: str, counter: collections.Counter) -> bool:
+    def keep(self, token: str) -> bool:
         """
         Determine whether to keep a token based on word frequencies and threshold.
 
         Args:
             token (str): The token to evaluate.
-            counter (collections.Counter): Counter object with word frequencies.
 
         Returns:
             bool: True if the token should be kept, False otherwise.
         """
-        if counter is None:
-            raise ValueError(
-                'Word frequencies not calculated. Call calculate_word_frequencies() first.'
-            )
-        num_tokens = sum(counter.values())
-        ratio = counter[token] / num_tokens
+        num_tokens = sum(self.counter.values())
+        ratio = self.counter[token] / num_tokens
         keep_flag = (random.uniform(0, 1) < math.sqrt(self.threshold / ratio))
         return keep_flag
 
-    def subsample_words(self) -> List[List[str]]:
+    def get_subsample_words(self) -> List[List[str]]:
         """
         Perform word subsampling based on word frequencies and threshold.
 
         Returns:
             List[List[str]]: List of sentences with subsampled words.
         """
-        self.sentences = self.exclude_unknown_tokens(self.raw_texts)
-        self.counter = self.calculate_word_frequencies(self.sentences)
-        self.subsampled_words = [[
-            token for token in line if self.keep(token, self.counter)
-        ] for line in self.raw_texts]
+        self.subsampled_words = [[token for token in line if self.keep(token)]
+                                 for line in self.sentences]
         return self.subsampled_words
 
-    def get_word_frequencies(self, token: str):
+    def get_word_count(self, token: str):
         """
         Get the frequency of a specific token.
 
@@ -323,23 +292,44 @@ class WordSubsampler:
             raise ValueError(
                 'Word frequencies not calculated. Call calculate_word_frequencies() first.'
             )
-        origin_counts = sum(
+        origin_count = sum(
             [sentence.count(token) for sentence in self.sentences])
-        subsampled_counts = sum(
+        subsampled_count = sum(
             [sentence.count(token) for sentence in self.subsampled_words])
 
-        return origin_counts, subsampled_counts
+        return origin_count, subsampled_count
 
-    def get_word_counter(self):
-        if self.counter is None:
-            raise ValueError(
-                'Word frequencies not calculated. Call calculate_word_frequencies() first.'
-            )
-        return self.counter
+    def get_skipgram_datasets(self, context_size: int = 2):
+        centers, contexts = [], []
+        for sentence in self.sentences:
+            if len(sentence) < 2:
+                continue
+            skipgram_data = generate_skipgram_sample(sentence, context_size)
+            center, context = zip(*skipgram_data)
+            centers.append(center)
+            contexts.append(context)
+        return centers, contexts
+
+    def get_negaitive_datasets(self, all_contexts, K: int = 5):
+        sampling_weights = [
+            self.counter[self.vocab.to_tokens(i)]**0.75
+            for i in range(1, len(self.vocab))
+        ]
+        generator = RandomGenerator(sampling_weights)
+        negative_samples = []
+        for contexts in all_contexts:
+            negatives = []
+            while len(negatives) < K * len(contexts):
+                negative_idx = generator.draw()
+                negative_word = self.vocab.to_tokens(negative_idx)
+                if negative_word not in contexts:
+                    negatives.append(negative_word)
+            negative_samples.append(negatives)
+        return negative_samples
 
 
-def generate_ngram_dataset(sentence: List[str],
-                           context_size: int) -> List[Tuple[List[str], str]]:
+def generate_ngram_sample(sentence: List[str],
+                          context_size: int) -> List[Tuple[List[str], str]]:
     """
     Generate an n-gram dataset from a given sentence.
 
@@ -371,8 +361,10 @@ def generate_ngram_dataset(sentence: List[str],
     return ngram_data
 
 
-def generate_cbow_dataset(sentence: List[str],
-                          context_size: int) -> List[Tuple[List[str], str]]:
+def generate_cbow_sample(
+        sentence: List[str],
+        context_size: int,
+        use_random_window: bool = True) -> List[Tuple[List[str], str]]:
     """
     Generate a CBOW (Continuous Bag of Words) dataset from a given sentence.
 
@@ -400,28 +392,49 @@ def generate_cbow_dataset(sentence: List[str],
     if sentence_length < 2:
         return []
     for i in range(sentence_length):
+
+        window_size = random.randint(
+            1, context_size) if use_random_window else context_size
+
         # Determine the context word indices within the window
-        left_idx = max(0, i - context_size)
-        right_idx = min(sentence_length, i + 1 + context_size)
+        left_idx = max(0, i - window_size)
+        right_idx = min(sentence_length, i + 1 + window_size)
         context_indices = list(range(left_idx, right_idx))
         # Get the target word
-        center_words = sentence[i]
+        center_word = sentence[i]
         # Exclude the target word from the context words
         context_indices.remove(i)
-        context_words = [sentence[idx] for idx in context_indices]
+        context_word = [sentence[idx] for idx in context_indices]
 
         # Append the context and target as a tuple to the dataset
-        cbow_data.append((context_words, center_words))
+        cbow_data.append((context_word, center_word))
 
     return cbow_data
 
 
-def generate_skipgram_dataset(
+def generate_skipgram_sample(
         sentence: List[str],
-        context_size: int) -> Tuple[List[str], List[List[str]]]:
+        context_size: int,
+        use_random_window: bool = True) -> Tuple[List[str], List[List[str]]]:
     """
     Generate an Skip-gram dataset from a given sentence.
     返回跳元模型中的中心词和上下文词.
+
+    在Word2Vec中，上下文窗口是指在训练过程中，用来确定中心词周围哪些词作为上下文进行预测的窗口大小。这个窗口的大小可以影响到模型的性能和训练效果。
+
+    使用随机采样一个介于1到max_window_size之间的整数作为上下文窗口，而不是固定使用max_window_size，有一些原理和考虑：
+
+    - Diversification（多样性）：随机采样窗口大小可以引入更多的多样性，使得模型不仅仅关注固定大小的上下文窗口。这样可以更好地捕捉不同距离的关系，
+        避免过于集中在一个特定的上下文范围内。
+
+    - 平衡计算复杂度：较大的上下文窗口可能会引入更多的噪声，因为与中心词距离较远的词可能与中心词的语义关联较弱。同时，较大的窗口可能会增加计算的复杂度,
+        因为要考虑更多的上下文词。通过随机采样窗口大小，可以在捕捉不同距离关系的同时，平衡计算的复杂度。
+
+    - 训练稳定性：随机窗口大小可以提高模型的训练稳定性。如果总是使用固定的 max_window_size，可能会使模型对于固定距离范围内的关系过于敏感，从而导致训练不稳定。
+
+    - 对罕见词的处理：对于罕见词，较大的上下文窗口可能会导致模型将与中心词无关的词考虑在内，从而影响预测的准确性。随机窗口大小可以在一定程度上缓解这个问题。
+
+    综合考虑以上因素，使用随机采样一个介于1到max_window_size之间的窗口大小可以帮助模型更好地学习单词之间的关系，提高训练的效果和稳定性。
 
     Args:
         sentence (List[str]): The input sentence as a list of words.
@@ -436,12 +449,12 @@ def generate_skipgram_dataset(
         >>> context_size = 2
         >>> data = generate_skipgram_dataset(sentence, context_size)
         >>> print(data)
-        [(['love', 'to'], 'I'),
-        (['I', 'to', 'eat'], 'love'),
-        (['I', 'love', 'eat', 'ice'], 'to'),
-        (['love', 'to', 'ice', 'cream'], 'eat'),
-        (['to', 'eat', 'cream'], 'ice'),
-        (['eat', 'ice'], 'cream')]
+            [('I', ['love', 'to']),
+            ('love', ['I', 'to', 'eat']),
+            ('to', ['I', 'love', 'eat', 'ice']),
+            ('eat', ['love', 'to', 'ice', 'cream']),
+            ('ice', ['to', 'eat', 'cream']),
+            ('cream', ['eat', 'ice'])]
     ```
     """
     skipgram_data = []
@@ -452,9 +465,12 @@ def generate_skipgram_dataset(
         return []
 
     for i in range(sentence_length):
+        window_size = random.randint(
+            1, context_size) if use_random_window else context_size
+
         # Determine the context word indices within the window
-        left_idx = max(0, i - context_size)
-        right_idx = min(sentence_length, i + 1 + context_size)
+        left_idx = max(0, i - window_size)
+        right_idx = min(sentence_length, i + 1 + window_size)
         context_indices = list(range(left_idx, right_idx))
         center_word = sentence[i]
         # Exclude the center word from the context words
@@ -466,7 +482,7 @@ def generate_skipgram_dataset(
     return skipgram_data
 
 
-class RandomSampler:
+class RandomGenerator:
     """
     Randomly sample integers from a population based on given weights.
 
@@ -477,7 +493,7 @@ class RandomSampler:
 
 
     Example:
-        >>> sampler = RandomSampler([0.2, 0.3, 0.5])
+        >>> sampler = RandomGenerator([0.2, 0.3, 0.5])
         >>> sample = sampler.draw()
     """
     def __init__(self, sampling_weights: List[float]):
@@ -511,7 +527,7 @@ class RandomSampler:
 
 # Example usage:
 if __name__ == '__main__':
-    sampler = RandomSampler([0.2, 0.3, 0.5])
+    sampler = RandomGenerator([0.2, 0.3, 0.5])
     sample = sampler.draw()
     print(f'Randomly sampled value: {sample}')
 
@@ -519,11 +535,11 @@ if __name__ == '__main__':
     print(corpus)
     context_size = 2
 
-    ngrm = generate_ngram_dataset(corpus, context_size)
+    ngrm = generate_ngram_sample(corpus, context_size)
     print(ngrm)
 
-    cbow = generate_cbow_dataset(corpus, context_size)
+    cbow = generate_cbow_sample(corpus, context_size)
     print(cbow)
 
-    skip = generate_skipgram_dataset(corpus, context_size)
+    skip = generate_skipgram_sample(corpus, context_size)
     print(skip)
