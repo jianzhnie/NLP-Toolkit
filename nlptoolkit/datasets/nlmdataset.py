@@ -232,9 +232,24 @@ class GloveDataset(Dataset):
 
 
 class Word2VecToolkit:
+    """
+    实现了 Word2Vec 训练所需的一些工具和数据处理函数的类。这个类包括了以下功能：
+
+    1. 初始化 Word2VecToolkit，并构建词汇表（Vocab）。
+
+    2. keep 方法用于确定是否保留一个词汇标记，根据词汇频率和阈值来决定。
+
+    3. get_subsample_datasets 方法执行基于词汇频率和阈值的词汇子采样，返回经过子采样的句子列表。
+
+    4. get_word_frequency 方法用于获取特定词汇标记的频率统计信息。
+
+    5. get_skipgram_datasets 方法生成Skipgram模型的数据集，包括中心词和上下文词。
+
+    6. get_negaitive_datasets 方法生成用于Skipgram模型的负采样数据集。
+    """
     def __init__(self, sentences: List[List[str]], threshold: float = 1e-4):
         """
-        Initialize the WordSubsampler.
+        Initialize the Word2Vec Toolkit.
 
         Args:
             sentences (List[List[str]]): A list of lists containing tokenized sentences.
@@ -253,7 +268,7 @@ class Word2VecToolkit:
         self.word_counter = self.vocab.get_token_freq()
         self.threshold = threshold
 
-    def keep(self, token: str, num_tokens: int) -> bool:
+    def should_keep_token(self, token: str, num_tokens: int) -> bool:
         """
         Determine whether to keep a token based on word frequencies and threshold.
 
@@ -268,7 +283,7 @@ class Word2VecToolkit:
         flag = (random.uniform(0, 1) < math.sqrt(self.threshold / ratio))
         return flag
 
-    def get_subsample_datasets(self) -> List[List[str]]:
+    def get_subsampled_datasets(self) -> List[List[str]]:
         """
         Perform word subsampling based on word frequencies and threshold.
 
@@ -277,11 +292,12 @@ class Word2VecToolkit:
         """
         num_tokens = sum(self.word_counter.values())
         self.subsampled_datasets = [[
-            token for token in line if self.keep(token, num_tokens)
+            token for token in line
+            if self.should_keep_token(token, num_tokens)
         ] for line in self.sentences]
         return self.subsampled_datasets
 
-    def get_word_frequency(self, token: str):
+    def get_word_frequency(self, token: str) -> Tuple[int, int]:
         """
         Get the frequency of a specific token.
 
@@ -289,7 +305,7 @@ class Word2VecToolkit:
             token (str): The token to query.
 
         Returns:
-            int: The frequency count of the token.
+            Tuple[int, int]: The original and subsampled frequency counts of the token.
         """
         origin_count = sum(
             [sentence.count(token) for sentence in self.sentences])
@@ -298,7 +314,18 @@ class Word2VecToolkit:
 
         return origin_count, subsampled_count
 
-    def get_skipgram_datasets(self, context_size: int = 2):
+    def get_skipgram_datasets(
+            self,
+            context_size: int = 2) -> Tuple[List[List[str]], List[List[str]]]:
+        """
+        Generate Skipgram datasets.
+
+        Args:
+            context_size (int): The context window size.
+
+        Returns:
+            Tuple[List[List[str]], List[List[str]]]: Lists of centers and contexts.
+        """
         centers, contexts = [], []
         for sentence in self.sentences:
             if len(sentence) < 2:
@@ -309,12 +336,20 @@ class Word2VecToolkit:
             contexts.append(context)
         return centers, contexts
 
-    def get_negaitive_datasets(self,
-                               all_contexts: List[List[str]],
-                               ratio: float = 0.75,
-                               K: int = 5):
+    def get_negative_datasets(self,
+                              all_contexts: List[List[str]],
+                              ratio: float = 0.75,
+                              K: int = 5) -> List[List[str]]:
         """
-        Generate negative samples for skipgram datasets.
+        Generate negative samples for Skipgram datasets.
+
+        Args:
+            all_contexts (List[List[str]]): Lists of contexts.
+            ratio (float): Ratio for negative sampling.
+            K (int): Number of negative samples per context.
+
+        Returns:
+            List[List[str]]: Lists of negative samples.
         """
         sampling_weights = [
             self.word_counter[self.vocab.to_tokens(i)]**ratio
