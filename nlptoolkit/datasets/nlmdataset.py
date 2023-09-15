@@ -20,7 +20,7 @@ from tqdm.auto import tqdm
 sys.path.append('../../')
 from nlptoolkit.data.vocab import Vocab
 from nlptoolkit.utils.data_utils import (BOS_TOKEN, EOS_TOKEN, PAD_TOKEN,
-                                         UNK_TOKEN)
+                                         UNK_TOKEN, load_ptb_data)
 
 
 class RNNlmDataset(Dataset):
@@ -249,36 +249,39 @@ class Word2VecToolkit:
             bos_token=BOS_TOKEN,
             eos_token=EOS_TOKEN,
         )
-        self.counter = self.vocab.get_token_freq()
+        self.num_special_tokens = len(self.vocab.special_token_dict)
+        self.word_counter = self.vocab.get_token_freq()
         self.threshold = threshold
 
-    def keep(self, token: str) -> bool:
+    def keep(self, token: str, num_tokens: int) -> bool:
         """
         Determine whether to keep a token based on word frequencies and threshold.
 
         Args:
             token (str): The token to evaluate.
+            num_tokens (int): The total number of tokens in the dataset.
 
         Returns:
             bool: True if the token should be kept, False otherwise.
         """
-        num_tokens = sum(self.counter.values())
-        ratio = self.counter[token] / num_tokens
-        keep_flag = (random.uniform(0, 1) < math.sqrt(self.threshold / ratio))
-        return keep_flag
+        ratio = self.word_counter[token] / num_tokens
+        flag = (random.uniform(0, 1) < math.sqrt(self.threshold / ratio))
+        return flag
 
-    def get_subsample_words(self) -> List[List[str]]:
+    def get_subsample_datasets(self) -> List[List[str]]:
         """
         Perform word subsampling based on word frequencies and threshold.
 
         Returns:
             List[List[str]]: List of sentences with subsampled words.
         """
-        self.subsampled_words = [[token for token in line if self.keep(token)]
-                                 for line in self.sentences]
-        return self.subsampled_words
+        num_tokens = sum(self.word_counter.values())
+        self.subsampled_datasets = [[
+            token for token in line if self.keep(token, num_tokens)
+        ] for line in self.sentences]
+        return self.subsampled_datasets
 
-    def get_word_count(self, token: str):
+    def get_word_frequency(self, token: str):
         """
         Get the frequency of a specific token.
 
@@ -288,14 +291,10 @@ class Word2VecToolkit:
         Returns:
             int: The frequency count of the token.
         """
-        if self.counter is None:
-            raise ValueError(
-                'Word frequencies not calculated. Call calculate_word_frequencies() first.'
-            )
         origin_count = sum(
             [sentence.count(token) for sentence in self.sentences])
         subsampled_count = sum(
-            [sentence.count(token) for sentence in self.subsampled_words])
+            [sentence.count(token) for sentence in self.subsampled_datasets])
 
         return origin_count, subsampled_count
 
@@ -310,10 +309,16 @@ class Word2VecToolkit:
             contexts.append(context)
         return centers, contexts
 
-    def get_negaitive_datasets(self, all_contexts, K: int = 5):
+    def get_negaitive_datasets(self,
+                               all_contexts: List[List[str]],
+                               ratio: float = 0.75,
+                               K: int = 5):
+        """
+        Generate negative samples for skipgram datasets.
+        """
         sampling_weights = [
-            self.counter[self.vocab.to_tokens(i)]**0.75
-            for i in range(1, len(self.vocab))
+            self.word_counter[self.vocab.to_tokens(i)]**ratio
+            for i in range(self.num_special_tokens, len(self.vocab))
         ]
         generator = RandomGenerator(sampling_weights)
         negative_samples = []
@@ -543,3 +548,14 @@ if __name__ == '__main__':
 
     skip = generate_skipgram_sample(corpus, context_size)
     print(skip)
+
+    data_dir = '/home/robin/work_dir/llm/nlp-toolkit/data/ptb'
+    sentences = load_ptb_data(data_dir, split='train')
+
+    toolkit = Word2VecToolkit(sentences)
+    subsample = toolkit.get_subsample_datasets()
+    a, b = toolkit.get_word_frequency('the')
+    print(a, b)
+
+    all_centers, all_contexts = toolkit.get_skipgram_datasets()
+    all_negativaes = toolkit.get_negaitive_datasets(all_contexts)

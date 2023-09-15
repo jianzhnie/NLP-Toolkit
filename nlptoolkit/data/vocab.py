@@ -140,6 +140,7 @@ class Vocab(object):
         self.token_freqs = sorted(counter.items(),
                                   key=lambda x: x[1],
                                   reverse=True)
+        self.word_counter = {key: val for key, val in self.token_freqs}
         # Frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         special_tokens = set(special_tokens)
@@ -407,4 +408,4 @@ class Vocab(object):
             self.pad_token) if self.pad_token is not None else None
 
     def get_token_freq(self):
-        return self.token_freqs
+        return self.word_counter

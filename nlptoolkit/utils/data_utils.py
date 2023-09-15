@@ -37,7 +37,7 @@ def truncate_pad(inputs: List[int],
     return inputs
 
 
-def read_ptb_data(data_dir, split='train'):
+def load_ptb_data(data_dir, split='train'):
     """Penn Tree Bank（PTB）。该语料库取自“华尔街日报”的文章，分为训练集、验证集和测试集。
     在原始格式中，文本文件的每一行表示由空格分隔的一句话, 函数 `read_ptb_data` 将PTB数据集加载到文本行的列表中
     data_url: http://d2l-data.s3-accelerate.amazonaws.com/ptb.zip
