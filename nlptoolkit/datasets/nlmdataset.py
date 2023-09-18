@@ -231,7 +231,7 @@ class GloveDataset(Dataset):
         return (words, contexts, counts)
 
 
-class Word2VecToolkit:
+class Word2VecDataset(object):
     """
     实现了 Word2Vec 训练所需的一些工具和数据处理函数的类。这个类包括了以下功能：
 
@@ -258,14 +258,14 @@ class Word2VecToolkit:
         self.sentences = sentences
         self.vocab = Vocab.build_vocab(
             sentences,
-            min_freq=10,
+            min_freq=1,
             unk_token=UNK_TOKEN,
             pad_token=PAD_TOKEN,
             bos_token=BOS_TOKEN,
             eos_token=EOS_TOKEN,
         )
-        self.num_special_tokens = len(self.vocab.special_token_dict)
         self.word_counter = self.vocab.get_token_freq()
+        self.generator = self.init_generator(self.word_counter)
         self.threshold = threshold
 
     def should_keep_token(self, token: str, num_tokens: int) -> bool:
@@ -314,8 +314,60 @@ class Word2VecToolkit:
 
         return origin_count, subsampled_count
 
+    def init_generator(self, word_counter: dict = None, ratio: float = 0.75):
+        num_words = len(self.vocab.special_token_dict)
+        total_words = len(self.vocab)
+        population = list(range(num_words, total_words))
+        weights = [
+            word_counter[self.vocab.to_tokens(idx)]**ratio
+            for idx in population
+        ]
+        generator = RandomGenerator(population, weights)
+        return generator
+
+    def get_negative_sample(self,
+                            contexts: List[str],
+                            n_negatives: int = 5) -> List[List[str]]:
+        """
+        Generate negative samples for Skipgram datasets.
+
+        Args:
+            contexts List[str]: Lists of contexts.
+            n_negatives (int): Number of negative samples per context.
+
+        Returns:
+            List[str]: Lists of negative samples.
+        """
+        negatives = []
+        while len(negatives) < n_negatives * len(contexts):
+            negative_idx = self.generator.draw()
+            negative_word = self.vocab.to_tokens(negative_idx)
+            if negative_word not in contexts:
+                negatives.append(negative_word)
+        return negatives
+
+    def get_negative_datasets(self,
+                              all_contexts: List[List[str]],
+                              n_negatives: int = 5) -> List[List[str]]:
+        """
+        Generate negative samples for Skipgram datasets.
+
+        Args:
+            contexts List[List[str]]: Lists of contexts.
+            n_negatives (int): Number of negative samples per context.
+
+        Returns:
+            List[List[str]]: Lists of negative samples.
+        """
+        all_negatives = []
+        for context in all_contexts:
+            all_negatives.append(self.get_negative_sample(
+                context, n_negatives))
+        return all_negatives
+
     def get_skipgram_datasets(
             self,
+            sentences,
             context_size: int = 2) -> Tuple[List[List[str]], List[List[str]]]:
         """
         Generate Skipgram datasets.
@@ -327,224 +379,193 @@ class Word2VecToolkit:
             Tuple[List[List[str]], List[List[str]]]: Lists of centers and contexts.
         """
         centers, contexts = [], []
-        for sentence in self.sentences:
+        for sentence in sentences:
             if len(sentence) < 2:
                 continue
-            skipgram_data = generate_skipgram_sample(sentence, context_size)
+            skipgram_data = self.generate_skipgram_sample(
+                sentence, context_size)
             center, context = zip(*skipgram_data)
             centers.append(center)
             contexts.append(context)
         return centers, contexts
 
-    def get_negative_datasets(self,
-                              all_contexts: List[List[str]],
-                              ratio: float = 0.75,
-                              K: int = 5) -> List[List[str]]:
+    def generate_ngram_sample(
+            self, sentence: List[str],
+            context_size: int) -> List[Tuple[List[str], str]]:
         """
-        Generate negative samples for Skipgram datasets.
+        Generate an n-gram dataset from a given sentence.
 
         Args:
-            all_contexts (List[List[str]]): Lists of contexts.
-            ratio (float): Ratio for negative sampling.
-            K (int): Number of negative samples per context.
+            sentence (List[str]): The input sentence as a list of words.
+            context_size (int): The size of the context for each n-gram.
 
         Returns:
-            List[List[str]]: Lists of negative samples.
+            List[Tuple[List[str], str]]: A list of tuples, each containing a context list and a target word.
+
+        Example:
+            >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
+            >>> context_size = 2
+            >>> data = generate_ngram_dataset(sentence, context_size)
+            >>> print(data)
+            [(['I', 'love'], 'to'), (['love', 'to'], 'eat'), (['to', 'eat'], 'ice'), (['eat', 'ice'], 'cream')]
         """
-        sampling_weights = [
-            self.word_counter[self.vocab.to_tokens(i)]**ratio
-            for i in range(self.num_special_tokens, len(self.vocab))
-        ]
-        generator = RandomGenerator(sampling_weights)
-        negative_samples = []
-        for contexts in all_contexts:
-            negatives = []
-            while len(negatives) < K * len(contexts):
-                negative_idx = generator.draw()
-                negative_word = self.vocab.to_tokens(negative_idx)
-                if negative_word not in contexts:
-                    negatives.append(negative_word)
-            negative_samples.append(negatives)
-        return negative_samples
+        ngram_data = []
+        sentence_length = len(sentence)
+        if sentence_length < context_size:
+            return []
 
+        for i in range(context_size, sentence_length):
+            # Construct the context for the current n-gram
+            context = sentence[i - context_size:i]
+            target = sentence[i]
+            ngram_data.append((context, target))
 
-def generate_ngram_sample(sentence: List[str],
-                          context_size: int) -> List[Tuple[List[str], str]]:
-    """
-    Generate an n-gram dataset from a given sentence.
+        return ngram_data
 
-    Args:
-        sentence (List[str]): The input sentence as a list of words.
-        context_size (int): The size of the context for each n-gram.
+    def generate_cbow_sample(
+            self,
+            sentence: List[str],
+            context_size: int,
+            use_random_window: bool = True) -> List[Tuple[List[str], str]]:
+        """
+        Generate a CBOW (Continuous Bag of Words) dataset from a given sentence.
 
-    Returns:
-        List[Tuple[List[str], str]]: A list of tuples, each containing a context list and a target word.
+        Args:
+            sentence (List[str]): The input sentence as a list of words.
+            context_size (int): The context window size, determining the number of words to consider before and after the target word.
 
-    Example:
-        >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
-        >>> context_size = 2
-        >>> data = generate_ngram_dataset(sentence, context_size)
-        >>> print(data)
-        [(['I', 'love'], 'to'), (['love', 'to'], 'eat'), (['to', 'eat'], 'ice'), (['eat', 'ice'], 'cream')]
-    """
-    ngram_data = []
-    sentence_length = len(sentence)
-    if sentence_length < context_size:
-        return []
+        Returns:
+            List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
 
-    for i in range(context_size, sentence_length):
-        # Construct the context for the current n-gram
-        context = sentence[i - context_size:i]
-        target = sentence[i]
-        ngram_data.append((context, target))
+        Example:
+            >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
+            >>> context_size = 2
+            >>> data = generate_cbow_dataset(sentence, context_size)
+            >>> print(data)
+            [(['love', 'to'], 'I'),
+            (['I', 'to', 'eat'], 'love'),
+            (['I', 'love', 'eat', 'ice'], 'to'),
+            (['love', 'to', 'ice', 'cream'], 'eat'),
+            (['to', 'eat', 'cream'], 'ice'),
+            (['eat', 'ice'], 'cream')]
+        """
+        cbow_data = []
+        sentence_length = len(sentence)
+        if sentence_length < 2:
+            return []
+        for i in range(sentence_length):
 
-    return ngram_data
+            window_size = random.randint(
+                1, context_size) if use_random_window else context_size
 
+            # Determine the context word indices within the window
+            left_idx = max(0, i - window_size)
+            right_idx = min(sentence_length, i + 1 + window_size)
+            context_indices = list(range(left_idx, right_idx))
+            # Get the target word
+            center_word = sentence[i]
+            # Exclude the target word from the context words
+            context_indices.remove(i)
+            context_word = [sentence[idx] for idx in context_indices]
 
-def generate_cbow_sample(
-        sentence: List[str],
-        context_size: int,
-        use_random_window: bool = True) -> List[Tuple[List[str], str]]:
-    """
-    Generate a CBOW (Continuous Bag of Words) dataset from a given sentence.
+            # Append the context and target as a tuple to the dataset
+            cbow_data.append((context_word, center_word))
 
-    Args:
-        sentence (List[str]): The input sentence as a list of words.
-        context_size (int): The context window size, determining the number of words to consider before and after the target word.
+        return cbow_data
 
-    Returns:
-        List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
+    def generate_skipgram_sample(
+            self,
+            sentence: List[str],
+            context_size: int,
+            use_random_window: bool = True
+    ) -> Tuple[List[str], List[List[str]]]:
+        """
+        Generate an Skip-gram dataset from a given sentence.
+        返回跳元模型中的中心词和上下文词.
 
-    Example:
-        >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
-        >>> context_size = 2
-        >>> data = generate_cbow_dataset(sentence, context_size)
-        >>> print(data)
-        [(['love', 'to'], 'I'),
-        (['I', 'to', 'eat'], 'love'),
-        (['I', 'love', 'eat', 'ice'], 'to'),
-        (['love', 'to', 'ice', 'cream'], 'eat'),
-        (['to', 'eat', 'cream'], 'ice'),
-        (['eat', 'ice'], 'cream')]
-    """
-    cbow_data = []
-    sentence_length = len(sentence)
-    if sentence_length < 2:
-        return []
-    for i in range(sentence_length):
+        在Word2Vec中，上下文窗口是指在训练过程中，用来确定中心词周围哪些词作为上下文进行预测的窗口大小。这个窗口的大小可以影响到模型的性能和训练效果。
 
-        window_size = random.randint(
-            1, context_size) if use_random_window else context_size
+        使用随机采样一个介于1到max_window_size之间的整数作为上下文窗口，而不是固定使用max_window_size，有一些原理和考虑：
 
-        # Determine the context word indices within the window
-        left_idx = max(0, i - window_size)
-        right_idx = min(sentence_length, i + 1 + window_size)
-        context_indices = list(range(left_idx, right_idx))
-        # Get the target word
-        center_word = sentence[i]
-        # Exclude the target word from the context words
-        context_indices.remove(i)
-        context_word = [sentence[idx] for idx in context_indices]
+        - Diversification（多样性）：随机采样窗口大小可以引入更多的多样性，使得模型不仅仅关注固定大小的上下文窗口。这样可以更好地捕捉不同距离的关系，
+            避免过于集中在一个特定的上下文范围内。
 
-        # Append the context and target as a tuple to the dataset
-        cbow_data.append((context_word, center_word))
+        - 平衡计算复杂度：较大的上下文窗口可能会引入更多的噪声，因为与中心词距离较远的词可能与中心词的语义关联较弱。同时，较大的窗口可能会增加计算的复杂度,
+            因为要考虑更多的上下文词。通过随机采样窗口大小，可以在捕捉不同距离关系的同时，平衡计算的复杂度。
 
-    return cbow_data
+        - 训练稳定性：随机窗口大小可以提高模型的训练稳定性。如果总是使用固定的 max_window_size，可能会使模型对于固定距离范围内的关系过于敏感，从而导致训练不稳定。
 
+        - 对罕见词的处理：对于罕见词，较大的上下文窗口可能会导致模型将与中心词无关的词考虑在内，从而影响预测的准确性。随机窗口大小可以在一定程度上缓解这个问题。
 
-def generate_skipgram_sample(
-        sentence: List[str],
-        context_size: int,
-        use_random_window: bool = True) -> Tuple[List[str], List[List[str]]]:
-    """
-    Generate an Skip-gram dataset from a given sentence.
-    返回跳元模型中的中心词和上下文词.
+        综合考虑以上因素，使用随机采样一个介于1到max_window_size之间的窗口大小可以帮助模型更好地学习单词之间的关系，提高训练的效果和稳定性。
 
-    在Word2Vec中，上下文窗口是指在训练过程中，用来确定中心词周围哪些词作为上下文进行预测的窗口大小。这个窗口的大小可以影响到模型的性能和训练效果。
+        Args:
+            sentence (List[str]): The input sentence as a list of words.
+            context_size (int): The maximum window size for context words.
 
-    使用随机采样一个介于1到max_window_size之间的整数作为上下文窗口，而不是固定使用max_window_size，有一些原理和考虑：
+        Returns:
+            List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
 
-    - Diversification（多样性）：随机采样窗口大小可以引入更多的多样性，使得模型不仅仅关注固定大小的上下文窗口。这样可以更好地捕捉不同距离的关系，
-        避免过于集中在一个特定的上下文范围内。
+        Example:
+        ```python
+            >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
+            >>> context_size = 2
+            >>> data = generate_skipgram_dataset(sentence, context_size)
+            >>> print(data)
+                [('I', ['love', 'to']),
+                ('love', ['I', 'to', 'eat']),
+                ('to', ['I', 'love', 'eat', 'ice']),
+                ('eat', ['love', 'to', 'ice', 'cream']),
+                ('ice', ['to', 'eat', 'cream']),
+                ('cream', ['eat', 'ice'])]
+        ```
+        """
+        skipgram_data = []
 
-    - 平衡计算复杂度：较大的上下文窗口可能会引入更多的噪声，因为与中心词距离较远的词可能与中心词的语义关联较弱。同时，较大的窗口可能会增加计算的复杂度,
-        因为要考虑更多的上下文词。通过随机采样窗口大小，可以在捕捉不同距离关系的同时，平衡计算的复杂度。
+        sentence_length = len(sentence)
+        # To form "center word - context word" pairs, a sentence should have at least 2 words.
+        if sentence_length < 2:
+            return []
 
-    - 训练稳定性：随机窗口大小可以提高模型的训练稳定性。如果总是使用固定的 max_window_size，可能会使模型对于固定距离范围内的关系过于敏感，从而导致训练不稳定。
+        for i in range(sentence_length):
+            window_size = random.randint(
+                1, context_size) if use_random_window else context_size
 
-    - 对罕见词的处理：对于罕见词，较大的上下文窗口可能会导致模型将与中心词无关的词考虑在内，从而影响预测的准确性。随机窗口大小可以在一定程度上缓解这个问题。
+            # Determine the context word indices within the window
+            left_idx = max(0, i - window_size)
+            right_idx = min(sentence_length, i + 1 + window_size)
+            context_indices = list(range(left_idx, right_idx))
+            center_word = sentence[i]
+            # Exclude the center word from the context words
+            context_indices.remove(i)
+            context_words = [sentence[idx] for idx in context_indices]
+            # Append the center word and context words as a tuple to the dataset
+            skipgram_data.append((center_word, context_words))
 
-    综合考虑以上因素，使用随机采样一个介于1到max_window_size之间的窗口大小可以帮助模型更好地学习单词之间的关系，提高训练的效果和稳定性。
-
-    Args:
-        sentence (List[str]): The input sentence as a list of words.
-        context_size (int): The maximum window size for context words.
-
-    Returns:
-        List[Tuple[List[str], str]]: A list of tuples, where each tuple contains a list of context words and the target word.
-
-    Example:
-    ```python
-        >>> sentence = ["I", "love", "to", "eat", "ice", "cream"]
-        >>> context_size = 2
-        >>> data = generate_skipgram_dataset(sentence, context_size)
-        >>> print(data)
-            [('I', ['love', 'to']),
-            ('love', ['I', 'to', 'eat']),
-            ('to', ['I', 'love', 'eat', 'ice']),
-            ('eat', ['love', 'to', 'ice', 'cream']),
-            ('ice', ['to', 'eat', 'cream']),
-            ('cream', ['eat', 'ice'])]
-    ```
-    """
-    skipgram_data = []
-
-    sentence_length = len(sentence)
-    # To form "center word - context word" pairs, a sentence should have at least 2 words.
-    if sentence_length < 2:
-        return []
-
-    for i in range(sentence_length):
-        window_size = random.randint(
-            1, context_size) if use_random_window else context_size
-
-        # Determine the context word indices within the window
-        left_idx = max(0, i - window_size)
-        right_idx = min(sentence_length, i + 1 + window_size)
-        context_indices = list(range(left_idx, right_idx))
-        center_word = sentence[i]
-        # Exclude the center word from the context words
-        context_indices.remove(i)
-        context_words = [sentence[idx] for idx in context_indices]
-        # Append the center word and context words as a tuple to the dataset
-        skipgram_data.append((center_word, context_words))
-
-    return skipgram_data
+        return skipgram_data
 
 
 class RandomGenerator:
     """
     Randomly sample integers from a population based on given weights.
 
-    This class allows you to sample integers from 1 to n based on provided sampling weights.
+    It is used for making random selections from a given sequence (list, string, or any iterable) with replacement.
+    This means that items can be selected more than once, and the probability of each item being selected is uniform.
 
     Args:
-        sampling_weights (List[float]): A list of sampling weights for each integer in the population.
-
-
+        population: This is the sequence from which you want to make random selections.
+        weights (optional): This parameter allows you to specify a list of weights for the items in the population. \n
+        The weights determine the probability of each item being selected. If not provided, all items are assumed to have equal probability.
+        k: This is the number of random selections you want to make. It defaults to 1 if not specified.
     Example:
-        >>> sampler = RandomGenerator([0.2, 0.3, 0.5])
-        >>> sample = sampler.draw()
+        >>> generator = RandomGenerator(population = ['apple', 'banana', 'cherry', 'date'], weights = [0.2, 0.3, 0.4, 0.1])
+        >>> sample = [generator.draw() for _ in range(10)]
     """
-    def __init__(self, sampling_weights: List[float]):
-        """
-        Initialize the RandomSampler with sampling weights.
-
-        Args:
-            sampling_weights (List[float]): A list of sampling weights for each integer in the population.
-        """
-        self.population = list(range(1, len(sampling_weights) + 1))
-        self.sampling_weights = sampling_weights
+    def __init__(self,
+                 population: List[int] = None,
+                 weights: List[float] = None):
+        self.population = population
+        self.weights = weights
         self.candidates = []
         self.i = 0
 
@@ -558,7 +579,7 @@ class RandomGenerator:
         if self.i == len(self.candidates):
             # Cache k random samples
             self.candidates = random.choices(self.population,
-                                             self.sampling_weights,
+                                             self.weights,
                                              k=10000)
             self.i = 0
         self.i += 1
@@ -567,30 +588,38 @@ class RandomGenerator:
 
 # Example usage:
 if __name__ == '__main__':
-    sampler = RandomGenerator([0.2, 0.3, 0.5])
-    sample = sampler.draw()
+    generator = RandomGenerator(
+        population=['apple', 'banana', 'cherry', 'date'],
+        weights=[0.2, 0.3, 0.4, 0.1])
+    sample = [generator.draw() for _ in range(10)]
     print(f'Randomly sampled value: {sample}')
 
     corpus = ['I', 'love', 'to', 'eat', 'ice', 'cream']
     print(corpus)
     context_size = 2
 
-    ngrm = generate_ngram_sample(corpus, context_size)
+    word2vec_dataset = Word2VecDataset(corpus)
+
+    ngrm = word2vec_dataset.generate_ngram_sample(corpus, context_size)
     print(ngrm)
 
-    cbow = generate_cbow_sample(corpus, context_size)
+    cbow = word2vec_dataset.generate_cbow_sample(corpus, context_size)
     print(cbow)
 
-    skip = generate_skipgram_sample(corpus, context_size)
+    skip = word2vec_dataset.generate_skipgram_sample(corpus, context_size)
     print(skip)
 
     data_dir = '/home/robin/work_dir/llm/nlp-toolkit/data/ptb'
     sentences = load_ptb_data(data_dir, split='train')
 
-    toolkit = Word2VecToolkit(sentences)
-    subsample = toolkit.get_subsample_datasets()
-    a, b = toolkit.get_word_frequency('the')
+    word2vec_dataset = Word2VecDataset(sentences)
+    subsample = word2vec_dataset.get_subsampled_datasets()
+    a, b = word2vec_dataset.get_word_frequency('the')
     print(a, b)
 
-    all_centers, all_contexts = toolkit.get_skipgram_datasets()
-    all_negativaes = toolkit.get_negaitive_datasets(all_contexts)
+    all_centers, all_contexts = word2vec_dataset.get_skipgram_datasets(
+        sentences)
+
+    print(all_centers[:5], all_contexts[:5])
+    all_negativaes = word2vec_dataset.get_negative_datasets(all_contexts)
+    print(all_negativaes[:5])
