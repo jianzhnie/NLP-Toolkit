@@ -7,21 +7,55 @@ Description:
 
 '''
 import os
+import re
 import sys
 from typing import List
 
 import torch
 from torch.utils.data import DataLoader
 
+sys.path.append('../../')
 from nlptoolkit.data.vocab import Vocab
-
-sys.path.append('../../../')
 
 # Constants
 BOS_TOKEN = '<bos>'
 EOS_TOKEN = '<eos>'
 PAD_TOKEN = '<pad>'
 UNK_TOKEN = '<unk>'
+
+
+def minEditDistance(source: str, target: str) -> int:
+    """
+    计算两个字符串的最小编辑距离
+
+    参数:
+      source: 源字符串
+      target: 目标字符串
+
+    返回:
+      两个字符串的最小编辑距离,即源字符串转换成目标字符串的最少编辑操作次数
+    """
+
+    n = len(source)
+    m = len(target)
+
+    # 初始化编辑距离矩阵
+    dist_matrix: List[List[int]] = [[0 for _ in range(m + 1)]
+                                    for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        dist_matrix[i][0] = i
+    for j in range(1, m + 1):
+        dist_matrix[0][j] = j
+    # 动态规划计算最小编辑距离
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            if source[i - 1] == target[j - 1]:
+                dist_matrix[i][j] = dist_matrix[i - 1][j - 1]
+            else:
+                dist_matrix[i][j] = min(dist_matrix[i - 1][j] + 1,
+                                        dist_matrix[i][j - 1] + 1,
+                                        dist_matrix[i - 1][j - 1] + 1)
+    return dist_matrix[n][m]
 
 
 def truncate_pad(inputs: List[int],
@@ -50,23 +84,39 @@ def load_ptb_data(data_dir, split='train'):
     return [line.split() for line in raw_text.split('\n')]
 
 
-def load_sentence_polarity():
-    from nltk.corpus import sentence_polarity
+def remove_empty_paired_punc(in_str):
+    return in_str.replace('（）', '').replace('《》',
+                                            '').replace('【】',
+                                                        '').replace('[]', '')
 
-    vocab = Vocab(sentence_polarity.sents())
-    train_data = [
-        (vocab.to_ids(sentence), 0)
-        for sentence in sentence_polarity.sents(categories='pos')[:4000]
-    ] + [(vocab.to_ids(sentence), 1)
-         for sentence in sentence_polarity.sents(categories='neg')[:4000]]
 
-    test_data = [
-        (vocab.to_ids(sentence), 0)
-        for sentence in sentence_polarity.sents(categories='pos')[4000:]
-    ] + [(vocab.to_ids(sentence), 1)
-         for sentence in sentence_polarity.sents(categories='neg')[4000:]]
+def remove_html_tags(in_str):
+    html_pattern = re.compile(r'<[^>]+>', re.S)
+    return html_pattern.sub('', in_str)
 
-    return train_data, test_data, vocab
+
+def remove_control_chars(in_str):
+    control_chars = ''.join(
+        map(chr,
+            list(range(0, 32)) + list(range(127, 160))))
+    control_chars = re.compile('[%s]' % re.escape(control_chars))
+    return control_chars.sub('', in_str)
+
+
+def cleaning_wikidata(wiki_file):
+    new_text = []
+    with open(wiki_file, 'r', encoding='utf-8') as f_in:
+        for line in f_in.readlines():
+            line = line.strip()
+            if re.search(r'^(<doc id)|(</doc>)', line):
+                print(line)
+                continue
+            line = remove_empty_paired_punc(line)
+            line = remove_html_tags(line)
+            line = remove_control_chars(line)
+            new_text.append(line)
+
+    return new_text
 
 
 def length_to_mask(lengths):
@@ -77,31 +127,6 @@ def length_to_mask(lengths):
         lengths.shape[0], max_len) > lengths.unsqueeze(1)
     mask = mask.type(torch.bool)
     return mask
-
-
-def load_treebank():
-    from nltk.corpus import treebank
-    sents, postags = zip(*(zip(*sent) for sent in treebank.tagged_sents()))
-    vocab = Vocab(sents, reserved_tokens=['<pad>'])
-    tag_vocab = Vocab(postags)
-    train_data = [(vocab.to_ids(sentence), tag_vocab.to_ids(tags))
-                  for sentence, tags in zip(sents[:3000], postags[:3000])]
-    test_data = [(vocab.to_ids(sentence), tag_vocab.to_ids(tags))
-                 for sentence, tags in zip(sents[3000:], postags[3000:])]
-
-    return train_data, test_data, vocab, tag_vocab
-
-
-def load_reuters():
-    from nltk.corpus import reuters
-    text = reuters.sents()
-    # lowercase (optional)
-    text = [[word.lower() for word in sentence] for sentence in text]
-    vocab = Vocab(tokens=text,
-                  reserved_tokens=[PAD_TOKEN, BOS_TOKEN, EOS_TOKEN])
-    corpus = [vocab.to_ids(sentence) for sentence in text]
-
-    return corpus, vocab
 
 
 def save_pretrained(vocab, embeds, save_path):
@@ -138,12 +163,3 @@ def get_loader(dataset, batch_size, shuffle=True):
                              collate_fn=dataset.collate_fn,
                              shuffle=shuffle)
     return data_loader
-
-
-if __name__ == '__main__':
-    train_data, test_data, vocab = load_sentence_polarity()
-    print(train_data[:10])
-
-    train_data, test_data, vocab, tag_vocab = load_treebank()
-    print(train_data[:10])
-    print(test_data[:10])

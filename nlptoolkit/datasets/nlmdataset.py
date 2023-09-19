@@ -202,18 +202,21 @@ class NegativeSampleingSkipGramDataset(Dataset):
 
 
 class GloveDataset(Dataset):
-    def __init__(self, corpus, vocab, context_size=2):
+    def __init__(self, corpus, vocab: Vocab, context_size=2):
         # 记录词与上下文在给定语料中的共现次数
         self.cooccur_counts = defaultdict(float)
-        self.bos = vocab[BOS_TOKEN]
-        self.eos = vocab[EOS_TOKEN]
+        self.bos = vocab.bos_token
+        self.eos = vocab.eos_token
         for sentence in tqdm(corpus, desc='Dataset Construction'):
             sentence = [self.bos] + sentence + [self.eos]
             for i in range(1, len(sentence) - 1):
                 word = sentence[i]
+                word = vocab.to_index(word)
                 left_contexts = sentence[max(0, i - context_size):i]
+                left_contexts = vocab.to_index(left_contexts)
                 right_contexts = sentence[(i + 1):(
                     min(len(sentence), i + context_size) + 1)]
+                right_contexts = vocab.to_index(right_contexts)
                 # 共现次数随距离衰减: 1/d(w, c)
                 for k, contexts_words in enumerate(left_contexts[::-1]):
                     self.cooccur_counts[(word, contexts_words)] += 1 / (k + 1)

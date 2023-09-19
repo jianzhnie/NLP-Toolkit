@@ -6,56 +6,120 @@ LastEditors: jianzhnie
 Description:
 
 '''
+import os
+from typing import List, Tuple, Union
 
-import math
-
-import torch.nn as nn
-from torch import Tensor
+import torch
 
 
-# helper Module to convert tensor of input indices into corresponding tensor of token embeddings
-class TokenEmbedding(nn.Module):
-    """Word Embedding layer of Transformer.
-
-    This layer automatically constructs a 2D embedding matrix based on the
-    input the size of vocabulary (`vocab_size`) and the size of each embedding
-    vector (`emb_dim`). This layer lookups embeddings vector of ids provided
-    by input `word`.
-
-    After the embedding, those weights are multiplied by `sqrt(d_model)` which is
-    `sqrt(emb_dim)` in the interface.
-
-    .. math::
-
-        Out = embedding(word) * sqrt(emb_dim)
-
-    Args:
-        vocab_size (int):
-            The size of vocabulary.
-        emb_dim (int):
-            Dimensionality of each embedding vector.
-        bos_id (int, optional):
-            The start token id and also is used as padding id. Defaults to 0.
+class TokenEmbedding:
     """
-    def __init__(self, vocab_size: int, emb_dim: int):
-        super(TokenEmbedding, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_dim)
-        self.emb_dim = emb_dim
-
-    def forward(self, tokens: Tensor):
-        r"""
-        Computes word embedding.
+    TokenEmbedding class for loading and using pre-trained word embeddings like GloVe or fastText.
+    """
+    def __init__(self, embedding_name: str):
+        """
+        Initialize the TokenEmbedding instance.
 
         Args:
-            word (Tensor):
-                The input ids which indicates the sequences' words with shape
-                `[batch_size, sequence_length]` whose data type can be
-                int or int64.
+            embedding_name (str): Name of the pre-trained word embedding model to load (e.g., "glove.6B.50d").
+        """
+        self.idx_to_token, self.idx_to_vec = self.load_embedding(
+            embedding_name)
+        self.unknown_idx = 0
+        self.token_to_idx = {
+            token: idx
+            for idx, token in enumerate(self.idx_to_token)
+        }
+
+    def load_embedding(self,
+                       embedding_name: str) -> Tuple[List[str], torch.Tensor]:
+        """
+        Load the pre-trained word embeddings from a file.
+
+        Args:
+            embedding_name (str): Name of the pre-trained word embedding model to load.
 
         Returns:
-            Tensor:
-                The (scaled) embedding tensor of shape
-                `(batch_size, sequence_length, emb_dim)` whose data type can be
-                float32 or float64.
+            Tuple[List[str], torch.Tensor]: List of tokens and a tensor of word vectors.
         """
-        return self.embedding(tokens.long()) * math.sqrt(self.emb_dim)
+        idx_to_token, idx_to_vec = ['<unk>'], []
+
+        # Load the word embeddings from the file
+        with open(os.path.join(embedding_name, 'vec.txt'), 'r') as f:
+            for line in f:
+                elems = line.rstrip().split(' ')
+                token, elems = elems[0], [float(elem) for elem in elems[1:]]
+                if len(elems) > 1:
+                    idx_to_token.append(token)
+                    idx_to_vec.append(elems)
+
+        idx_to_vec = [[0] * len(idx_to_vec[0])] + idx_to_vec
+        return idx_to_token, torch.tensor(idx_to_vec)
+
+    def __getitem__(self, tokens: Union[str, List[str]]) -> torch.Tensor:
+        """
+        Get word embeddings for one or more tokens.
+
+        Args:
+            tokens (str or List[str]): Token(s) for which to retrieve embeddings.
+
+        Returns:
+            torch.Tensor: Word embeddings as a tensor.
+        """
+        if isinstance(tokens, str):
+            tokens = [tokens]
+
+        indices = [
+            self.token_to_idx.get(token, self.unknown_idx) for token in tokens
+        ]
+        vecs = self.idx_to_vec[torch.tensor(indices)]
+        return vecs
+
+    def __len__(self) -> int:
+        """
+        Get the size of the vocabulary, including the '<unk>' token.
+
+        Returns:
+            int: Size of the vocabulary.
+        """
+        return len(self.idx_to_token)
+
+
+def find_k_nearest_neighbors(embedding: TokenEmbedding,
+                             query_word: str,
+                             k: int = 5) -> List[str]:
+    """
+    Find the K-nearest neighbors for a query word based on cosine similarities between word vectors.
+
+    Args:
+        embedding (TokenEmbedding): An instance of the TokenEmbedding class.
+        query_word (str): The word for which to find nearest neighbors.
+        k (int, optional): The number of nearest neighbors to retrieve. Default is 5.
+
+    Returns:
+        List[str]: A list of K-nearest neighbor words.
+    """
+    if query_word not in embedding.token_to_idx:
+        return []
+    # Return an empty list if the query word is not in the vocabulary
+
+    query_vector = embedding(query_word)
+    similarity_scores = torch.matmul(embedding.idx_to_vec, query_vector.T)
+    similarity_scores /= (torch.norm(embedding.idx_to_vec, dim=1) *
+                          torch.norm(query_vector))
+
+    # Get the indices of the K-nearest neighbors (excluding the query word itself)
+    top_k_indices = similarity_scores.argsort(dim=0, descending=True)[1:k + 1]
+
+    # Retrieve the corresponding words
+    nearest_neighbors = [embedding.idx_to_token[i] for i in top_k_indices]
+
+    return nearest_neighbors
+
+
+if __name__ == '__main__':
+    # Example usage:
+    embedding = TokenEmbedding('glove.6B.50d')
+    query_word = 'king'
+    similar_words = find_k_nearest_neighbors(embedding, query_word, k=5)
+    print(f"Words similar to '{query_word}': {similar_words}")
