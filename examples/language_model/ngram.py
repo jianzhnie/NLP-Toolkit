@@ -13,12 +13,11 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
-                                         save_pretrained)
-from nlptoolkit.datasets.nlmdataset import NGramDataset
-from nlptoolkit.models.lm.word2vec import NGramLanguageModel
-
 sys.path.append('../../')
+from nlptoolkit.datasets.nlmdataset import NGramDataset, Word2VecDataset
+from nlptoolkit.models.lm.word2vec import NGramLanguageModel
+from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
+                                         save_pretrained)
 
 if __name__ == '__main__':
     embedding_dim = 64
@@ -28,8 +27,11 @@ if __name__ == '__main__':
     num_epoch = 10
 
     # 读取文本数据，构建FFNNLM训练数据集（n-grams）
-    corpus, vocab = load_reuters()
-    dataset = NGramDataset(corpus, vocab, context_size)
+    ptb_data = load_ptb_data('../../data/ptb')
+    word2vec = Word2VecDataset(ptb_data)
+    vocab = word2vec.vocab
+
+    dataset = NGramDataset(ptb_data, vocab, context_size)
     data_loader = get_loader(dataset, batch_size)
 
     # 负对数似然损失函数

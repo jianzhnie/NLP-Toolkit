@@ -14,12 +14,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
-                                         save_pretrained)
-from nlptoolkit.datasets.nlmdataset import NegativeSampleingSkipGramDataset
-from nlptoolkit.models.lm.word2vec import SkipGramNegativeSamplingModel
-
 sys.path.append('../../')
+from nlptoolkit.datasets.nlmdataset import (NegativeSampleingSkipGramDataset,
+                                            Word2VecDataset)
+from nlptoolkit.models.lm.word2vec import SkipGramNegativeSamplingModel
+from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
+                                         save_pretrained)
 
 
 def get_unigram_distribution(corpus, vocab_size):
@@ -43,14 +43,15 @@ if __name__ == '__main__':
     n_negatives = 10
 
     # 读取文本数据
-    corpus, vocab = load_reuters()
-    # 计算unigram概率分布
-    unigram_dist = get_unigram_distribution(corpus, len(vocab))
+    ptb_data = load_ptb_data('../../data/ptb')
+    word2vec = Word2VecDataset(ptb_data)
+    vocab = word2vec.vocab  # 计算unigram概率分布
+    unigram_dist = get_unigram_distribution(ptb_data, vocab, len(vocab))
     # 根据unigram分布计算负采样分布: p(w)**0.75
     negative_sampling_dist = unigram_dist**0.75
     negative_sampling_dist /= negative_sampling_dist.sum()
     # 构建SGNS训练数据集
-    dataset = NegativeSampleingSkipGramDataset(corpus,
+    dataset = NegativeSampleingSkipGramDataset(ptb_data,
                                                vocab,
                                                context_size=context_size,
                                                n_negatives=n_negatives,

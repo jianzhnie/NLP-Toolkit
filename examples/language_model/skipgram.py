@@ -13,10 +13,11 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
-                                         save_pretrained)
-from nlptoolkit.datasets.nlmdataset import SkipGramDataset
+sys.path.append('../../')
+from nlptoolkit.datasets.nlmdataset import SkipGramDataset, Word2VecDataset
 from nlptoolkit.models.lm import SkipGramModel
+from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
+                                         save_pretrained)
 
 sys.path.append('../../')
 
@@ -29,8 +30,10 @@ if __name__ == '__main__':
     num_epoch = 10
 
     # 读取文本数据，构建Skip-gram模型训练数据集
-    corpus, vocab = load_reuters()
-    dataset = SkipGramDataset(corpus, vocab, context_size=context_size)
+    ptb_data = load_ptb_data('../../data/ptb')
+    word2vec = Word2VecDataset(ptb_data)
+    vocab = word2vec.vocab
+    dataset = SkipGramDataset(ptb_data, vocab, context_size=context_size)
     data_loader = get_loader(dataset, batch_size)
 
     nll_loss = nn.NLLLoss()
