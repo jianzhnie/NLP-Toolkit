@@ -15,27 +15,25 @@ class TokenEmbedding:
     """
     TokenEmbedding class for loading and using pre-trained word embeddings like GloVe or fastText.
     """
-    def __init__(self, embedding_data_path: str):
+    def __init__(self, file_name: str):
         """
         Initialize the TokenEmbedding instance.
 
         Args:
-            embedding_data_path (str): Name of the pre-trained word embedding model to load (e.g., "glove.6B.50d").
+            file_name (str): Path to the pre-trained word embedding model file.
         """
-        self.tokens, self.embeddings = self.load_embedding(embedding_data_path)
-        self.unknown_idx = 0
+        self.tokens, self.embeddings = self.load_embedding(file_name)
         self.token_to_idx = {
             token: idx
             for idx, token in enumerate(self.tokens)
         }
 
-    def load_embedding(
-            self, embedding_data_path: str) -> Tuple[List[str], torch.Tensor]:
+    def load_embedding(self, file_name: str) -> Tuple[List[str], torch.Tensor]:
         """
         Load the pre-trained word embeddings from a file.
 
         Args:
-            embedding_data_path (str): Name or file path of the pre-trained word embedding model to load.
+            file_name (str): Path to the pre-trained word embedding model file.
 
         Returns:
             Tuple[List[str], torch.Tensor]: List of tokens and a tensor of word vectors.
@@ -43,15 +41,17 @@ class TokenEmbedding:
         tokens, embeds = [], []
 
         # Load the word embeddings from the file
-        with open(embedding_data_path, 'r') as f:
+        with open(file_name,
+                  'r',
+                  encoding='utf-8',
+                  newline='\n',
+                  errors='ignore') as f:
             for line in f.readlines():
                 line = line.rstrip().split(' ')
                 token, elems = line[0], list(map(float, line[1:]))
                 if len(elems) > 1:
                     tokens.append(token)
                     embeds.append(elems)
-
-        embeds = [[0] * len(embeds[0])] + embeds
         return tokens, torch.tensor(embeds, dtype=torch.float)
 
     def get_word_embedding(self, tokens: Union[str,
@@ -81,16 +81,40 @@ class TokenEmbedding:
         """
         return len(self.tokens)
 
-    def get_knn_distance(self,
-                         embeddings: torch.Tensor,
-                         query_vector: torch.Tensor,
-                         top_k: int = 5):
+    def cosine_similarity(self, embeddings_mat: torch.Tensor,
+                          query_vector: torch.Tensor) -> torch.Tensor:
+        """
+        Compute cosine similarity between two tensors.
+
+        Returns:
+            torch.Tensor: Cosine similarity between the two tensors.
+        """
         # Normalize the query vector
         normed_query = query_vector / torch.norm(query_vector)
         # Calculate the cosine similarity between the query word and all other words in the vocabulary
-        normed_embeddings = embeddings / torch.norm(
-            embeddings, dim=1, keepdim=True)
+        normed_embeddings = embeddings_mat / torch.norm(
+            embeddings_mat, dim=1, keepdim=True)
+
         similarity_scores = torch.matmul(normed_embeddings, normed_query.T)
+
+        return similarity_scores
+
+    def get_knn_neighbors(self,
+                          embeddings: torch.Tensor,
+                          query_vector: torch.Tensor,
+                          top_k: int = 5) -> Tuple[List[str], List[float]]:
+        """
+        Get the K-nearest neighbors based on cosine similarities between word vectors.
+
+        Args:
+            embeddings (torch.Tensor): Word embeddings for the entire vocabulary.
+            query_vector (torch.Tensor): Query vector for which to find nearest neighbors.
+            top_k (int, optional): Number of nearest neighbors to retrieve. Default is 5.
+
+        Returns:
+            Tuple[List[str], List[float]]: List of K-nearest neighbor words and their cosine distances.
+        """
+        similarity_scores = self.cosine_similarity(embeddings, query_vector)
         # Get the indices of the K-nearest neighbors (excluding the query word itself)
         topk_indices = similarity_scores.argsort(dim=0,
                                                  descending=True)[1:top_k + 1]
@@ -102,14 +126,13 @@ class TokenEmbedding:
 
     def find_k_nearest_neighbors(self,
                                  query_word: str,
-                                 k: int = 5) -> List[str]:
+                                 top_k: int = 5) -> List[str]:
         """
         Find the K-nearest neighbors for a query word based on cosine similarities between word vectors.
 
         Args:
-            embedding : An instance of the TokenEmbedding class.
             query_word (str): The word for which to find nearest neighbors.
-            k (int, optional): The number of nearest neighbors to retrieve. Default is 5.
+            top_k (int, optional): The number of nearest neighbors to retrieve. Default is 5.
 
         Returns:
             List[str]: A list of K-nearest neighbor words.
@@ -120,9 +143,9 @@ class TokenEmbedding:
         # Get the embedding for the query word
         query_vector = self.get_word_embedding(query_word)
         # Get the indices and distances of the k-nearest neighbors
-        topk_words, topk_distance = self.get_knn_distance(self.embeddings,
-                                                          query_vector,
-                                                          top_k=k)
+        topk_words, topk_distance = self.get_knn_neighbors(self.embeddings,
+                                                           query_vector,
+                                                           top_k=top_k)
 
         return topk_words, topk_distance
 
@@ -130,11 +153,23 @@ class TokenEmbedding:
                           word1: str,
                           word2: str,
                           word3: str,
-                          k: int = 1):
+                          k: int = 1) -> List[str]:
+        """
+        Get words that are similar to the analogy: word1 - word2 + word3.
+
+        Args:
+            word1 (str): First word in the analogy.
+            word2 (str): Second word in the analogy.
+            word3 (str): Third word in the analogy.
+            k (int, optional): The number of similar words to retrieve. Default is 1.
+
+        Returns:
+            List[str]: A list of words that are similar to the given analogy.
+        """
         vecs = self.get_word_embedding([word1, word2, word3])
         unk_vec = vecs[1] - vecs[0] + vecs[2]
         unk_vec = unk_vec.reshape(vecs[0].shape)
-        knn_words, scores = self.get_knn_distance(self.embeddings, unk_vec, k)
+        knn_words, _ = self.get_knn_neighbors(self.embeddings, unk_vec, k)
         return knn_words
 
 
@@ -145,7 +180,7 @@ if __name__ == '__main__':
     )
     query_word = 'king'
     similar_words, similar_distance = embedding.find_k_nearest_neighbors(
-        query_word, k=5)
+        query_word, top_k=5)
     print(
         f"Words similar to '{query_word}': {similar_words}: distances: {similar_distance}"
     )
