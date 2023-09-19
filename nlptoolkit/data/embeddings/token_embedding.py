@@ -86,42 +86,44 @@ class TokenEmbedding:
         """
         Compute cosine similarity between two tensors.
 
+        Args:
+            embeddings_mat (torch.Tensor): Matrix of word embeddings.
+            query_vector (torch.Tensor): Query vector for which to find cosine similarities.
+
         Returns:
-            torch.Tensor: Cosine similarity between the two tensors.
+            torch.Tensor: Cosine similarities between the query vector and all vectors in the matrix.
         """
         # Normalize the query vector
         normed_query = query_vector / torch.norm(query_vector)
-        # Calculate the cosine similarity between the query word and all other words in the vocabulary
+        # Normalize all embeddings in the matrix
         normed_embeddings = embeddings_mat / torch.norm(
             embeddings_mat, dim=1, keepdim=True)
-
+        # Calculate cosine similarities
         similarity_scores = torch.matmul(normed_embeddings, normed_query.T)
-
         return similarity_scores
 
     def get_knn_neighbors(self,
-                          embeddings: torch.Tensor,
                           query_vector: torch.Tensor,
                           top_k: int = 5) -> Tuple[List[str], List[float]]:
         """
         Get the K-nearest neighbors based on cosine similarities between word vectors.
 
         Args:
-            embeddings (torch.Tensor): Word embeddings for the entire vocabulary.
             query_vector (torch.Tensor): Query vector for which to find nearest neighbors.
             top_k (int, optional): Number of nearest neighbors to retrieve. Default is 5.
 
         Returns:
             Tuple[List[str], List[float]]: List of K-nearest neighbor words and their cosine distances.
         """
-        similarity_scores = self.cosine_similarity(embeddings, query_vector)
+        similarity_scores = self.cosine_similarity(self.embeddings,
+                                                   query_vector)
         # Get the indices of the K-nearest neighbors (excluding the query word itself)
         topk_indices = similarity_scores.argsort(dim=0,
                                                  descending=True)[1:top_k + 1]
         # Get the tokens corresponding to the indices
         topk_words = [self.tokens[idx] for idx in topk_indices]
         # Get the corresponding cosine distances
-        topk_distance = [similarity_scores[i] for i in topk_indices]
+        topk_distance = [similarity_scores[i].item() for i in topk_indices]
         return topk_words, topk_distance
 
     def find_k_nearest_neighbors(self,
@@ -143,8 +145,7 @@ class TokenEmbedding:
         # Get the embedding for the query word
         query_vector = self.get_word_embedding(query_word)
         # Get the indices and distances of the k-nearest neighbors
-        topk_words, topk_distance = self.get_knn_neighbors(self.embeddings,
-                                                           query_vector,
+        topk_words, topk_distance = self.get_knn_neighbors(query_vector,
                                                            top_k=top_k)
 
         return topk_words, topk_distance
@@ -169,7 +170,7 @@ class TokenEmbedding:
         vecs = self.get_word_embedding([word1, word2, word3])
         unk_vec = vecs[1] - vecs[0] + vecs[2]
         unk_vec = unk_vec.reshape(vecs[0].shape)
-        knn_words, _ = self.get_knn_neighbors(self.embeddings, unk_vec, k)
+        knn_words, _ = self.get_knn_neighbors(unk_vec, k)
         return knn_words
 
 
