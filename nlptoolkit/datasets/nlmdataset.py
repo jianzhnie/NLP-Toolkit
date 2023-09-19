@@ -55,10 +55,10 @@ class RNNlmDataset(Dataset):
 
 
 class NGramDataset(Dataset):
-    def __init__(self, corpus, vocab, context_size=2):
+    def __init__(self, corpus, vocab: Vocab, context_size=2):
         self.data = []
-        self.bos = vocab[BOS_TOKEN]
-        self.eos = vocab[EOS_TOKEN]
+        self.bos = vocab.bos_token
+        self.eos = vocab.eos_token
         for sentence in tqdm(corpus, desc='Dataset Construction'):
             # 插入句首句尾符号
             sentence = [self.bos] + sentence + [self.eos]
@@ -67,8 +67,10 @@ class NGramDataset(Dataset):
             for i in range(context_size, len(sentence)):
                 # 模型输入：长为context_size的上文
                 context = sentence[i - context_size:i]
+                context = vocab.to_index(context)
                 # 模型输出：当前词
                 target = sentence[i]
+                target = vocab.to_index(target)
                 self.data.append((context, target))
 
     def __len__(self):
@@ -85,10 +87,10 @@ class NGramDataset(Dataset):
 
 
 class CbowDataset(Dataset):
-    def __init__(self, corpus, vocab, context_size=2):
+    def __init__(self, corpus, vocab: Vocab, context_size=2):
         self.data = []
-        self.bos = vocab[BOS_TOKEN]
-        self.eos = vocab[EOS_TOKEN]
+        self.bos = vocab.bos_token
+        self.eos = vocab.eos_token
         for sentence in tqdm(corpus, desc='Dataset Construction'):
             sentence = [self.bos] + sentence + [self.eos]
             if len(sentence) < context_size * 2 + 1:
@@ -123,11 +125,13 @@ class SkipGramDataset(Dataset):
             for i in range(1, len(sentence) - 1):
                 # 模型输入：当前词
                 w = sentence[i]
+                w = vocab.to_index(w)
                 # 模型输出：一定窗口大小内的上下文
                 left_context_index = max(0, i - context_size)
                 right_context_index = min(len(sentence), i + context_size)
                 context = sentence[left_context_index:i] + sentence[
                     (i + 1):(right_context_index + 1)]
+                context = vocab.to_index(context)
                 self.data.extend([(w, c) for c in context])
 
     def __len__(self):
@@ -146,24 +150,26 @@ class NegativeSampleingSkipGramDataset(Dataset):
     """Negative Sampleing for Skip-Gram Dataset."""
     def __init__(self,
                  corpus,
-                 vocab,
+                 vocab: Vocab,
                  context_size=2,
                  n_negatives=5,
                  ns_dist=None):
         self.data = []
-        self.bos = vocab[BOS_TOKEN]
-        self.eos = vocab[EOS_TOKEN]
-        self.pad = vocab[PAD_TOKEN]
+        self.bos = vocab.bos_token
+        self.eos = vocab.eos_token
+        self.pad = vocab.pad_token
         for sentence in tqdm(corpus, desc='Dataset Construction'):
             sentence = [self.bos] + sentence + [self.eos]
             for i in range(1, len(sentence) - 1):
                 # 模型输入：(w, context) ；输出为0/1，表示context是否为负样本
                 w = sentence[i]
+                w = vocab.to_index(w)
                 left_context_index = max(0, i - context_size)
                 right_context_index = min(len(sentence), i + context_size)
                 context = sentence[left_context_index:i] + sentence[
                     (i + 1):(right_context_index + 1)]
                 context += [self.pad] * (2 * context_size - len(context))
+                context = vocab.to_index(context)
                 self.data.append((w, context))
 
         # 负样本数量
@@ -246,6 +252,12 @@ class Word2VecDataset(object):
     5. get_skipgram_datasets 方法生成Skipgram模型的数据集，包括中心词和上下文词。
 
     6. get_negaitive_datasets 方法生成用于Skipgram模型的负采样数据集。
+
+    7. get_negative_sample 方法生成Skipgram模型的负采样数据。
+
+    8. generate_ngram_sample 生成 Ngram 模型的采样数据。
+
+    9. generate_cbow_sample 生成CBOW模型的采样数据，包括上下文词和中心词。
     """
     def __init__(self, sentences: List[List[str]], threshold: float = 1e-4):
         """
