@@ -129,32 +129,16 @@ def length_to_mask(lengths):
     return mask
 
 
-def save_pretrained(vocab, embeds, save_path):
+def save_pretrained_vector(vocab: Vocab, embeds: torch.tensor, save_path: str):
     """Save pretrained token vectors in a unified format, where the first line
     specifies the `number_of_tokens` and `embedding_dim` followed with all
     token vectors, one token per line."""
     with open(save_path, 'w') as writer:
         writer.write(f'{embeds.shape[0]} {embeds.shape[1]}\n')
-        for idx, token in enumerate(vocab.idx_to_token):
+        for idx, token in vocab.idx_to_token.items():
             vec = ' '.join(['{:.4f}'.format(x) for x in embeds[idx]])
             writer.write(f'{token} {vec}\n')
     print(f'Pretrained embeddings saved to: {save_path}')
-
-
-def load_pretrained(load_path):
-    with open(load_path, 'r') as fin:
-        # Optional: depending on the specific format of pretrained vector file
-        n, d = map(int, fin.readline().split())
-        tokens = []
-        embeds = []
-        for line in fin:
-            line = line.rstrip().split(' ')
-            token, embed = line[0], list(map(float, line[1:]))
-            tokens.append(token)
-            embeds.append(embed)
-        vocab = Vocab(tokens)
-        embeds = torch.tensor(embeds, dtype=torch.float)
-    return vocab, embeds
 
 
 def get_loader(dataset, batch_size, shuffle=True):
