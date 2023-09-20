@@ -179,7 +179,7 @@ if __name__ == '__main__':
     embedding = TokenEmbedding(
         '/home/robin/work_dir/llm/nlp-toolkit/examples/language_model/glove.vec'
     )
-    query_word = 'king'
+    query_word = 'beautiful'
     similar_words, similar_distance = embedding.find_k_nearest_neighbors(
         query_word, top_k=5)
     print(
@@ -187,5 +187,5 @@ if __name__ == '__main__':
     )
 
     # Example usage:
-    analogy_word = embedding.get_analogy_words('man', 'woman', 'son')
+    analogy_word = embedding.get_analogy_words('man', 'woman', 'king')
     print(analogy_word)
