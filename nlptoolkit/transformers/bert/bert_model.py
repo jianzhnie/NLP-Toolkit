@@ -7,35 +7,36 @@ Description:
 
 '''
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
 from torch import Tensor
+from transformers.modeling_outputs import \
+    BaseModelOutputWithPoolingAndCrossAttentions
 
 from nlptoolkit.transformers.vanilla import (TransformerEncoder,
                                              TransformerEncoderLayer)
 
 
 class BertEmbedding(nn.Module):
+    """
+    Include embeddings from word, position and token_type embeddings
+    """
     def __init__(self,
                  vocab_size,
                  hidden_size,
                  type_vocab_size,
                  hidden_dropout_prob=0.1,
-                 max_position_embeddings=1000,
-                 position_embedding_type='absolute'):
+                 max_position_embeddings=1000):
         super().__init__()
-        self.word_embedding = nn.Embedding(vocab_size,
-                                           hidden_size,
-                                           padding_idx=0)
+        self.word_embedding = nn.Embedding(vocab_size, hidden_size)
         self.position_embedding = nn.Embedding(max_position_embeddings,
                                                hidden_size)
         self.token_type_embedding = nn.Embedding(type_vocab_size, hidden_size)
 
-        self.LayerNorm = nn.LayerNorm(hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
-        self.position_embedding_type = position_embedding_type
         self.register_buffer('position_ids',
                              torch.arange(max_position_embeddings).expand(
                                  (1, -1)),
@@ -50,16 +51,10 @@ class BertEmbedding(nn.Module):
         input_ids: Optional[torch.LongTensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        inputs_embeds: Optional[torch.LongTensor] = None,
-        past_key_values_length: int = 0,
+        past_key_values_length: Optional[int] = None,
     ):
-        if input_ids is not None:
-            input_shape = input_ids.size()
-        else:
-            input_shape = inputs_embeds.size()[:-1]
-
+        input_shape = input_ids.size()
         seq_length = input_shape[1]
-
         if position_ids is None:
             position_ids = self.position_ids[:, past_key_values_length:
                                              seq_length +
@@ -78,17 +73,57 @@ class BertEmbedding(nn.Module):
                                              dtype=torch.long,
                                              device=self.position_ids.device)
 
-        if inputs_embeds is None:
-            inputs_embeds = self.word_embedding(input_ids)
+        inputs_embeddings = self.word_embedding(input_ids)
         token_type_embeddings = self.token_type_embedding(token_type_ids)
+        position_embeddings = self.position_embedding(position_ids)
 
-        embeddings = inputs_embeds + token_type_embeddings
-        if self.position_embedding_type == 'absolute':
-            position_embeddings = self.position_embedding(position_ids)
-            embeddings += position_embeddings
-        embeddings = self.LayerNorm(embeddings)
+        embeddings = inputs_embeddings + token_type_embeddings + position_embeddings
+        embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
+
+
+class BertPooler(nn.Module):
+    """
+    Pool the result of BertEncoder.
+    """
+    def __init__(self, hidden_size):
+        """init the bert pooler with config & args/kwargs
+
+        Args:
+            config (BertConfig): BertConfig instance. Defaults to None.
+        """
+        super(BertPooler, self).__init__()
+
+        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.activation = nn.Tanh()
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+        first_token_tensor = hidden_states[:, 0]
+        pooled_output = self.dense(first_token_tensor)
+        pooled_output = self.activation(pooled_output)
+        return pooled_output
+
+
+class BertOutput(nn.Module):
+    def __init__(self,
+                 intermediate_size,
+                 hidden_size,
+                 layer_norm_eps=1e-12,
+                 hidden_dropout_prob=0.1):
+        super().__init__()
+        self.dense = nn.Linear(intermediate_size, hidden_size)
+        self.LayerNorm = nn.LayerNorm(hidden_size, eps=layer_norm_eps)
+        self.dropout = nn.Dropout(hidden_dropout_prob)
+
+    def forward(self, hidden_states: torch.Tensor,
+                input_tensor: torch.Tensor) -> torch.Tensor:
+        hidden_states = self.dense(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        hidden_states = self.LayerNorm(hidden_states + input_tensor)
+        return hidden_states
 
 
 class MaskLM(nn.Module):
@@ -124,23 +159,23 @@ class MaskLM(nn.Module):
         return mlm_Y_hat
 
 
-class NextSentencePred(nn.Module):
+class BertForNextSentencePred(nn.Module):
     """The next sentence prediction task of BERT.
 
     - 为了帮助理解两个文本序列之间的关系，BERT在预训练中考虑了一个二元分类任务——下一句预测。
     - 在为预训练生成句子对时，有一半的时间它们确实是标签为“真”的连续句子；
     - 在另一半的时间里，第二个句子是从语料库中随机抽取的，标记为“假”。
 
-    - NextSentencePred类使用单隐藏层的多层感知机来预测第二个句子是否是BERT输入序列中第一个句子的下一个句子。
+    - BertForNextSentencePred 类使用单隐藏层的多层感知机来预测第二个句子是否是BERT输入序列中第一个句子的下一个句子。
     - 由于Transformer编码器中的自注意力，特殊词元“<cls>”的BERT表示已经对输入的两个句子进行了编码。过程如下:
         - step1: 输入带 “<cls>”标记的词元 inputs ;
         - step2: encoded_feature = BertEncoder(inputs) 编码后的词元
         - step3: output = MLP(encoded_feature[:, 0, :])  BertModel 的 Head, 0 是“<cls>”标记的索引
-        - step4: output = NextSentencePred(output)  单隐藏层的 MLP 预测下一个句子.
+        - step4: output = BertForNextSentencePred(output)  单隐藏层的 MLP 预测下一个句子.
 
     """
     def __init__(self, d_model, **kwargs):
-        super(NextSentencePred, self).__init__(**kwargs)
+        super(BertForNextSentencePred, self).__init__(**kwargs)
         self.output = nn.Linear(d_model, 2)
 
     def forward(self, inputs):
@@ -162,54 +197,168 @@ class BERTModel(nn.Module):
         d_model: int = 512,
         num_heads: int = 8,
         num_layers: int = 6,
-        dim_feedforward: int = 2048,
+        intermediate_size: int = 2048,
         dropout: float = 0.1,
         activation: str = 'relu',
         mlm_in_features: int = 512,
         nsp_in_features: int = 512,
     ):
         super(BERTModel, self).__init__()
-        self.embed_layer = BertEmbedding(vocab_size, hidden_size, n_segments,
-                                         max_len)
+        self.embedding_layer = BertEmbedding(vocab_size, hidden_size,
+                                             n_segments, max_len)
         encoder_layer = TransformerEncoderLayer(d_model, num_heads,
-                                                dim_feedforward, dropout,
+                                                intermediate_size, dropout,
                                                 activation)
         encoder_norm = nn.LayerNorm(d_model)
         self.encoder = TransformerEncoder(encoder_layer, num_layers,
                                           encoder_norm)
         self.mlm = MaskLM(vocab_size, hidden_size, mlm_in_features)
-        self.nsp = NextSentencePred(nsp_in_features)
+        self.nsp = BertForNextSentencePred(nsp_in_features)
+        self.pooler = BertPooler(d_model)
 
     def forward(
         self,
-        tokens: Tensor,
-        segments: Tensor,
-        pred_positions: Optional[Tensor] = None,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+        use_cache: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ) -> Tensor:
-        """
-        Perform a forward pass through the Transformer model.
+        r"""
+        The BertModel forward method, overrides the `__call__()` special method.
 
         Args:
-            src (Tensor): The sequence to the encoder (required).
-            src_mask (Optional[Tensor]): The additive mask for the src sequence (optional).
-            src_key_padding_mask (Optional[Tensor]): The ByteTensor mask for src keys per batch (optional).
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+            token_type_ids (Tensor, optional):
+                Segment token indices to indicate different portions of the inputs.
+                Selected in the range ``[0, type_vocab_size - 1]``.
+                If `type_vocab_size` is 2, which means the inputs have two portions.
+                Indices can either be 0 or 1:
+
+                - 0 corresponds to a *sentence A* token,
+                - 1 corresponds to a *sentence B* token.
+
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to `None`, which means we don't add segment embeddings.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
+            use_cache (`bool`, optional):
+                If set to `True`, `past_key_values` key value states are returned.
+                Defaults to `None`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `None`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `None`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~torch.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `None`.
 
         Returns:
-            Tensor: The output tensor of shape (T, N, E).
+            An instance of :class:`~torch.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~torch.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
-        Shape:
-            - src: (S, N, E).
-            - src_mask: (S, S).
-            - src_key_padding_mask: (N, S).
+        Example:
+            .. code-block::
+
+                import torch
+                from torch.transformers import BertModel, BertTokenizer
+
+                tokenizer = BertTokenizer.from_pretrained('bert-wwm-chinese')
+                model = BertModel.from_pretrained('bert-wwm-chinese')
+
+                inputs = tokenizer("欢迎使用百度飞桨!")
+                inputs = {k:torch.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
         """
-        embeddings = self.embed_layer(tokens, segments)
-        output = self.encoder(embeddings)
-        if pred_positions is not None:
-            mlm_pred = self.mlm(output, pred_positions)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (output_hidden_states
+                                if output_hidden_states is not None else
+                                self.config.output_hidden_states)
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        past_key_values_length = None
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
+
+        if attention_mask is None:
+            attention_mask = torch.unsqueeze(
+                (input_ids == self.pad_token_id).astype(
+                    self.pooler.dense.weight.dtype) * -1e4,
+                axis=[1, 2])
+            if past_key_values is not None:
+                batch_size = past_key_values[0][0].shape[0]
+                past_mask = torch.zeros(
+                    [batch_size, 1, 1, past_key_values_length],
+                    dtype=attention_mask.dtype)
+                attention_mask = torch.concat([past_mask, attention_mask],
+                                              axis=-1)
         else:
-            mlm_pred = None
-        nsp_pred = self.nsp(output[:, 0, :])
-        return output, mlm_pred, nsp_pred
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
+                    torch.get_default_dtype())
+                attention_mask = (1.0 - attention_mask) * -1e4
+
+        embedding_output = self.embedding_layer(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+            past_key_values_length=past_key_values_length,
+        )
+        encoder_outputs = self.encoder(
+            embedding_output,
+            src_mask=attention_mask,
+            cache=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        if isinstance(encoder_outputs, type(embedding_output)):
+            sequence_output = encoder_outputs
+            pooled_output = self.pooler(sequence_output)
+            return (sequence_output, pooled_output)
+        else:
+            sequence_output = encoder_outputs[0]
+            pooled_output = self.pooler(sequence_output)
+            if not return_dict:
+                return (sequence_output, pooled_output) + encoder_outputs[1:]
+            return BaseModelOutputWithPoolingAndCrossAttentions(
+                last_hidden_state=sequence_output,
+                pooler_output=pooled_output,
+                past_key_values=encoder_outputs.past_key_values,
+                hidden_states=encoder_outputs.hidden_states,
+                attentions=encoder_outputs.attentions,
+            )
 
     def _reset_parameters(self):
         """
