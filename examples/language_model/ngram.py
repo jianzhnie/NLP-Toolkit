@@ -17,7 +17,7 @@ sys.path.append('../../')
 from nlptoolkit.datasets.nlmdataset import NGramDataset, Word2VecDataset
 from nlptoolkit.models.lm.word2vec import NGramLanguageModel
 from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
-                                         save_pretrained)
+                                         save_pretrained_vector)
 
 if __name__ == '__main__':
     embedding_dim = 64
@@ -30,6 +30,7 @@ if __name__ == '__main__':
     ptb_data = load_ptb_data('../../data/ptb')
     word2vec = Word2VecDataset(ptb_data)
     vocab = word2vec.vocab
+    print(f'Vocab size: {len(vocab)}')
 
     dataset = NGramDataset(ptb_data, vocab, context_size)
     data_loader = get_loader(dataset, batch_size)
@@ -60,4 +61,4 @@ if __name__ == '__main__':
         total_losses.append(total_loss)
 
     # 保存词向量（model.embeddings）
-    save_pretrained(vocab, model.embeddings.weight.data, 'ffnnlm.vec')
+    save_pretrained_vector(vocab, model.embeddings.weight.data, 'ffnnlm.vec')

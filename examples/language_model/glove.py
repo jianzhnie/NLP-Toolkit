@@ -13,26 +13,28 @@ import torch
 import torch.optim as optim
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
-                                         save_pretrained)
-from nlptoolkit.datasets.nlmdataset import GloveDataset
-from nlptoolkit.models.lm.glove import GloveModel
-
 sys.path.append('../../')
+from nlptoolkit.datasets.nlmdataset import GloveDataset, Word2VecDataset
+from nlptoolkit.models.lm.glove import GloveModel
+from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
+                                         save_pretrained_vector)
 
 if __name__ == '__main__':
 
     embedding_dim = 64
-    context_size = 2
+    context_size = 3
     batch_size = 1024
-    num_epoch = 10
+    num_epoch = 20
 
     # 用以控制样本权重的超参数
     m_max = 100
     alpha = 0.75
     # 从文本数据中构建GloVe训练数据集
-    corpus, vocab = load_reuters()
-    dataset = GloveDataset(corpus, vocab, context_size=context_size)
+    ptb_data = load_ptb_data('../../data/ptb')
+    word2vec = Word2VecDataset(ptb_data)
+    vocab = word2vec.vocab
+
+    dataset = GloveDataset(ptb_data, vocab, context_size=context_size)
     data_loader = get_loader(dataset, batch_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -71,4 +73,4 @@ if __name__ == '__main__':
 
     # 合并词嵌入矩阵与上下文嵌入矩阵，作为最终的预训练词向量
     combined_embeds = model.w_embeddings.weight + model.c_embeddings.weight
-    save_pretrained(vocab, combined_embeds.data, 'glove.vec')
+    save_pretrained_vector(vocab, combined_embeds.data, 'glove.vec')
