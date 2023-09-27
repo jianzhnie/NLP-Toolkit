@@ -1,3 +1,38 @@
+# Word Embedding with NLP Toolkit
+
+## 简介
+
+以下通过基于开源情感倾向分类数据集ChnSentiCorp的文本分类训练例子展示 Word Embedding 的训练过程。
+
+## 启动训练
+
+我们以中文情感分类公开数据集ChnSentiCorp为示例数据集，可以运行下面的命令，在训练集（train.tsv）上进行模型训练，并在验证集（dev.tsv）验证。训练时会自动下载词表dict.txt，用于对数据集进行切分，构造数据样本。
+
+启动训练：
+
+```shell
+python train_bowcls.py \
+                --lr=5e-4 \
+                --batch_size=64 \
+                --epochs=20 \
+                --vocab_path /home/robin/work_dir/llm/nlp-toolkit/data/word_vocab.txt
+
+```
+
+以上参数表示：
+
+* `lr`: 学习率， 默认为5e-4。
+* `batch_size`: 运行一个batch大小，默认为64。
+* `epochs`: 训练轮次，默认为5。
+* `vocab_path`: 需要加载的单词词表文件路径
+
+
+## 参考论文
+- Li, Shen, et al. "Analogical reasoning on chinese morphological and semantic relations." arXiv preprint arXiv:1805.06504 (2018).
+- Qiu, Yuanyuan, et al. "Revisiting correlations between intrinsic and extrinsic evaluations of word embeddings." Chinese Computational Linguistics and Natural Language Processing Based on Naturally Annotated Big Data. Springer, Cham, 2018. 209-221.
+- Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation.
+- T. Mikolov, E. Grave, P. Bojanowski, C. Puhrsch, A. Joulin. Advances in Pre-Training Distributed Word Representations
+
 # Word-level Language Modeling using RNN and Transformer
 
 This example trains a multi-layer RNN (Elman, GRU, or LSTM) or Transformer on a language modeling task. By default, the training script uses the Wikitext-2 dataset, provided.

@@ -1,5 +1,6 @@
+import argparse
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -30,7 +31,7 @@ class BoWClassifier(nn.Module):
 
     参数:
     - vocab_size: 词表大小
-    - embed_dim: 嵌入维度
+    - embed_size: 嵌入维度
     - num_classes: 分类数
     - hidden_size: 第一个全连接层隐藏层大小
     - dropout: dropout概率
@@ -38,21 +39,18 @@ class BoWClassifier(nn.Module):
     """
     def __init__(self,
                  vocab_size: int,
-                 embed_dim: int,
-                 num_classes: int,
+                 embed_size: int,
                  hidden_size: int = 128,
+                 num_classes: int = 2,
                  dropout: float = 0.5):
         super().__init__()
 
         # 词嵌入层
-        self.embed = nn.Embedding(vocab_size, embed_dim)
-
+        self.embed = nn.Embedding(vocab_size, embed_size)
         # 全连接层
-        self.fc1 = nn.Linear(embed_dim, hidden_size)
-
+        self.fc1 = nn.Linear(embed_size, hidden_size)
         # Dropout
         self.dropout = nn.Dropout(dropout)
-
         # 输出层
         self.fc2 = nn.Linear(hidden_size, num_classes)
 
@@ -67,22 +65,18 @@ class BoWClassifier(nn.Module):
         - output: 分类logits,形状为 [batch_size, num_classes]
 
         """
-
         # 获取词嵌入表示
+        # [batch_size, seq_len, embed_size]
         embed = self.embed(text)
-
         # 对序列dimension求平均,得到文本表示
+        # [batch_size, embed_size]
         embed = torch.mean(embed, dim=1)
-
-        # 全连接层, 激活函数为tanh
-        out = torch.tanh(self.fc1(embed))
-
-        # Dropout正则化
+        # [batch_size, hidden_size]
+        out = self.fc1(embed)
+        out = torch.tanh(out)
         out = self.dropout(out)
-
-        # 输出层
+        # [batch_size, num_classes]
         logits = self.fc2(out)
-
         return logits
 
 
@@ -95,14 +89,9 @@ class TorchDataset(Dataset):
         tokenizer: Tokenizer to split text into tokens.
         vocab: Vocabulary for mapping tokens to indices.
         max_seq_len: Maximum sequence length after truncation.
-        label_dtype: Data type of label tensor (int64 for classification, float32 for regression).
     """
-    def __init__(self,
-                 dataset: List[Dict],
-                 tokenizer: JiebaTokenizer,
-                 vocab: Vocab,
-                 max_seq_len: int,
-                 label_dtype: Optional[torch.dtype] = torch.int64):
+    def __init__(self, dataset: List[Dict], tokenizer: JiebaTokenizer,
+                 vocab: Vocab, max_seq_len: int):
         """
         Initialize dataset with data, tokenizer, vocab and max sequence length.
         """
@@ -110,7 +99,6 @@ class TorchDataset(Dataset):
         self.tokenizer = tokenizer
         self.vocab = vocab
         self.max_seq_len = max_seq_len
-        self.label_dtype = label_dtype
 
     def __len__(self) -> int:
         """Return length of dataset."""
@@ -144,7 +132,7 @@ class TorchDataset(Dataset):
         # Convert to tensors
         input_ids = torch.tensor(input_ids, dtype=torch.int32)
         valid_length = torch.tensor(valid_length)
-        label = torch.tensor(label, dtype=self.label_dtype)
+        label = torch.tensor(label, dtype=torch.int64)
 
         return input_ids, valid_length, label
 
@@ -163,7 +151,7 @@ class TorchDataset(Dataset):
 
 
 def train(model: nn.Module,
-          train_loader: DataLoader,
+          loader: DataLoader,
           optimizer: Adam,
           loss_fn: nn.Module,
           num_epochs: int = 10,
@@ -176,7 +164,7 @@ def train(model: nn.Module,
 
         total_loss = 0
 
-        for batch in train_loader:
+        for batch in loader:
 
             # Move batch tensors to device
             inputs, length, labels = batch
@@ -201,39 +189,75 @@ def train(model: nn.Module,
         print(f'Epoch {epoch+1}, Loss: {total_loss:.4f}')
 
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs',
+                        type=int,
+                        default=5,
+                        help='Number of epoches for training.')
+    parser.add_argument('--lr',
+                        type=float,
+                        default=5e-4,
+                        help='Learning rate used to train.')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=64,
+                        help="Total examples' number of a batch for training.")
+    parser.add_argument('--embed_size',
+                        type=int,
+                        default=300,
+                        help='Embedding size.')
+    parser.add_argument('--hidden_size',
+                        type=int,
+                        default=128,
+                        help='Hidden size.')
+    parser.add_argument('--max_seq_len',
+                        type=int,
+                        default=128,
+                        help='Maximum sequence length.')
+    parser.add_argument('--vocab_path',
+                        type=str,
+                        default=None,
+                        help='The path of vocabulary file.')
+    parser.add_argument('--save_dir',
+                        type=str,
+                        default='./checkpoints/',
+                        help='Directory to save model checkpoint')
+    args = parser.parse_args()
+    return args
+
+
 def main():
+    args = get_args()
     train_ds, dev_ds = load_dataset('chnsenticorp', splits=['train', 'dev'])
     num_classes = len(train_ds.label_list)
-    vocab_path = '/home/robin/work_dir/llm/nlp-toolkit/data/word_vocab.txt'
-    lm_vocab = Vocab.load_vocabulary(vocab_path,
+    lm_vocab = Vocab.load_vocabulary(args.vocab_path,
                                      unk_token='[UNK]',
                                      pad_token='[PAD]')
-    lm_vocab.save_vocabulary(
-        '/home/robin/work_dir/llm/nlp-toolkit/data/save_vocab.txt')
-
     tokenizer = JiebaTokenizer(lm_vocab)
-    train_dataset = TorchDataset(train_ds, tokenizer, lm_vocab, 128)
-    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    train_dataset = TorchDataset(train_ds,
+                                 tokenizer,
+                                 lm_vocab,
+                                 max_seq_len=args.max_seq_len)
+    dataloader = DataLoader(train_dataset,
+                            batch_size=args.batch_size,
+                            shuffle=True)
 
     model = BoWClassifier(vocab_size=len(lm_vocab),
-                          embed_dim=300,
+                          embed_size=args.embed_size,
                           num_classes=num_classes,
-                          hidden_size=128,
-                          dropout=0.5)
+                          hidden_size=args.hidden_size)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = Adam(
-        model.parameters(),
-        lr=1e-3,
-    )
+    optimizer = Adam(params=model.parameters(), lr=args.lr)
     model.to(device)
     train(model,
-          train_dataloader,
+          dataloader,
           optimizer,
           loss_fn,
-          num_epochs=20,
+          num_epochs=args.epochs,
           device=device)
 
 
