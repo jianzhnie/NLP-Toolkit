@@ -14,10 +14,11 @@ from typing import Optional, Tuple, Union
 import torch
 import torch.nn as nn
 from torch import Tensor
-from transformers.modeling_utils import ModelOutput, PreTrainedModel
+from transformers.modeling_utils import PreTrainedModel
 
 from .config_bert import BertConfig
-from .modeling_output import BertEncoderOutput, BertModelOutput
+from .modeling_output import (BertEncoderOutput, BertForPreTrainingOutput,
+                              BertModelOutput)
 
 logger = logging.get_logger(__name__)
 
@@ -344,7 +345,7 @@ class BertEncoder(nn.Module):
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
-                logger.warning_once(
+                logger.warning(
                     '`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`...'
                 )
                 use_cache = False
@@ -598,10 +599,10 @@ class BertModel(BertPreTrainedModel):
         self.pooler = BertPooler(config)
 
     def get_input_embeddings(self):
-        return self.embedding_layer.word_embedding
+        return self.embeddings.word_embedding
 
     def set_input_embeddings(self, value):
-        self.embedding_layer.word_embedding = value
+        self.embeddings.word_embedding = value
 
     def forward(
         self,
@@ -726,6 +727,14 @@ class BertModel(BertPreTrainedModel):
         extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(
             attention_mask, input_shape)
 
+        # Prepare head mask if needed
+        # 1.0 in head_mask indicate we keep the head
+        # attention_probs has shape bsz x n_heads x N x N
+        # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
+        # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
+        head_mask = self.get_head_mask(head_mask,
+                                       self.config.num_hidden_layers)
+
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -759,39 +768,6 @@ class BertModel(BertPreTrainedModel):
         )
 
 
-class BertForPreTrainingOutput(ModelOutput):
-    """
-    Output type of [`BertForPreTraining`].
-
-    Args:
-        loss (*optional*, returned when `labels` is provided, `torch.Tensor` of shape `(1,)`):
-            Total loss as the sum of the masked language modeling loss and the next sequence prediction
-            (classification) loss.
-        prediction_logits (`torch.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
-            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
-        seq_relationship_logits (`torch.Tensor` of shape `(batch_size, 2)`):
-            Prediction scores of the next sequence prediction (classification) head (scores of True/False continuation
-            before SoftMax).
-        hidden_states (`tuple(torch.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
-            Tuple of `torch.Tensor` (one for the output of the embeddings + one for the output of each layer) of
-            shape `(batch_size, sequence_length, hidden_size)`.
-
-            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-        attentions (`tuple(torch.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
-            Tuple of `torch.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
-            sequence_length)`.
-
-            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
-            heads.
-    """
-
-    loss: Optional[torch.Tensor] = None
-    prediction_logits: torch.Tensor = None
-    seq_relationship_logits: torch.Tensor = None
-    hidden_states: Optional[Tuple[torch.Tensor]] = None
-    attentions: Optional[Tuple[torch.Tensor]] = None
-
-
 class BertForPretraing(BertPreTrainedModel):
     """
     Bert Model with pretraining tasks on top.
@@ -802,9 +778,13 @@ class BertForPretraing(BertPreTrainedModel):
     """
     def __init__(self, config: BertConfig):
         super(BertForPretraing, self).__init__(config)
+        self.config = config
 
         self.bert = BertModel(config)
         self.bert_heads = BertPreTrainingHeads(config)
+
+        # Initialize weights and apply final processing
+        self.post_init()
 
     def get_output_embeddings(self):
         return self.bert_heads.lm_head.decoder
@@ -814,15 +794,16 @@ class BertForPretraing(BertPreTrainedModel):
 
     def forward(
         self,
-        input_ids: Tensor,
-        token_type_ids: Optional[Tensor] = None,
-        position_ids: Optional[Tensor] = None,
-        attention_mask: Optional[Tensor] = None,
-        masked_positions: Optional[Tensor] = None,
-        labels: Optional[Tensor] = None,
-        next_sentence_label: Optional[Tensor] = None,
-        output_hidden_states: Optional[bool] = None,
+        input_ids: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        token_type_ids: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        head_mask: Optional[torch.Tensor] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        next_sentence_label: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], BertForPreTrainingOutput]:
         r"""
@@ -868,27 +849,29 @@ class BertForPretraing(BertPreTrainedModel):
 
         outputs = self.bert(
             input_ids,
+            attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
         sequence_output, pooled_output = outputs[:2]
 
         prediction_scores, seq_relationship_score = self.bert_heads(
-            sequence_output, pooled_output, masked_positions)
+            sequence_output, pooled_output)
 
         total_loss = None
         if labels is not None and next_sentence_label is not None:
             loss_fct = nn.CrossEntropyLoss()
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
-                labels.reshape((-1, )))
-            next_sentence_loss = loss_fct(
-                seq_relationship_score.reshape((-1, 2)),
-                next_sentence_label.reshape((-1, )))
+                prediction_scores.view(-1, self.config.vocab_size),
+                labels.view(-1))
+            next_sentence_loss = loss_fct(seq_relationship_score.view(-1, 2),
+                                          next_sentence_label.view(-1))
             total_loss = masked_lm_loss + next_sentence_loss
 
         if not return_dict:
