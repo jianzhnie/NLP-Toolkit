@@ -6,8 +6,7 @@ LastEditors: jianzhnie
 Description:
 
 '''
-
-from transformers.configuration_utils import PretrainedConfig
+from transformers import PretrainedConfig
 
 
 class BertConfig(PretrainedConfig):

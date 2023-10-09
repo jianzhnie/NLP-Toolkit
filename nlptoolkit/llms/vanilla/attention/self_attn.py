@@ -92,12 +92,21 @@ class MultiHeadAttention(nn.Module):
         assert d_model % nhead == 0
         self.d_k = d_model // nhead
         self.nhead = nhead
-        self.linears = clones(nn.Linear(d_model, d_model), 3)
-        # self.query_linear = nn.Linear(d_model, d_model)
-        # self.key_linear = nn.Linear(d_model, d_model)
-        # self.value_linear = nn.Linear(d_model, d_model)
+
+        self.query_linear = nn.Linear(d_model, d_model)
+        self.key_linear = nn.Linear(d_model, d_model)
+        self.value_linear = nn.Linear(d_model, d_model)
+
         self.output_linear = nn.Linear(d_model, d_model)
+
         self.attention = ScaledDotProductAttention(dropout=dropout)
+
+    def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (batch_size, seq_len, d_model) ->  (batch_size, seq_len, self.nhead, self.d_k)
+        new_x_shape = x.size()[:-1] + (self.nhead, self.d_k)
+        x = x.view(new_x_shape)
+        #  (batch_size, self.nhead, seq_len, self.d_k)
+        return x.permute(0, 2, 1, 3)
 
     def forward(self,
                 query: torch.Tensor,
@@ -123,16 +132,18 @@ class MultiHeadAttention(nn.Module):
         nbatches = query.size(0)
 
         # 1) Do all the linear projections in batch from d_model => nhead * d_k
-        query, key, value = [
-            linear(x).view(nbatches, -1, self.nhead, self.d_k).transpose(1, 2)
-            for linear, x in zip(self.linears, (query, key, value))
-        ]
-        # query shape: (batch_size, nhead, seq_len, d_k)
-        # key shape: (batch_size, nhead, seq_len, d_k)
-        # value shape: (batch_size, nhead, seq_len, d_k)
+        mixed_query_layer = self.query_linear(query)
+        mixed_key_layer = self.key_linear(key)
+        mixed_value_layer = self.value_linear(value)
+
+        # Transpose the projections into multi-head
+        # (batch_size, seq_len, d_model) => (batch_size, nhead, seq_len, d_k)
+        query_layer = self.transpose_for_scores(mixed_query_layer)
+        key_layer = self.transpose_for_scores(mixed_key_layer)
+        value_layer = self.transpose_for_scores(mixed_value_layer)
 
         # 2) Apply attention on all the projected vectors in batch.
-        x = self.attention(query, key, value, mask=mask)
+        x = self.attention(query_layer, key_layer, value_layer, mask=mask)
         # x shape: (batch_size, nhead, seq_len, d_k)
 
         # 3) "Concat" using a view and apply a final linear.
