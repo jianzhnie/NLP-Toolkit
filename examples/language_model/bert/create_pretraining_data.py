@@ -1,5 +1,8 @@
+import argparse
 import collections
+import os
 import random
+import sys
 from typing import List, NamedTuple, Tuple
 
 import h5py
@@ -7,8 +10,10 @@ import numpy as np
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
-from nlptoolkit.llms.bert.bert_tokenizer import (BertTokenizer,
-                                                 convert_to_unicode)
+sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
+from transformers.models.bert.tokenization_bert import BertTokenizer
+
+from nlptoolkit.llms.bert.bert_tokenizer import convert_to_unicode
 
 
 # Define a named tuple called MaskedLmInstance
@@ -39,9 +44,9 @@ class TrainingInstance:
         self,
         tokens: List[str],
         segment_ids: List[int],
+        is_random_next: bool,
         masked_lm_positions: List[int],
         masked_lm_labels: List[str],
-        is_random_next: bool,
     ):
         """
         Initializes a TrainingInstance object.
@@ -49,15 +54,15 @@ class TrainingInstance:
         Args:
             tokens (List[str]): List of tokens representing the input sentence pair.
             segment_ids (List[int]): List of segment IDs indicating token belongingness to sentences.
+            is_random_next (bool): Indicates if the next sentence is randomly chosen.
             masked_lm_positions (List[int]): List of positions where tokens are masked during training.
             masked_lm_labels (List[str]): List of masked tokens corresponding to masked positions.
-            is_random_next (bool): Indicates if the next sentence is randomly chosen.
         """
         self.tokens = tokens
         self.segment_ids = segment_ids
+        self.is_random_next = is_random_next
         self.masked_lm_positions = masked_lm_positions
         self.masked_lm_labels = masked_lm_labels
-        self.is_random_next = is_random_next
 
     def __str__(self) -> str:
         """
@@ -165,20 +170,38 @@ def write_instance_to_example_file(
 
     print(f'Total instances processed: {total_written}')
     print('Saving data to HDF5 file...')
-    with h5py.File(output_file, 'w') as f:
-        for feature_name, feature_data in features.items():
-            f.create_dataset(feature_name,
-                             data=feature_data,
-                             dtype=feature_data.dtype,
-                             compression='gzip')
+    f = h5py.File(output_file, 'w')
+    f.create_dataset('input_ids',
+                     data=features['input_ids'],
+                     dtype='i4',
+                     compression='gzip')
+    f.create_dataset('input_mask',
+                     data=features['input_mask'],
+                     dtype='i1',
+                     compression='gzip')
+    f.create_dataset('segment_ids',
+                     data=features['segment_ids'],
+                     dtype='i1',
+                     compression='gzip')
+    f.create_dataset('masked_lm_positions',
+                     data=features['masked_lm_positions'],
+                     dtype='i4',
+                     compression='gzip')
+    f.create_dataset('masked_lm_ids',
+                     data=features['masked_lm_ids'],
+                     dtype='i4',
+                     compression='gzip')
+    f.create_dataset('next_sentence_labels',
+                     data=features['next_sentence_labels'],
+                     dtype='i1',
+                     compression='gzip')
     f.flush()
     f.close()
-    print(f'Data saved to {output_file}')
 
 
 def create_training_instances(
     input_files: List[str],
-    tokenizer: BertTokenizer,
+    tokenizer: PreTrainedTokenizer,
     max_seq_length: int,
     dupe_factor: int,
     short_seq_prob: float,
@@ -375,17 +398,21 @@ def create_instances_from_document(
                 segment_ids = [0] * (len(tokens_a) +
                                      2) + [1] * (len(tokens_b) + 1)
 
-                (tokens, masked_lm_positions,
-                 masked_lm_labels) = create_masked_lm_predictions(
-                     tokens, masked_lm_prob, max_predictions_per_seq,
-                     vocab_words, random_generator)
+                output_tokens, masked_lm_positions, masked_lm_labels = create_masked_lm_predictions(
+                    tokens=tokens,
+                    masked_lm_prob=masked_lm_prob,
+                    max_predictions_per_seq=max_predictions_per_seq,
+                    vocab_words=vocab_words,
+                    random_generator=random_generator,
+                )
 
                 instance = TrainingInstance(
-                    tokens=tokens,
+                    tokens=output_tokens,
                     segment_ids=segment_ids,
                     is_random_next=is_random_next,
                     masked_lm_positions=masked_lm_positions,
-                    masked_lm_labels=masked_lm_labels)
+                    masked_lm_labels=masked_lm_labels,
+                )
                 instances.append(instance)
             current_chunk = []
             current_length = 0
@@ -490,3 +517,115 @@ def truncate_seq_pair(
             del trunc_tokens[0]  # Truncate from the front
         else:
             trunc_tokens.pop()  # Truncate from the back
+
+
+def pasre_args():
+    parser = argparse.ArgumentParser()
+    # Required parameters
+    parser.add_argument('--vocab_file',
+                        default=None,
+                        type=str,
+                        required=True,
+                        help='The vocabulary the BERT model will train on.')
+    parser.add_argument(
+        '--input_file',
+        default=None,
+        type=str,
+        required=True,
+        help=
+        'The input train corpus. can be directory with .txt files or a path to a single file'
+    )
+    parser.add_argument(
+        '--output_file',
+        default=None,
+        type=str,
+        required=True,
+        help='The output file where the model checkpoints will be written.')
+
+    # Other parameters
+    # int
+    parser.add_argument(
+        '--max_seq_length',
+        default=128,
+        type=int,
+        help=
+        'The maximum total input sequence length after WordPiece tokenization. \n'
+        'Sequences longer than this will be truncated, and sequences shorter \n'
+        'than this will be padded.')
+    parser.add_argument(
+        '--dupe_factor',
+        default=10,
+        type=int,
+        help=
+        'Number of times to duplicate the input data (with different masks).')
+    parser.add_argument('--max_predictions_per_seq',
+                        default=20,
+                        type=int,
+                        help='Maximum sequence length.')
+
+    # floats
+    parser.add_argument('--masked_lm_prob',
+                        default=0.15,
+                        type=float,
+                        help='Masked LM probability.')
+
+    parser.add_argument(
+        '--short_seq_prob',
+        default=0.1,
+        type=float,
+        help=
+        'Probability to create a sequence shorter than maximum sequence length'
+    )
+
+    parser.add_argument(
+        '--do_lower_case',
+        action='store_true',
+        default=True,
+        help=
+        'Whether to lower case the input text. True for uncased models, False for cased models.'
+    )
+    parser.add_argument('--random_seed',
+                        type=int,
+                        default=12345,
+                        help='random seed for initialization')
+
+    args = parser.parse_args()
+
+    return args
+
+
+def main():
+    args = pasre_args()
+    tokenizer = BertTokenizer(args.vocab_file,
+                              do_lower_case=args.do_lower_case,
+                              max_len=512)
+
+    input_files = []
+    if os.path.isfile(args.input_file):
+        input_files.append(args.input_file)
+    elif os.path.isdir(args.input_file):
+        input_files = [
+            os.path.join(args.input_file, f)
+            for f in os.listdir(args.input_file)
+            if (os.path.isfile(os.path.join(args.input_file, f))
+                and f.endswith('.txt'))
+        ]
+    else:
+        raise ValueError('{} is not a valid path'.format(args.input_file))
+
+    rng = random.Random(args.random_seed)
+    instances = create_training_instances(input_files, tokenizer,
+                                          args.max_seq_length,
+                                          args.dupe_factor,
+                                          args.short_seq_prob,
+                                          args.masked_lm_prob,
+                                          args.max_predictions_per_seq, rng)
+
+    output_file = args.output_file
+
+    write_instance_to_example_file(instances, tokenizer, args.max_seq_length,
+                                   args.max_predictions_per_seq, output_file)
+
+
+if __name__ == '__main__':
+    main()
