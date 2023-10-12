@@ -10,7 +10,7 @@ Description:
 import logging
 import math
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -63,6 +63,10 @@ class BertEmbedding(nn.Module):
         self.layer_norm = nn.LayerNorm(config.hidden_size,
                                        eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
+        self.position_embedding_type = getattr(config,
+                                               'position_embedding_type',
+                                               'absolute')
         self.register_buffer(
             'position_ids',
             torch.arange(config.max_position_embeddings).expand((1, -1)),
@@ -77,14 +81,17 @@ class BertEmbedding(nn.Module):
         input_ids: Optional[torch.LongTensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_values_length: Optional[int] = None,
-    ):
-        input_shape = input_ids.size()
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+    ) -> torch.Tensor:
+        if input_ids is not None:
+            input_shape = input_ids.size()
+        else:
+            input_shape = inputs_embeds.size()[:-1]
+
         seq_length = input_shape[1]
+
         if position_ids is None:
-            position_ids = self.position_ids[:, past_key_values_length:
-                                             seq_length +
-                                             past_key_values_length]
+            position_ids = self.position_ids[:, :seq_length]
         # Setting the token_type_ids to the registered buffer in constructor where it is all zeros, which usually occurs
         # when its auto-generated, registered buffer helps users when tracing the model without passing token_type_ids, solves
         # issue #5664
@@ -99,11 +106,17 @@ class BertEmbedding(nn.Module):
                                              dtype=torch.long,
                                              device=self.position_ids.device)
 
-        inputs_embeddings = self.word_embedding(input_ids)
-        token_type_embeddings = self.token_type_embedding(token_type_ids)
-        position_embeddings = self.position_embedding(position_ids)
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embedding(input_ids)
 
-        embeddings = inputs_embeddings + token_type_embeddings + position_embeddings
+        token_type_embeddings = self.token_type_embedding(token_type_ids)
+
+        embeddings = inputs_embeds + token_type_embeddings
+
+        if self.position_embedding_type == 'absolute':
+            position_embeddings = self.position_embedding(position_ids)
+            embeddings += position_embeddings
+
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -112,25 +125,36 @@ class BertEmbedding(nn.Module):
 class BertSelfAttention(nn.Module):
     def __init__(
         self,
-        hidden_size: int = 768,
-        num_attention_heads: int = 6,
-        attention_probs_dropout_prob: float = 0.1,
+        config: BertConfig,
+        position_embedding_type: Optional[str] = None,
     ):
         super(BertSelfAttention, self).__init__()
-        if hidden_size % num_attention_heads != 0:
+        if config.hidden_size % config.num_attention_heads != 0 and not hasattr(
+                config, 'embedding_size'):
             raise ValueError(
                 'The hidden size (%d) is not a multiple of the number of attention '
-                'heads (%d)' % (hidden_size, num_attention_heads))
+                'heads (%d)' %
+                (config.hidden_size, config.num_attention_heads))
 
-        self.num_attention_heads = num_attention_heads
-        self.attention_head_size = int(hidden_size / num_attention_heads)
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size /
+                                       config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(hidden_size, self.all_head_size)
-        self.key = nn.Linear(hidden_size, self.all_head_size)
-        self.value = nn.Linear(hidden_size, self.all_head_size)
+        self.query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.key = nn.Linear(config.hidden_size, self.all_head_size)
+        self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+
+        self.position_embedding_type = position_embedding_type or getattr(
+            config, 'position_embedding_type', 'absolute')
+
+        if self.position_embedding_type == 'relative_key' or self.position_embedding_type == 'relative_key_query':
+            self.max_position_embeddings = config.max_position_embeddings
+            self.distance_embedding = nn.Embedding(
+                2 * config.max_position_embeddings - 1,
+                self.attention_head_size)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
         # (batch_size, seq_len, hidden_size) -> ( batch_size, seq_len, num_attention_heads, attention_head_size)
@@ -620,7 +644,6 @@ class BertModel(BertPreTrainedModel):
         position_ids: Optional[Tensor] = None,
         head_mask: Optional[Tensor] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
         use_cache: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -658,13 +681,6 @@ class BertModel(BertPreTrainedModel):
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
-            past_key_values (tuple(tuple(Tensor)), optional):
-                The length of tuple equals to the number of layers, and each inner
-                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
-                which contains precomputed key and value hidden states of the attention blocks.
-                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
-                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
-                `input_ids` of shape `(batch_size, sequence_length)`.
             use_cache (`bool`, optional):
                 If set to `True`, `past_key_values` key value states are returned.
                 Defaults to `None`.
@@ -709,14 +725,9 @@ class BertModel(BertPreTrainedModel):
         batch_size, seq_length = input_shape
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
-        # past_key_values_length
-        past_key_values_length = past_key_values[0][0].shape[
-            2] if past_key_values is not None else 0
-
         if attention_mask is None:
-            attention_mask = torch.ones(
-                ((batch_size, seq_length + past_key_values_length)),
-                device=device)
+            attention_mask = torch.ones(((batch_size, seq_length)),
+                                        device=device)
 
         if token_type_ids is None:
             if hasattr(self.embeddings, 'token_type_ids'):
@@ -748,13 +759,11 @@ class BertModel(BertPreTrainedModel):
             position_ids=position_ids,
             token_type_ids=token_type_ids,
             inputs_embeds=inputs_embeds,
-            past_key_values_length=past_key_values_length,
         )
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask=extended_attention_mask,
             head_mask=head_mask,
-            past_key_values=past_key_values,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -770,7 +779,6 @@ class BertModel(BertPreTrainedModel):
         return BertModelOutput(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
-            past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,
             attentions=encoder_outputs.attentions,
         )
@@ -921,7 +929,6 @@ class BertLMHeadModel(BertPreTrainedModel):
         head_mask: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
         labels: Optional[torch.Tensor] = None,
-        past_key_values: Optional[List[torch.Tensor]] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -941,13 +948,6 @@ class BertLMHeadModel(BertPreTrainedModel):
             Labels for computing the left-to-right language modeling loss (next word prediction). Indices should be in
             `[-100, 0, ..., config.vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
             ignored (masked), the loss is only computed for the tokens with labels n `[0, ..., config.vocab_size]`
-        past_key_values (`tuple(tuple(torch.FloatTensor))` of length `config.n_layers` with each tuple having 4 tensors of shape
-            `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`):
-            Contains precomputed key and value hidden states of the attention blocks. Can be used to speed up decoding.
-
-            If `past_key_values` are used, the user can optionally input only the last `decoder_input_ids` (those that
-            don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
-            `decoder_input_ids` of shape `(batch_size, sequence_length)`.
         use_cache (`bool`, *optional*):
             If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding (see
             `past_key_values`).
@@ -963,7 +963,6 @@ class BertLMHeadModel(BertPreTrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
-            past_key_values=past_key_values,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -991,7 +990,6 @@ class BertLMHeadModel(BertPreTrainedModel):
         return CausalLMOutputWithCrossAttentions(
             loss=lm_loss,
             logits=prediction_scores,
-            past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             cross_attentions=outputs.cross_attentions,
@@ -999,7 +997,6 @@ class BertLMHeadModel(BertPreTrainedModel):
 
     def prepare_inputs_for_generation(self,
                                       input_ids,
-                                      past_key_values=None,
                                       attention_mask=None,
                                       use_cache=True,
                                       **model_kwargs):
@@ -1008,24 +1005,11 @@ class BertLMHeadModel(BertPreTrainedModel):
         if attention_mask is None:
             attention_mask = input_ids.new_ones(input_shape)
 
-        # cut decoder_input_ids if past_key_values is used
-        if past_key_values is not None:
-            input_ids = input_ids[:, -1:]
-
         return {
             'input_ids': input_ids,
             'attention_mask': attention_mask,
-            'past_key_values': past_key_values,
             'use_cache': use_cache,
         }
-
-    def _reorder_cache(self, past_key_values, beam_idx):
-        reordered_past = ()
-        for layer_past in past_key_values:
-            reordered_past += (tuple(
-                past_state.index_select(0, beam_idx.to(past_state.device))
-                for past_state in layer_past), )
-        return reordered_past
 
 
 class BertForMaskedLM(BertPreTrainedModel):
