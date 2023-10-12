@@ -26,7 +26,7 @@ from .modeling_output import (BertEncoderOutput, BertForPreTrainingOutput,
                               QuestionAnsweringModelOutput,
                               SequenceClassifierOutput, TokenClassifierOutput)
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def gelu(x):
@@ -510,10 +510,8 @@ class BertOnlyNSPHead(nn.Module):
 class BertPreTrainingHeads(nn.Module):
     def __init__(self, config: BertConfig):
         super(BertPreTrainingHeads, self).__init__()
-        self.lm_head = BertOnlyMLMHead(config.vocab_size, config.hidden_size,
-                                       config.hidden_act,
-                                       config.layer_norm_eps)
-        self.nsp_head = BertOnlyNSPHead(config.hidden_size)
+        self.lm_head = BertOnlyMLMHead(config)
+        self.nsp_head = BertOnlyNSPHead(config)
 
     def forward(self, sequence_output, pooled_output):
         prediction_scores = self.lm_head(sequence_output)
@@ -602,7 +600,7 @@ class BertModel(BertPreTrainedModel):
         config: BertConfig,
         add_pooling_layer: bool = True,
     ):
-        super(BertModel, self).__init__()
+        super().__init__(config)
         self.config = config
         self.embeddings = BertEmbedding(config)
         self.encoder = BertEncoder(config)
