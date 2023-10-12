@@ -63,10 +63,7 @@ class BertEmbedding(nn.Module):
         self.layer_norm = nn.LayerNorm(config.hidden_size,
                                        eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.position_embedding_type = getattr(config,
-                                               'position_embedding_type',
-                                               'absolute')
+
         self.register_buffer(
             'position_ids',
             torch.arange(config.max_position_embeddings).expand((1, -1)),
@@ -110,12 +107,9 @@ class BertEmbedding(nn.Module):
             inputs_embeds = self.word_embedding(input_ids)
 
         token_type_embeddings = self.token_type_embedding(token_type_ids)
+        position_embeddings = self.position_embedding(position_ids)
 
-        embeddings = inputs_embeds + token_type_embeddings
-
-        if self.position_embedding_type == 'absolute':
-            position_embeddings = self.position_embedding(position_ids)
-            embeddings += position_embeddings
+        embeddings = inputs_embeds + token_type_embeddings + position_embeddings
 
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
@@ -123,11 +117,7 @@ class BertEmbedding(nn.Module):
 
 
 class BertSelfAttention(nn.Module):
-    def __init__(
-        self,
-        config: BertConfig,
-        position_embedding_type: Optional[str] = None,
-    ):
+    def __init__(self, config: BertConfig):
         super(BertSelfAttention, self).__init__()
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(
                 config, 'embedding_size'):
@@ -146,15 +136,6 @@ class BertSelfAttention(nn.Module):
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
-
-        self.position_embedding_type = position_embedding_type or getattr(
-            config, 'position_embedding_type', 'absolute')
-
-        if self.position_embedding_type == 'relative_key' or self.position_embedding_type == 'relative_key_query':
-            self.max_position_embeddings = config.max_position_embeddings
-            self.distance_embedding = nn.Embedding(
-                2 * config.max_position_embeddings - 1,
-                self.attention_head_size)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
         # (batch_size, seq_len, hidden_size) -> ( batch_size, seq_len, num_attention_heads, attention_head_size)
@@ -177,11 +158,12 @@ class BertSelfAttention(nn.Module):
         # and values come from an encoder; the attention mask needs to be
         # such that the encoder's padding tokens are not attended to.
 
+        # shape: (batch_size, seq_len, num_attention_heads * attention_head_size)
         mixed_query_layer = self.query(hidden_states)
         mixed_key_layer = self.key(hidden_states)
         mixed_value_layer = self.value(hidden_states)
 
-        # (batch_size, num_attention_heads, seq_len, attention_head_size)
+        # shape: (batch_size, num_attention_heads, seq_len, attention_head_size)
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)
