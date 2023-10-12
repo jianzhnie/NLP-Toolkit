@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def gelu(x):
-    return torch.nn.functional.gelu(x, approximate=True)
+    return torch.nn.functional.gelu(x)
 
 
 def swish(x):

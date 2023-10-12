@@ -7,8 +7,7 @@ import torch.nn as nn
 from .config_bert import BertConfig
 from .modeling_bert import (BertModel, BertOnlyMLMHead, BertOnlyNSPHead,
                             BertPreTrainedModel, BertPreTrainingHeads)
-from .modeling_output import (BertForPreTrainingOutput,
-                              CausalLMOutputWithCrossAttentions,
+from .modeling_output import (BertForPreTrainingOutput, CausalLMOutput,
                               MaskedLMOutput, MultipleChoiceModelOutput,
                               NextSentencePredictorOutput,
                               QuestionAnsweringModelOutput,
@@ -32,6 +31,12 @@ class BertForPretraing(BertPreTrainedModel):
 
         # Initialize weights and apply final processing
         self.post_init()
+
+    def get_output_embeddings(self):
+        return self.bert_heads.lm_head.predictions.decoder
+
+    def set_output_embeddings(self, new_embeddings):
+        self.bert_heads.lm_head.predictions.decoder = new_embeddings
 
     def forward(
         self,
@@ -138,10 +143,10 @@ class BertLMHeadModel(BertPreTrainedModel):
         self.post_init()
 
     def get_output_embeddings(self):
-        return self.lm_head.decoder
+        return self.lm_head.predictions.decoder
 
     def set_output_embeddings(self, new_embeddings):
-        self.lm_head.decoder = new_embeddings
+        self.lm_head.predictions.decoder = new_embeddings
 
     def forward(
         self,
@@ -155,7 +160,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple[torch.Tensor], CausalLMOutputWithCrossAttentions]:
+    ) -> Union[Tuple[torch.Tensor], CausalLMOutput]:
         r"""
         encoder_hidden_states  (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
             Sequence of hidden-states at the output of the last layer of the encoder. Used in the cross-attention if
@@ -208,12 +213,11 @@ class BertLMHeadModel(BertPreTrainedModel):
             output = (prediction_scores, ) + outputs[2:]
             return ((lm_loss, ) + output) if lm_loss is not None else output
 
-        return CausalLMOutputWithCrossAttentions(
+        return CausalLMOutput(
             loss=lm_loss,
             logits=prediction_scores,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-            cross_attentions=outputs.cross_attentions,
         )
 
     def prepare_inputs_for_generation(self,
@@ -244,10 +248,10 @@ class BertForMaskedLM(BertPreTrainedModel):
         self.post_init()
 
     def get_output_embeddings(self):
-        return self.lm_head.decoder
+        return self.lm_head.predictions.decoder
 
     def set_output_embeddings(self, new_embeddings):
-        self.lm_head.decoder = new_embeddings
+        self.lm_head.predictions.decoder = new_embeddings
 
     def forward(
         self,
@@ -282,7 +286,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         )
 
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output)
+        prediction_scores = self.lm_head(sequence_output)
 
         masked_lm_loss = None
         if labels is not None:

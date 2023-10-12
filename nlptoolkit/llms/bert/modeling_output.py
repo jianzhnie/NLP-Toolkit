@@ -111,7 +111,7 @@ class BertForPreTrainingOutput(ModelOutput):
 
 
 @dataclass
-class CausalLMOutputWithCrossAttentions(ModelOutput):
+class CausalLMOutput(ModelOutput):
     """
     Base class for causal language model (or autoregressive) outputs.
 
@@ -151,7 +151,6 @@ class CausalLMOutputWithCrossAttentions(ModelOutput):
     past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
-    cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
 
 
 @dataclass
