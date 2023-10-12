@@ -8,7 +8,7 @@ Description:
 '''
 from .config_bert import BertConfig
 from .modeling_bert import BertModel
-from .tasks_bert import BertForPretraing
+from .tasking_bert import BertForPretraing
 
 # from .tasks_bert import (BertForMaskedLM, BertForMultipleChoice,
 #                          BertForNextSentencePrediction, BertForPretraing,
