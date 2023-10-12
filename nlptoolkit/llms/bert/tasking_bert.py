@@ -14,19 +14,22 @@ from .modeling_output import (BertForPreTrainingOutput, CausalLMOutput,
                               SequenceClassifierOutput, TokenClassifierOutput)
 
 
-class BertForPretraing(BertPreTrainedModel):
+class BertForPretraining(BertPreTrainedModel):
     """
     Bert Model with pretraining tasks on top.
 
     Args:
-        config (:class:`BertConfig`):
+        config (BertConfig):
             An instance of BertConfig used to construct BertForPretraining.
     """
     def __init__(self, config: BertConfig):
-        super(BertForPretraing, self).__init__(config)
+        super(BertForPretraining, self).__init__(config)
         self.config = config
 
+        # BERT base model
         self.bert = BertModel(config)
+
+        # Pretraining heads for masked language modeling and next sentence prediction
         self.bert_heads = BertPreTrainingHeads(config)
 
         # Initialize weights and apply final processing
@@ -51,47 +54,27 @@ class BertForPretraing(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], BertForPreTrainingOutput]:
-        r"""
+        """
+        Forward pass for BertForPretraining.
 
         Args:
-            input_ids (Tensor):
-                See :class:`BertModel`.
-            token_type_ids (Tensor, optional):
-                See :class:`BertModel`.
-            position_ids (Tensor, optional):
-                See :class:`BertModel`.
-            attention_mask (Tensor, optional):
-                See :class:`BertModel`.
-            masked_positions(Tensor, optional):
-                See :class:`BertPretrainingHeads`.
-            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
-                vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked),
-                the loss is only computed for the tokens with labels in `[0, ..., vocab_size]`.
-            next_sentence_label (Tensor of shape `(batch_size,)`, optional):
-                Labels for computing the next sequence prediction (classification) loss. Input should be a sequence
-                pair (see `input_ids` docstring) Indices should be in `[0, 1]`:
-
-                - 0 indicates sequence B is a continuation of sequence A,
-                - 1 indicates sequence B is a random sequence.
-            output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `None`.
-            output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `None`.
-            return_dict (bool, optional):
-                Whether to return a :class:`~torchnlp.transformers.bert.BertForPreTrainingOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `None`.
+            input_ids (Tensor): Input token IDs.
+            attention_mask (Tensor, optional): Attention mask.
+            token_type_ids (Tensor, optional): Token type IDs.
+            position_ids (Tensor, optional): Positional embeddings.
+            head_mask (Tensor, optional): Head mask for attention layers.
+            labels (Tensor, optional): Labels for masked language modeling loss.
+            next_sentence_label (Tensor, optional): Labels for next sentence prediction.
+            output_attentions (bool, optional): Whether to return attentions.
+            output_hidden_states (bool, optional): Whether to return hidden states.
+            return_dict (bool, optional): Whether to return a ModelOutput object.
 
         Returns:
-            An instance of :class:`~torchnlp.transformers.bert.BertForPreTrainingOutput` if `return_dict=True`.
-            Otherwise it returns a tuple of tensors corresponding to ordered and
-            not None (depending on the input arguments) fields of :class:`~torchnlp.transformers.bert.BertForPreTrainingOutput`.
-
+            Union[Tuple[torch.Tensor], BertForPreTrainingOutput]: Output tuple or BertForPreTrainingOutput object.
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        # Forward pass through BERT base model
         outputs = self.bert(
             input_ids,
             attention_mask=attention_mask,
@@ -103,12 +86,15 @@ class BertForPretraing(BertPreTrainedModel):
             return_dict=return_dict,
         )
 
+        # Extract sequence and pooled outputs from BERT base model
         sequence_output, pooled_output = outputs[:2]
 
+        # Predictions from pretraining heads
         prediction_scores, seq_relationship_score = self.bert_heads(
             sequence_output, pooled_output)
 
         total_loss = None
+        # Calculate total loss if labels are provided for both masked language modeling and next sentence prediction
         if labels is not None and next_sentence_label is not None:
             loss_fct = nn.CrossEntropyLoss()
             masked_lm_loss = loss_fct(
@@ -119,10 +105,12 @@ class BertForPretraing(BertPreTrainedModel):
             total_loss = masked_lm_loss + next_sentence_loss
 
         if not return_dict:
+            # Return output as a tuple if return_dict is False
             output = (prediction_scores, seq_relationship_score) + outputs[2:]
             return ((total_loss, ) +
                     output) if total_loss is not None else output
 
+        # Return output as BertForPreTrainingOutput object if return_dict is True
         return BertForPreTrainingOutput(
             loss=total_loss,
             prediction_logits=prediction_scores,
@@ -133,19 +121,41 @@ class BertForPretraing(BertPreTrainedModel):
 
 
 class BertLMHeadModel(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    """
+    Bert Model with a Causal Language Modeling (CLM) head.
 
+    Args:
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertLMHeadModel.
+    """
+    def __init__(self, config):
+        """
+        Initializes the BertLMHeadModel.
+        Args:
+            config (BertConfig): Configuration class for BERT.
+        """
+        super().__init__(config)
         self.bert = BertModel(config, add_pooling_layer=False)
         self.lm_head = BertOnlyMLMHead(config)
+        self.config = config
 
         # Initialize weights and apply final processing
         self.post_init()
 
     def get_output_embeddings(self):
+        """
+        Retrieves the output embedding layer.
+        Returns:
+            torch.nn.Module: Output embedding layer.
+        """
         return self.lm_head.predictions.decoder
 
     def set_output_embeddings(self, new_embeddings):
+        """
+        Sets the output embedding layer to new_embeddings.
+        Args:
+            new_embeddings (torch.nn.Module): New embedding layer.
+        """
         self.lm_head.predictions.decoder = new_embeddings
 
     def forward(
@@ -161,23 +171,33 @@ class BertLMHeadModel(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], CausalLMOutput]:
-        r"""
-        encoder_hidden_states  (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
-            Sequence of hidden-states at the output of the last layer of the encoder. Used in the cross-attention if
-            the model is configured as a decoder.
-        encoder_attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Mask to avoid performing attention on the padding token indices of the encoder input. This mask is used in
-            the cross-attention if the model is configured as a decoder. Mask values selected in `[0, 1]`:
+        """
+        Forward pass for the BertLMHeadModel.
 
-            - 1 for tokens that are **not masked**,
-            - 0 for tokens that are **masked**.
-        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Labels for computing the left-to-right language modeling loss (next word prediction). Indices should be in
-            `[-100, 0, ..., config.vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are
-            ignored (masked), the loss is only computed for the tokens with labels n `[0, ..., config.vocab_size]`
-        use_cache (`bool`, *optional*):
-            If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding (see
-            `past_key_values`).
+        Args:
+            input_ids (torch.Tensor, optional):
+                See :class:`BertModel`.
+            attention_mask (torch.Tensor, optional):
+                See :class:`BertModel`.
+            token_type_ids (torch.Tensor, optional):
+                See :class:`BertModel`.
+            position_ids (torch.Tensor, optional):
+                See :class:`BertModel`.
+            head_mask (torch.Tensor, optional):
+                See :class:`BertModel`.
+            labels (torch.Tensor, optional):
+                Labels for computing the left-to-right language modeling loss.
+            use_cache (bool, optional):
+                If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding.
+            output_attentions (bool, optional):
+                Whether to return attentions tensors of all attention layers.
+            output_hidden_states (bool, optional):
+                Whether to return hidden states of all layers.
+            return_dict (bool, optional):
+                Whether to return a :class:`~CausalLMOutput` object.
+
+        Returns:
+            :class:`~CausalLMOutput`: An instance of CausalLMOutput if `return_dict=True`.
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if labels is not None:
@@ -200,7 +220,7 @@ class BertLMHeadModel(BertPreTrainedModel):
 
         lm_loss = None
         if labels is not None:
-            # we are doing next-token prediction; shift prediction scores and input ids by one
+            # Shift prediction scores and input ids by one
             shifted_prediction_scores = prediction_scores[:, :
                                                           -1, :].contiguous()
             labels = labels[:, 1:].contiguous()
@@ -210,8 +230,12 @@ class BertLMHeadModel(BertPreTrainedModel):
                 labels.view(-1))
 
         if not return_dict:
-            output = (prediction_scores, ) + outputs[2:]
-            return ((lm_loss, ) + output) if lm_loss is not None else output
+            output = (prediction_scores, )
+            if output_hidden_states:
+                output += outputs[2:]
+            if output_attentions:
+                output += outputs[3:]
+            return (lm_loss, ) + output if lm_loss is not None else output
 
         return CausalLMOutput(
             loss=lm_loss,
@@ -225,8 +249,17 @@ class BertLMHeadModel(BertPreTrainedModel):
                                       attention_mask=None,
                                       use_cache=True,
                                       **model_kwargs):
+        """
+        Prepare inputs for generation.
+        Args:
+            input_ids (torch.Tensor): Input tensor.
+            attention_mask (torch.Tensor, optional): Attention mask.
+            use_cache (bool, optional): Whether to use caching.
+
+        Returns:
+            dict: Prepared inputs for generation.
+        """
         input_shape = input_ids.shape
-        # if model is used as a decoder in encoder-decoder model, the decoder attention mask is created on the fly
         if attention_mask is None:
             attention_mask = input_ids.new_ones(input_shape)
 
