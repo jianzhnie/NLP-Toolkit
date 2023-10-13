@@ -14,16 +14,16 @@ from .modeling_output import (BertForPreTrainingOutput, CausalLMOutput,
                               SequenceClassifierOutput, TokenClassifierOutput)
 
 
-class BertForPretraing(BertPreTrainedModel):
+class BertForPreTraining(BertPreTrainedModel):
     """
     Bert Model with pretraining tasks on top.
 
     Args:
         config (BertConfig):
-            An instance of BertConfig used to construct BertForPretraing.
+            An instance of BertConfig used to construct BertForPreTraining.
     """
     def __init__(self, config: BertConfig):
-        super(BertForPretraing, self).__init__(config)
+        super(BertForPreTraining, self).__init__(config)
         self.config = config
 
         # BERT base model
