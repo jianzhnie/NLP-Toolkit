@@ -165,50 +165,73 @@ class BertDataSet(Dataset):
             segments += [1] * (len(tokens_b) + 1)
         return tokens, segments
 
-    def get_mlm_data_from_tokens(self, tokens):
-        candidate_pred_positions = []
-        # tokens是一个字符串列表
-        for i, token in enumerate(tokens):
-            # 在遮蔽语言模型任务中不会预测特殊词元
-            if token in ['<cls>', '<sep>']:
-                continue
-            candidate_pred_positions.append(i)
-        # 遮蔽语言模型任务中预测15%的随机词元
-        num_mlm_preds = max(1, round(len(tokens) * 0.15))
-        mlm_input_tokens, pred_positions_and_labels = self.replace_mskelm_tokens(
-            tokens, candidate_pred_positions, num_mlm_preds)
-        pred_positions_and_labels = sorted(pred_positions_and_labels,
-                                           key=lambda x: x[0])
-        pred_positions = [v[0] for v in pred_positions_and_labels]
-        mlm_pred_labels = [v[1] for v in pred_positions_and_labels]
-        return self.vocab[mlm_input_tokens], pred_positions, self.vocab[
-            mlm_pred_labels]
+    def get_mlm_data_from_tokens(
+            self, tokens: List[str]) -> Tuple[List[int], List[int], List[int]]:
+        """
+        Generates Masked Language Model (MLM) data from a list of tokens.
 
-    def replace_mskelm_tokens(self, tokens, candidate_pred_positions,
-                              num_mlm_preds, vocab_words):
+        Args:
+            tokens (List[str]): List of tokens in a sentence.
+
+        Returns:
+            Tuple[List[int], List[int], List[int]]: Indices of MLM input tokens, positions of masked tokens, and MLM labels.
+        """
+        candidate_pred_positions = []
+        for i, token in enumerate(tokens):
+            # Exclude special tokens from prediction
+            if token not in ['<cls>', '<sep>']:
+                candidate_pred_positions.append(i)
+
+        # Predict 15% of the tokens
+        num_mlm_preds = max(1, round(len(candidate_pred_positions) * 0.15))
+        mlm_input_tokens, pred_positions, mlm_pred_labels = self.replace_mlm_tokens(
+            tokens, candidate_pred_positions, num_mlm_preds)
+
+        return mlm_input_tokens, pred_positions, mlm_pred_labels
+
+    def replace_mlm_tokens(
+            self, tokens: List[str], candidate_pred_positions: List[int],
+            num_mlm_preds: int,
+            vocab_words: List[str]) -> Tuple[List[int], List[Tuple[int, int]]]:
+        """
+        Replaces tokens with <mask> or random tokens to create MLM training data.
+
+        Args:
+            tokens (List[str]): List of tokens in a sentence.
+            candidate_pred_positions (List[int]): List of indices where predictions can be made.
+            num_mlm_preds (int): Number of tokens to predict.
+            vocab_words (List[str]): Vocab word list.
+
+        Returns:
+            Tuple[List[int], List[Tuple[int, int]]]: Indices of MLM input tokens and positions with corresponding labels.
+        """
         # 为遮蔽语言模型的输入创建新的词元副本，其中输入可能包含替换的“<mask>”或随机词元
         mlm_input_tokens = [token for token in tokens]
-        pred_positions_and_labels = []
+        mlm_pred_positions = []
+        mlm_pred_labels = []
+
         # 打乱后用于在遮蔽语言模型任务中获取15%的随机词元进行预测
         random.shuffle(candidate_pred_positions)
         for mlm_pred_position in candidate_pred_positions:
-            if len(pred_positions_and_labels) >= num_mlm_preds:
+            if len(mlm_pred_positions) >= num_mlm_preds:
                 break
             masked_token = None
-            # 80%的时间：将词替换为“<mask>”词元
+            # 80% of the time, replace with <mask>
             if random.random() < 0.8:
                 masked_token = '<mask>'
             else:
-                # 10%的时间：保持词不变
+                # 10% of the time, keep the word unchanged
                 if random.random() < 0.5:
-                    masked_token = tokens[mlm_pred_position]
-                # 10%的时间：用随机词替换该词
+                    masked_token = mlm_input_tokens[mlm_pred_position]
+                # 10% of the time, replace with a random word from vocabulary
                 else:
                     masked_token = random.choice(vocab_words)
+
             mlm_input_tokens[mlm_pred_position] = masked_token
-            pred_positions_and_labels.append(
-                (mlm_pred_position, tokens[mlm_pred_position]))
-        return mlm_input_tokens, pred_positions_and_labels
+            mlm_pred_positions.append(mlm_pred_position)
+            mlm_pred_labels.append(tokens[mlm_pred_position])
+
+        return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
 
     def preprocess_text_data(self, path: str) -> List[List[str]]:
         """
