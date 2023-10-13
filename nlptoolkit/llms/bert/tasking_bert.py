@@ -271,24 +271,41 @@ class BertLMHeadModel(BertPreTrainedModel):
 
 
 class BertForMaskedLM(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    """
+    BERT model for Masked Language Modeling.
 
+    Args:
+        config: BERT configuration object.
+    """
+    def __init__(self, config: BertConfig):
+        super(BertForMaskedLM, self).__init__(config)
         self.bert = BertModel(config, add_pooling_layer=False)
         self.lm_head = BertOnlyMLMHead(config)
 
         # Initialize weights and apply final processing
         self.post_init()
 
-    def get_output_embeddings(self):
+    def get_output_embeddings(self) -> nn.Module:
+        """
+        Get the output embedding layer.
+
+        Returns:
+            nn.Module: Output embedding layer.
+        """
         return self.lm_head.predictions.decoder
 
-    def set_output_embeddings(self, new_embeddings):
+    def set_output_embeddings(self, new_embeddings: nn.Module):
+        """
+        Set the output embedding layer.
+
+        Args:
+            new_embeddings (nn.Module): New embedding layer.
+        """
         self.lm_head.predictions.decoder = new_embeddings
 
     def forward(
         self,
-        input_ids: Optional[torch.Tensor] = None,
+        input_ids: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
@@ -298,13 +315,26 @@ class BertForMaskedLM(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], MaskedLMOutput]:
-        r"""
-        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+        """
+        Perform forward pass for Masked Language Modeling.
+
+        Args:
+            input_ids (torch.Tensor): Input tensor of token IDs.
+            attention_mask (torch.Tensor, optional): Attention mask.
+            token_type_ids (torch.Tensor, optional): Token type IDs.
+            position_ids (torch.Tensor, optional): Positional embeddings.
+            head_mask (torch.Tensor, optional): Head mask for attention layers.
+            output_attentions (bool, optional): Whether to output attentions.
+            output_hidden_states (bool, optional): Whether to output hidden states.
+            return_dict (bool, optional): Whether to return a dictionary of outputs.
+            labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
             config.vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked), the
             loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`
-        """
 
+        Returns:
+            Union[Tuple[torch.Tensor], MaskedLMOutput]: Either a tuple of output tensors or a MaskedLMOutput object.
+        """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.bert(
@@ -323,7 +353,7 @@ class BertForMaskedLM(BertPreTrainedModel):
 
         masked_lm_loss = None
         if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
+            loss_fct = nn.CrossEntropyLoss()
             masked_lm_loss = loss_fct(
                 prediction_scores.view(-1, self.config.vocab_size),
                 labels.view(-1))
@@ -341,13 +371,25 @@ class BertForMaskedLM(BertPreTrainedModel):
         )
 
     def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      attention_mask=None,
-                                      **model_kwargs):
+                                      input_ids: torch.Tensor,
+                                      attention_mask: Optional[
+                                          torch.Tensor] = None,
+                                      **model_kwargs) -> dict:
+        """
+        Prepare inputs for generation.
+
+        Args:
+            input_ids (torch.Tensor): Input tensor of token IDs.
+            attention_mask (torch.Tensor, optional): Attention mask.
+            **model_kwargs: Additional model-specific arguments.
+
+        Returns:
+            dict: Prepared inputs for generation.
+        """
         input_shape = input_ids.shape
         effective_batch_size = input_shape[0]
 
-        #  add a dummy token
+        # Add a dummy token
         if self.config.pad_token_id is None:
             raise ValueError('The PAD token should be defined for generation')
 
