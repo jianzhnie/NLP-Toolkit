@@ -33,11 +33,19 @@ class BertDataSet(Dataset):
             tokenizer: Tokenizer = Tokenizer(),
             max_seq_len: int = 512,
     ) -> None:
+        """
+        Initializes the BertDataSet.
 
+        Args:
+            data_dir (str): Directory containing the data files.
+            data_split (str): Split of the data ('train', 'val', etc.).
+            tokenizer (Tokenizer): Tokenizer object for tokenizing the text.
+            max_seq_len (int): Maximum sequence length for BERT input.
+        """
         super().__init__()
         self.max_seq_len = max_seq_len
         self.tokenizer = tokenizer
-        self.data_dir = os.path.join(data_dir, data_split + '.txt')
+        self.data_dir = os.path.join(data_dir, f'{data_split}.txt')
         self.paragraphs = self.preprocess_text_data(self.data_dir)
         self.tokenized_paragraphs = [
             tokenizer.tokenize(paragraph) for paragraph in self.paragraphs
@@ -45,14 +53,13 @@ class BertDataSet(Dataset):
         self.vocab: Vocab = self.build_vocab()
         self.vocab_words = self.vocab.token_to_idx.keys()
 
-    def build_vocab(self) -> List[str]:
+    def build_vocab(self) -> Vocab:
         """
         Build vocabulary from tokenized sentences.
 
         Returns:
-            List[str]: List of vocabulary words.
+            Vocab: Vocabulary object.
         """
-
         tokenized_sentences = [
             sentence for paragraph in self.tokenized_paragraphs
             for sentence in paragraph
@@ -65,10 +72,21 @@ class BertDataSet(Dataset):
                                   eos_token='<eos>')
         return vocab
 
-    def get_bert_data(self, paragraphs, max_seq_len):
+    def get_bert_data(
+            self, paragraphs: List[List[str]],
+            max_seq_len: int) -> List[Tuple[List[str], List[int], bool]]:
+        """
+        Get BERT pretraining data from tokenized paragraphs.
+
+        Args:
+            paragraphs (List[List[str]]): List of tokenized paragraphs.
+            max_seq_len (int): Maximum sequence length for BERT input.
+
+        Returns:
+            List[Tuple[List[str], List[int], bool]]: List of BERT pretraining data tuples.
+        """
         examples = []
         for paragraph in paragraphs:
-            # 获取下一句子预测任务的数据
             nsp_data_from_paragraph = self.get_nsp_data_from_paragraph(
                 paragraph, paragraphs, max_seq_len)
             examples.extend(nsp_data_from_paragraph)
@@ -91,7 +109,7 @@ class BertDataSet(Dataset):
             paragraphs (List[List[str]]): List of paragraphs.
 
         Returns:
-            Tuple[List[str], bool]: Tokens of next sentence and whether they are consecutive sentences.
+            Tuple[List[str], List[str], bool]: Tokens of next sentence and whether they are consecutive sentences.
         """
         if random.random() < 0.5:
             is_next = True
@@ -103,12 +121,14 @@ class BertDataSet(Dataset):
 
     def get_nsp_data_from_paragraph(
             self, paragraph: List[str], paragraphs: List[List[List[str]]],
-            max_seq_len) -> List[Tuple[List[str], bool]]:
+            max_seq_len: int) -> List[Tuple[List[str], bool]]:
         """
         Generate NSP (Next Sentence Prediction) data from a paragraph.
 
         Args:
-            paragraph (List[str]): Tokenized paragraph.
+            paragraph (List[List[str]]): Tokenized paragraph.
+            paragraphs (List[List[List[str]]]): List of paragraphs.
+            max_seq_len (int): Maximum sequence length for BERT input.
 
         Returns:
             List[Tuple[List[str], bool]]: List of NSP data tuples.
@@ -205,8 +225,8 @@ class BertDataSet(Dataset):
         with open(path, 'r', encoding='utf8') as f:
             lines = f.readlines()
             for line in lines:
-                if len(line.split('. ')) >= 2:
-                    paragraph = line.strip().lower().split('. ')
+                if len(line.split(' . ')) >= 2:
+                    paragraph = line.strip().lower().split(' . ')
                     paragraphs.append(paragraph)
         return paragraphs
 
