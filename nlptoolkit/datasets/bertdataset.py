@@ -10,6 +10,7 @@ import os
 import random
 from typing import List, Tuple
 
+import torch
 from torch.utils.data import Dataset
 
 from nlptoolkit.data.tokenizer import Tokenizer
@@ -33,15 +34,6 @@ class BertDataSet(Dataset):
             tokenizer: Tokenizer = Tokenizer(),
             max_seq_len: int = 512,
     ) -> None:
-        """
-        Initializes the BertDataSet.
-
-        Args:
-            data_dir (str): Directory containing the data files.
-            data_split (str): Split of the data ('train', 'val', etc.).
-            tokenizer (Tokenizer): Tokenizer object for tokenizing the text.
-            max_seq_len (int): Maximum sequence length for BERT input.
-        """
         super().__init__()
         self.max_seq_len = max_seq_len
         self.tokenizer = tokenizer
@@ -69,7 +61,9 @@ class BertDataSet(Dataset):
                                   unk_token='<unk>',
                                   pad_token='<pad>',
                                   bos_token='<bos>',
-                                  eos_token='<eos>')
+                                  eos_token='<eos>',
+                                  cls_token='<cls>',
+                                  seq_token='<sep>')
         return vocab
 
     def get_bert_data(
@@ -90,12 +84,16 @@ class BertDataSet(Dataset):
             nsp_data_from_paragraph = self.get_nsp_data_from_paragraph(
                 paragraph, paragraphs, max_seq_len)
             examples.extend(nsp_data_from_paragraph)
+
         # 获取遮蔽语言模型任务的数据
-        examples = [
-            (self.get_mlm_data_from_tokens(tokens) + (segments, is_next))
-            for tokens, segments, is_next in examples
-        ]
-        return examples
+        bert_data = []
+        for tokens, segments, is_next in examples:
+            mlm_input_tokens, mlm_pred_positions, mlm_pred_labels = self.get_mlm_data_from_tokens(
+                tokens)
+            bert_data.append((mlm_input_tokens, mlm_pred_positions,
+                              mlm_pred_labels) + (segments, is_next))
+
+        return bert_data
 
     def get_next_sentence(
             self, sentence: List[str], next_sentence: List[str],
@@ -184,10 +182,10 @@ class BertDataSet(Dataset):
 
         # Predict 15% of the tokens
         num_mlm_preds = max(1, round(len(candidate_pred_positions) * 0.15))
-        mlm_input_tokens, pred_positions, mlm_pred_labels = self.replace_mlm_tokens(
+        mlm_input_tokens, mlm_pred_positions, mlm_pred_labels = self.replace_mlm_tokens(
             tokens, candidate_pred_positions, num_mlm_preds)
 
-        return mlm_input_tokens, pred_positions, mlm_pred_labels
+        return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
 
     def replace_mlm_tokens(
             self, tokens: List[str], candidate_pred_positions: List[int],
@@ -203,10 +201,10 @@ class BertDataSet(Dataset):
             vocab_words (List[str]): Vocab word list.
 
         Returns:
-            Tuple[List[int], List[Tuple[int, int]]]: Indices of MLM input tokens and positions with corresponding labels.
+            Tuple[List[int], List[int], List[int]]: Indices of MLM input tokens and positions with corresponding labels.
         """
         # 为遮蔽语言模型的输入创建新的词元副本，其中输入可能包含替换的“<mask>”或随机词元
-        mlm_input_tokens = [token for token in tokens]
+        mlm_input_tokens = tokens.copy()
         mlm_pred_positions = []
         mlm_pred_labels = []
 
@@ -232,6 +230,40 @@ class BertDataSet(Dataset):
             mlm_pred_labels.append(tokens[mlm_pred_position])
 
         return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
+
+    def formate_bert_inputs(self, examples, max_seq_len):
+        max_num_mlm_preds = round(max_seq_len * 0.15)
+        all_token_ids, all_segments, valid_lens, = [], [], []
+        all_pred_positions, all_mlm_weights, all_mlm_labels = [], [], []
+        nsp_labels = []
+        for (token_ids, pred_positions, mlm_pred_label_ids, segments,
+             is_next) in examples:
+            all_token_ids.append(
+                torch.tensor(token_ids + [self.vocab['<pad>']] *
+                             (max_seq_len - len(token_ids)),
+                             dtype=torch.long))
+            all_segments.append(
+                torch.tensor(segments + [0] * (max_seq_len - len(segments)),
+                             dtype=torch.long))
+            # valid_lens不包括'<pad>'的计数
+            valid_lens.append(torch.tensor(len(token_ids),
+                                           dtype=torch.float32))
+            all_pred_positions.append(
+                torch.tensor(pred_positions + [0] *
+                             (max_num_mlm_preds - len(pred_positions)),
+                             dtype=torch.long))
+            # 填充词元的预测将通过乘以0权重在损失中过滤掉
+            all_mlm_weights.append(
+                torch.tensor([1.0] * len(mlm_pred_label_ids) + [0.0] *
+                             (max_num_mlm_preds - len(pred_positions)),
+                             dtype=torch.float32))
+            all_mlm_labels.append(
+                torch.tensor(mlm_pred_label_ids + [0] *
+                             (max_num_mlm_preds - len(mlm_pred_label_ids)),
+                             dtype=torch.long))
+            nsp_labels.append(torch.tensor(is_next, dtype=torch.long))
+        return (all_token_ids, all_segments, valid_lens, all_pred_positions,
+                all_mlm_weights, all_mlm_labels, nsp_labels)
 
     def preprocess_text_data(self, path: str) -> List[List[str]]:
         """
