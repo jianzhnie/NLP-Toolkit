@@ -8,16 +8,18 @@ Description:
 '''
 import os
 import random
+import sys
 from typing import List, Tuple
 
 import torch
 from torch.utils.data import Dataset
 
+sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
 from nlptoolkit.data.tokenizer import Tokenizer
 from nlptoolkit.data.vocab import Vocab
 
 
-class BertDataSet(Dataset):
+class BertDataset(Dataset):
     """
     Dataset class for BERT pretraining tasks.
 
@@ -39,11 +41,24 @@ class BertDataSet(Dataset):
         self.tokenizer = tokenizer
         self.data_dir = os.path.join(data_dir, f'{data_split}.txt')
         self.paragraphs = self.preprocess_text_data(self.data_dir)
-        self.tokenized_paragraphs = [
-            tokenizer.tokenize(paragraph) for paragraph in self.paragraphs
-        ]
+        self.tokenized_paragraphs = self.tokenize_text(self.paragraphs)
         self.vocab: Vocab = self.build_vocab()
-        self.vocab_words = self.vocab.token_to_idx.keys()
+        self.vocab_words = list(self.vocab.token_to_idx.keys())
+        (self.all_token_ids, self.all_token_type_ids, self.valid_lens,
+         self.all_pred_positions, self.all_mlm_weights, self.all_mlm_labels,
+         self.nsp_labels) = self.get_bert_data(self.tokenized_paragraphs,
+                                               max_seq_len)
+
+    def tokenize_text(self,
+                      paragraphs: List[List[str]]) -> List[List[List[str]]]:
+        tokenized_paragraphs = []
+        for paragraph in paragraphs:
+            tokenized_paragraph = []
+            for sentence in paragraph:
+                tokenized_sentences = self.tokenizer.tokenize(sentence)
+                tokenized_paragraph.append(tokenized_sentences)
+            tokenized_paragraphs.append(tokenized_paragraph)
+        return tokenized_paragraphs
 
     def build_vocab(self) -> Vocab:
         """
@@ -93,7 +108,9 @@ class BertDataSet(Dataset):
             bert_data.append((mlm_input_tokens, mlm_pred_positions,
                               mlm_pred_labels) + (segments, is_next))
 
-        return bert_data
+        formated_bert_data = self.format_bert_inputs(bert_data, max_seq_len)
+
+        return formated_bert_data
 
     def get_next_sentence(
             self, sentence: List[str], next_sentence: List[str],
@@ -110,11 +127,11 @@ class BertDataSet(Dataset):
             Tuple[List[str], List[str], bool]: Tokens of next sentence and whether they are consecutive sentences.
         """
         if random.random() < 0.5:
-            is_next = True
+            is_next = 1
         else:
             # paragraphs 是三重列表的嵌套
             next_sentence = random.choice(random.choice(paragraphs))
-            is_next = False
+            is_next = 0
         return sentence, next_sentence, is_next
 
     def get_nsp_data_from_paragraph(
@@ -183,7 +200,11 @@ class BertDataSet(Dataset):
         # Predict 15% of the tokens
         num_mlm_preds = max(1, round(len(candidate_pred_positions) * 0.15))
         mlm_input_tokens, mlm_pred_positions, mlm_pred_labels = self.replace_mlm_tokens(
-            tokens, candidate_pred_positions, num_mlm_preds)
+            tokens,
+            candidate_pred_positions,
+            num_mlm_preds,
+            vocab_words=self.vocab_words,
+        )
 
         return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
 
@@ -231,39 +252,64 @@ class BertDataSet(Dataset):
 
         return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
 
-    def formate_bert_inputs(self, examples, max_seq_len):
+    def format_bert_inputs(
+        self,
+        examples: List[Tuple[List[str], List[int], List[int], List[int],
+                             List[int], bool]],
+        max_seq_len: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+               torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Formats BERT pretraining inputs from examples.
+
+        Args:
+            examples (List[Tuple[List[str], List[int], List[int], List[int], List[int], bool]]): List of BERT pretraining examples.
+            max_seq_len (int): Maximum sequence length for BERT input.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+                Formatted BERT pretraining inputs (tokens, segments, valid lengths, MLM prediction positions, MLM weights, MLM labels, NSP labels).
+        """
         max_num_mlm_preds = round(max_seq_len * 0.15)
-        all_token_ids, all_segments, valid_lens, = [], [], []
+        all_token_ids, all_token_type_ids, valid_lens = [], [], []
         all_pred_positions, all_mlm_weights, all_mlm_labels = [], [], []
         nsp_labels = []
-        for (token_ids, pred_positions, mlm_pred_label_ids, segments,
+
+        for (mlm_input_tokens, mlm_pred_positions, mlm_pred_labels, segments,
              is_next) in examples:
-            all_token_ids.append(
-                torch.tensor(token_ids + [self.vocab['<pad>']] *
-                             (max_seq_len - len(token_ids)),
-                             dtype=torch.long))
-            all_segments.append(
-                torch.tensor(segments + [0] * (max_seq_len - len(segments)),
-                             dtype=torch.long))
-            # valid_lens不包括'<pad>'的计数
-            valid_lens.append(torch.tensor(len(token_ids),
-                                           dtype=torch.float32))
-            all_pred_positions.append(
-                torch.tensor(pred_positions + [0] *
-                             (max_num_mlm_preds - len(pred_positions)),
-                             dtype=torch.long))
-            # 填充词元的预测将通过乘以0权重在损失中过滤掉
-            all_mlm_weights.append(
-                torch.tensor([1.0] * len(mlm_pred_label_ids) + [0.0] *
-                             (max_num_mlm_preds - len(pred_positions)),
-                             dtype=torch.float32))
-            all_mlm_labels.append(
-                torch.tensor(mlm_pred_label_ids + [0] *
-                             (max_num_mlm_preds - len(mlm_pred_label_ids)),
-                             dtype=torch.long))
-            nsp_labels.append(torch.tensor(is_next, dtype=torch.long))
-        return (all_token_ids, all_segments, valid_lens, all_pred_positions,
-                all_mlm_weights, all_mlm_labels, nsp_labels)
+
+            # Tokenize and pad tokens
+            token_ids = self.vocab[mlm_input_tokens]
+            token_ids += [self.vocab['<pad>']] * (max_seq_len - len(token_ids))
+
+            all_token_ids.append(token_ids)
+
+            # Pad segments
+            token_type_ids = segments + [0] * (max_seq_len - len(segments))
+            all_token_type_ids.append(token_type_ids)
+
+            # Compute valid lengths (excluding padding tokens)
+            valid_lens.append(len(mlm_input_tokens))
+
+            # Pad MLM prediction positions, MLM weights, and MLM labels
+            mlm_positions = mlm_pred_positions + [0] * (
+                max_num_mlm_preds - len(mlm_pred_positions))
+
+            mlm_weights = [1.0] * len(mlm_pred_labels) + [0.0] * (
+                max_num_mlm_preds - len(mlm_pred_labels))
+
+            mlm_labels = self.vocab[mlm_pred_labels] + [0] * (
+                max_num_mlm_preds - len(mlm_pred_labels))
+
+            all_pred_positions.append(mlm_positions)
+            all_mlm_weights.append(mlm_weights)
+            all_mlm_labels.append(mlm_labels)
+
+            # NSP labels
+            nsp_labels.append(is_next)
+
+        # Convert lists to tensors and return
+        return all_token_ids, all_token_type_ids, valid_lens, all_pred_positions, all_mlm_weights, all_mlm_labels, nsp_labels
 
     def preprocess_text_data(self, path: str) -> List[List[str]]:
         """
@@ -292,7 +338,7 @@ class BertDataSet(Dataset):
         Returns:
             int: Number of paragraphs.
         """
-        return len(self.paragraphs)
+        return len(self.all_token_ids)
 
     def __getitem__(self, idx: int) -> List[Tuple[List[str], List[int], bool]]:
         """
@@ -304,8 +350,24 @@ class BertDataSet(Dataset):
         Returns:
             List[Tuple[List[str], List[int], bool]]: List of NSP data tuples.
         """
-        paragraph = self.paragraphs[idx]
-        examples = self.get_nsp_data_from_paragraph(paragraph)
-        examples = [(self.get_tokens_and_segments(tokens), is_next)
-                    for tokens, _, is_next in examples]
-        return examples
+        inputs = dict(
+            token_ids=torch.tensor(self.all_token_ids[idx], dtype=torch.long),
+            token_type_ids=torch.tensor(self.all_token_type_ids[idx],
+                                        dtype=torch.long),
+            valid_len=torch.tensor(self.valid_lens[idx], dtype=torch.float32),
+            pred_positions=torch.tensor(self.all_pred_positions[idx],
+                                        dtype=torch.long),
+            mlm_weight=torch.tensor(self.all_mlm_weights[idx],
+                                    dtype=torch.float32),
+            labels=torch.tensor(self.all_mlm_labels[idx], dtype=torch.long),
+            nsp_labels=torch.tensor(self.nsp_labels[idx], dtype=torch.long),
+        )
+
+        return inputs
+
+
+if __name__ == '__main__':
+    data_dir = '/home/robin/work_dir/llm/nlp-toolkit/text_data/wikitext-2/'
+    bert_dataset = BertDataset(data_dir=data_dir, max_seq_len=64)
+    for i in range(5):
+        print(bert_dataset[i])
