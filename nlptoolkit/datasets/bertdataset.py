@@ -17,6 +17,7 @@ from torch.utils.data import Dataset
 sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
 from nlptoolkit.data.tokenizer import Tokenizer
 from nlptoolkit.data.vocab import Vocab
+from nlptoolkit.utils.data_utils import truncate_pad
 
 
 class BertDataset(Dataset):
@@ -51,6 +52,15 @@ class BertDataset(Dataset):
 
     def tokenize_text(self,
                       paragraphs: List[List[str]]) -> List[List[List[str]]]:
+        """
+        Tokenize paragraphs and sentences in the text.
+
+        Args:
+            paragraphs (List[List[str]]): List of paragraphs.
+
+        Returns:
+            List[List[List[str]]]: Tokenized paragraphs and sentences.
+        """
         tokenized_paragraphs = []
         for paragraph in paragraphs:
             tokenized_paragraph = []
@@ -100,7 +110,7 @@ class BertDataset(Dataset):
                 paragraph, paragraphs, max_seq_len)
             examples.extend(nsp_data_from_paragraph)
 
-        # 获取遮蔽语言模型任务的数据
+        # Get Masked Language Model (MLM) data
         bert_data = []
         for tokens, segments, is_next in examples:
             mlm_input_tokens, mlm_pred_positions, mlm_pred_labels = self.get_mlm_data_from_tokens(
@@ -168,6 +178,7 @@ class BertDataset(Dataset):
 
         Args:
             tokens_a (List[str]): Tokens of the sentence.
+            tokens_b (List[str]): Tokens of the next sentence.
 
         Returns:
             Tuple[List[str], List[int]]: Tokens and corresponding segments.
@@ -224,12 +235,13 @@ class BertDataset(Dataset):
         Returns:
             Tuple[List[int], List[int], List[int]]: Indices of MLM input tokens and positions with corresponding labels.
         """
-        # 为遮蔽语言模型的输入创建新的词元副本，其中输入可能包含替换的“<mask>”或随机词元
+        # Create a copy of tokens for Masked Language Model (MLM) input,
+        # where inputs might contain replaced '<mask>' or random tokens
         mlm_input_tokens = tokens.copy()
         mlm_pred_positions = []
         mlm_pred_labels = []
 
-        # 打乱后用于在遮蔽语言模型任务中获取15%的随机词元进行预测
+        # Shuffle for 15% of random tokens for prediction in Masked Language Model (MLM) task
         random.shuffle(candidate_pred_positions)
         for mlm_pred_position in candidate_pred_positions:
             if len(mlm_pred_positions) >= num_mlm_preds:
@@ -249,6 +261,11 @@ class BertDataset(Dataset):
             mlm_input_tokens[mlm_pred_position] = masked_token
             mlm_pred_positions.append(mlm_pred_position)
             mlm_pred_labels.append(tokens[mlm_pred_position])
+            sorted_ids = sorted(range(len(mlm_pred_positions)),
+                                key=lambda x: mlm_pred_positions[x])
+
+            mlm_pred_positions = [mlm_pred_positions[i] for i in sorted_ids]
+            mlm_pred_labels = [mlm_pred_labels[i] for i in sorted_ids]
 
         return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
 
@@ -280,12 +297,16 @@ class BertDataset(Dataset):
 
             # Tokenize and pad tokens
             token_ids = self.vocab[mlm_input_tokens]
-            token_ids += [self.vocab['<pad>']] * (max_seq_len - len(token_ids))
+            token_ids = truncate_pad(token_ids,
+                                     max_seq_len,
+                                     padding_token_id=self.vocab['<pad>'])
 
             all_token_ids.append(token_ids)
 
             # Pad segments
-            token_type_ids = segments + [0] * (max_seq_len - len(segments))
+            token_type_ids = truncate_pad(segments,
+                                          max_seq_len,
+                                          padding_token_id=0)
             all_token_type_ids.append(token_type_ids)
 
             # Compute valid lengths (excluding padding tokens)
@@ -368,6 +389,6 @@ class BertDataset(Dataset):
 
 if __name__ == '__main__':
     data_dir = '/home/robin/work_dir/llm/nlp-toolkit/text_data/wikitext-2/'
-    bert_dataset = BertDataset(data_dir=data_dir, max_seq_len=64)
+    bert_dataset = BertDataset(data_dir=data_dir, max_seq_len=128)
     for i in range(5):
         print(bert_dataset[i])
