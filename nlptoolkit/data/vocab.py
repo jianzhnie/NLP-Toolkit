@@ -12,10 +12,13 @@ import json
 import os
 from typing import Dict, Iterable, List
 
-BOS_TOKEN = '<bos>'
-EOS_TOKEN = '<eos>'
-PAD_TOKEN = '<pad>'
-UNK_TOKEN = '<unk>'
+UNK_TOKEN = '<UNK>'
+SEP_TOKEN = '<SEP>'
+PAD_TOKEN = '<PAD>'
+CLS_TOKEN = '<CLS>'
+MASK_TOKEN = '<MASK>'
+BOS_TOKEN = '<BOS>'
+EOS_TOKEN = '<EOS>'
 
 
 def tokenize(lines, token='word'):
@@ -194,6 +197,9 @@ class Vocab(object):
         return self[tokens]
 
     def __len__(self):
+        return len(self.idx_to_token)
+
+    def size(self):
         return len(self.idx_to_token)
 
     def __getitem__(self, tokens):
