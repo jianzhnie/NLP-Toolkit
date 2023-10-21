@@ -13,11 +13,71 @@ from typing import List, Tuple
 
 import torch
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
 from nlptoolkit.data.tokenizer import Tokenizer
 from nlptoolkit.data.vocab import Vocab
 from nlptoolkit.utils.data_utils import truncate_pad
+
+
+class TrainingInstance:
+    """
+    A single training instance (sentence pair) for masked language model training.
+    """
+    def __init__(
+        self,
+        tokens: List[str],
+        segment_ids: List[int],
+        is_next_sentence: bool,
+        masked_lm_positions: List[int],
+        masked_lm_labels: List[str],
+    ):
+        """
+        Initializes a TrainingInstance object.
+
+        Args:
+            tokens (List[str]): List of tokens representing the input sentence pair.
+            segment_ids (List[int]): List of segment IDs indicating token belongingness to sentences.
+            is_next_sentence (bool): Indicates if the next sentence is the next sentence or randomly chosen.
+            masked_lm_positions (List[int]): List of positions where tokens are masked during training.
+            masked_lm_labels (List[str]): List of masked tokens corresponding to masked positions.
+        """
+        self.tokens = tokens
+        self.segment_ids = segment_ids
+        self.is_next_sentence = is_next_sentence
+        self.masked_lm_positions = masked_lm_positions
+        self.masked_lm_labels = masked_lm_labels
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of the TrainingInstance object.
+
+        Returns:
+            str: String representation of the TrainingInstance.
+        """
+        tokens_str = ' '.join(self.tokens)
+        segment_ids_str = ' '.join(map(str, self.segment_ids))
+        masked_positions_str = ' '.join(map(str, self.masked_lm_positions))
+        masked_labels_str = ' '.join(self.masked_lm_labels)
+
+        outputs = ''
+        outputs += f'Tokens: {tokens_str}\n'
+        outputs += f'Segment IDs: {segment_ids_str}\n'
+        outputs += f'Masked Positions: {masked_positions_str}\n'
+        outputs += f'Masked Labels: {masked_labels_str}\n'
+        outputs += f'Is Next Sentence: {self.is_next_sentence}'
+
+        return outputs
+
+    def __repr__(self) -> str:
+        """
+        Returns a string representation of the TrainingInstance object.
+
+        Returns:
+            str: String representation of the TrainingInstance.
+        """
+        return self.__str__()
 
 
 class BertDataset(Dataset):
@@ -45,10 +105,13 @@ class BertDataset(Dataset):
         self.tokenized_paragraphs = self.tokenize_text(self.paragraphs)
         self.vocab: Vocab = self.build_vocab()
         self.vocab_words = list(self.vocab.token_to_idx.keys())
-        (self.all_token_ids, self.all_token_type_ids, self.valid_lens,
-         self.all_pred_positions, self.all_mlm_weights, self.all_mlm_labels,
-         self.nsp_labels) = self.get_bert_data(self.tokenized_paragraphs,
-                                               max_seq_len)
+        self.bert_instances = self.get_bert_pretraing_instances(
+            self.tokenized_paragraphs, max_seq_len)
+        (self.all_input_ids, self.all_token_type_ids, self.valid_lens,
+         self.all_masked_lm_positions, self.all_masked_lm_weights,
+         self.all_masked_lm_labels,
+         self.all_next_sentence_labels) = self.format_bert_inputs(
+             self.bert_instances, max_seq_len)
 
     def tokenize_text(self,
                       paragraphs: List[List[str]]) -> List[List[List[str]]]:
@@ -91,7 +154,67 @@ class BertDataset(Dataset):
                                   seq_token='<sep>')
         return vocab
 
-    def get_bert_data(
+    def format_bert_inputs(
+        self,
+        instances: List[TrainingInstance],
+        max_seq_len: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
+               torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Formats BERT pretraining inputs from instances.
+
+        Args:
+            instances (List[TrainingInstance]): List of BERT pretraining instances.
+            max_seq_len (int): Maximum sequence length for BERT input.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+                Formatted BERT pretraining inputs (tokens, segments, valid lengths, MLM prediction positions, MLM weights, MLM labels, NSP labels).
+        """
+        max_num_mlm_preds = round(max_seq_len * 0.15)
+        all_input_ids, all_token_type_ids, valid_lens = [], [], []
+        all_masked_lm_positions, all_masked_lm_weights, all_masked_lm_labels = [], [], []
+        all_next_sentence_labels = []
+
+        for idx, instance in enumerate(tqdm(instances)):
+            # Tokenize and pad tokens
+            token_ids = self.vocab[instance.tokens]
+            token_ids = truncate_pad(token_ids,
+                                     max_seq_len,
+                                     padding_token_id=self.vocab['<pad>'])
+            all_input_ids.append(token_ids)
+
+            # Pad segments
+            token_type_ids = truncate_pad(instance.segment_ids,
+                                          max_seq_len,
+                                          padding_token_id=0)
+            all_token_type_ids.append(token_type_ids)
+
+            # Compute valid lengths (excluding padding tokens)
+            valid_lens.append(len(instance.tokens))
+
+            # Pad MLM prediction positions, MLM weights, and MLM labels
+            masked_lm_positions = instance.masked_lm_positions + [0] * (
+                max_num_mlm_preds - len(instance.masked_lm_positions))
+
+            masked_lm_weights = [1.0] * len(instance.masked_lm_labels) + [
+                0.0
+            ] * (max_num_mlm_preds - len(instance.masked_lm_labels))
+
+            masked_lm_labels = self.vocab[instance.masked_lm_labels] + [0] * (
+                max_num_mlm_preds - len(instance.masked_lm_labels))
+
+            all_masked_lm_positions.append(masked_lm_positions)
+            all_masked_lm_weights.append(masked_lm_weights)
+            all_masked_lm_labels.append(masked_lm_labels)
+
+            # NSP labels
+            all_next_sentence_labels.append(instance.is_next_sentence)
+
+        # Convert lists to tensors and return
+        return all_input_ids, all_token_type_ids, valid_lens, all_masked_lm_positions, all_masked_lm_weights, all_masked_lm_labels, all_next_sentence_labels
+
+    def get_bert_pretraing_instances(
             self, paragraphs: List[List[str]],
             max_seq_len: int) -> List[Tuple[List[str], List[int], bool]]:
         """
@@ -111,16 +234,21 @@ class BertDataset(Dataset):
             examples.extend(nsp_data_from_paragraph)
 
         # Get Masked Language Model (MLM) data
-        bert_data = []
-        for tokens, segments, is_next in examples:
-            mlm_input_tokens, mlm_pred_positions, mlm_pred_labels = self.get_mlm_data_from_tokens(
+        bert_instances = []
+        for tokens, segment_ids, is_next in examples:
+            masked_lm_tokens, masked_lm_positions, masked_lm_labels = self.get_masked_lm_data_from_tokens(
                 tokens)
-            bert_data.append((mlm_input_tokens, mlm_pred_positions,
-                              mlm_pred_labels) + (segments, is_next))
 
-        formated_bert_data = self.format_bert_inputs(bert_data, max_seq_len)
+            instance = TrainingInstance(
+                tokens=masked_lm_tokens,
+                segment_ids=segment_ids,
+                is_next_sentence=is_next,
+                masked_lm_positions=masked_lm_positions,
+                masked_lm_labels=masked_lm_labels,
+            )
+            bert_instances.append(instance)
 
-        return formated_bert_data
+        return bert_instances
 
     def get_next_sentence(
             self, sentence: List[str], next_sentence: List[str],
@@ -191,7 +319,7 @@ class BertDataset(Dataset):
             segments += [1] * (len(tokens_b) + 1)
         return tokens, segments
 
-    def get_mlm_data_from_tokens(
+    def get_masked_lm_data_from_tokens(
             self, tokens: List[str]) -> Tuple[List[int], List[int], List[int]]:
         """
         Generates Masked Language Model (MLM) data from a list of tokens.
@@ -269,69 +397,6 @@ class BertDataset(Dataset):
 
         return mlm_input_tokens, mlm_pred_positions, mlm_pred_labels
 
-    def format_bert_inputs(
-        self,
-        examples: List[Tuple[List[str], List[int], List[int], List[int],
-                             List[int], bool]],
-        max_seq_len: int,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-               torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Formats BERT pretraining inputs from examples.
-
-        Args:
-            examples (List[Tuple[List[str], List[int], List[int], List[int], List[int], bool]]): List of BERT pretraining examples.
-            max_seq_len (int): Maximum sequence length for BERT input.
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-                Formatted BERT pretraining inputs (tokens, segments, valid lengths, MLM prediction positions, MLM weights, MLM labels, NSP labels).
-        """
-        max_num_mlm_preds = round(max_seq_len * 0.15)
-        all_token_ids, all_token_type_ids, valid_lens = [], [], []
-        all_pred_positions, all_mlm_weights, all_mlm_labels = [], [], []
-        nsp_labels = []
-
-        for (mlm_input_tokens, mlm_pred_positions, mlm_pred_labels, segments,
-             is_next) in examples:
-
-            # Tokenize and pad tokens
-            token_ids = self.vocab[mlm_input_tokens]
-            token_ids = truncate_pad(token_ids,
-                                     max_seq_len,
-                                     padding_token_id=self.vocab['<pad>'])
-
-            all_token_ids.append(token_ids)
-
-            # Pad segments
-            token_type_ids = truncate_pad(segments,
-                                          max_seq_len,
-                                          padding_token_id=0)
-            all_token_type_ids.append(token_type_ids)
-
-            # Compute valid lengths (excluding padding tokens)
-            valid_lens.append(len(mlm_input_tokens))
-
-            # Pad MLM prediction positions, MLM weights, and MLM labels
-            mlm_positions = mlm_pred_positions + [0] * (
-                max_num_mlm_preds - len(mlm_pred_positions))
-
-            mlm_weights = [1.0] * len(mlm_pred_labels) + [0.0] * (
-                max_num_mlm_preds - len(mlm_pred_labels))
-
-            mlm_labels = self.vocab[mlm_pred_labels] + [0] * (
-                max_num_mlm_preds - len(mlm_pred_labels))
-
-            all_pred_positions.append(mlm_positions)
-            all_mlm_weights.append(mlm_weights)
-            all_mlm_labels.append(mlm_labels)
-
-            # NSP labels
-            nsp_labels.append(is_next)
-
-        # Convert lists to tensors and return
-        return all_token_ids, all_token_type_ids, valid_lens, all_pred_positions, all_mlm_weights, all_mlm_labels, nsp_labels
-
     def preprocess_text_data(self, path: str) -> List[List[str]]:
         """
         Preprocesses the text data from the specified file.
@@ -340,7 +405,7 @@ class BertDataset(Dataset):
             path (str): Path to the text file.
 
         Returns:
-            List[List[str]]: List of tokenized sentences.
+            List[List[str]]: List of  paragraphs (sentence list, atleast 2 ).
         """
         assert os.path.exists(path)
         paragraphs = []
@@ -359,7 +424,7 @@ class BertDataset(Dataset):
         Returns:
             int: Number of paragraphs.
         """
-        return len(self.all_token_ids)
+        return len(self.all_input_ids)
 
     def __getitem__(self, idx: int) -> List[Tuple[List[str], List[int], bool]]:
         """
@@ -372,16 +437,18 @@ class BertDataset(Dataset):
             List[Tuple[List[str], List[int], bool]]: List of NSP data tuples.
         """
         inputs = dict(
-            token_ids=torch.tensor(self.all_token_ids[idx], dtype=torch.long),
+            input_ids=torch.tensor(self.all_input_ids[idx], dtype=torch.long),
             token_type_ids=torch.tensor(self.all_token_type_ids[idx],
                                         dtype=torch.long),
             valid_len=torch.tensor(self.valid_lens[idx], dtype=torch.float32),
-            pred_positions=torch.tensor(self.all_pred_positions[idx],
-                                        dtype=torch.long),
-            mlm_weight=torch.tensor(self.all_mlm_weights[idx],
-                                    dtype=torch.float32),
-            labels=torch.tensor(self.all_mlm_labels[idx], dtype=torch.long),
-            nsp_labels=torch.tensor(self.nsp_labels[idx], dtype=torch.long),
+            masked_lm_positions=torch.tensor(self.all_masked_lm_positions[idx],
+                                             dtype=torch.long),
+            masked_lm_weight=torch.tensor(self.all_masked_lm_weights[idx],
+                                          dtype=torch.float32),
+            masked_lm_labels=torch.tensor(self.all_masked_lm_labels[idx],
+                                          dtype=torch.long),
+            next_sentence_labels=torch.tensor(
+                self.all_next_sentence_labels[idx], dtype=torch.long),
         )
 
         return inputs
