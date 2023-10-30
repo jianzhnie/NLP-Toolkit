@@ -20,6 +20,8 @@ from nlptoolkit.data.tokenizer import Tokenizer
 from nlptoolkit.data.vocab import Vocab
 from nlptoolkit.utils.data_utils import truncate_pad
 
+IGNORE_INDEX = -100
+
 
 class TrainingInstance:
     """
@@ -191,7 +193,7 @@ class BertDataset(Dataset):
             all_input_ids.append(token_ids)
 
             # masked token labels
-            label_ids = self.vocab[instance.masked_lm_labels]
+            label_ids = []
             label_ids = truncate_pad(label_ids,
                                      max_seq_len,
                                      padding_token_id=self.vocab['<pad>'])
@@ -217,8 +219,9 @@ class BertDataset(Dataset):
             masked_lm_pred_weights = [1.0] * len(
                 instance.masked_lm_pred_labels) + [0.0] * masked_lm_padding_len
 
-            masked_lm_pred_labels = self.vocab[
-                instance.masked_lm_pred_labels] + [0] * masked_lm_padding_len
+            masked_lm_pred_labels = instance.masked_lm_pred_labels + [
+                0
+            ] * masked_lm_padding_len
 
             all_masked_lm_pred_positions.append(masked_lm_pred_positions)
             all_masked_lm_pred_weights.append(masked_lm_pred_weights)
@@ -386,7 +389,7 @@ class BertDataset(Dataset):
         mlm_input_tokens = tokens.copy()
         mlm_pred_positions = []
         mlm_pred_labels = []
-        masked_lm_labels = tokens.copy()
+        masked_lm_labels = [IGNORE_INDEX] * len(tokens)
 
         # Shuffle for 15% of random tokens for prediction in Masked Language Model (MLM) task
         random.shuffle(candidate_pred_positions)
@@ -406,6 +409,8 @@ class BertDataset(Dataset):
                     masked_token = random.choice(vocab_words)
 
             mlm_input_tokens[mlm_pred_position] = masked_token
+            masked_lm_labels[mlm_pred_position] = self.vocab[masked_token]
+
             mlm_pred_positions.append(mlm_pred_position)
             mlm_pred_labels.append(tokens[mlm_pred_position])
             sorted_ids = sorted(range(len(mlm_pred_positions)),
@@ -413,6 +418,7 @@ class BertDataset(Dataset):
 
             mlm_pred_positions = [mlm_pred_positions[i] for i in sorted_ids]
             mlm_pred_labels = [mlm_pred_labels[i] for i in sorted_ids]
+            mlm_pred_labels = self.vocab[mlm_pred_labels]
 
         return mlm_input_tokens, masked_lm_labels, mlm_pred_positions, mlm_pred_labels
 
