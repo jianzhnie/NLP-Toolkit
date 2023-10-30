@@ -7,8 +7,9 @@ import torch.nn as nn
 from .config_bert import BertConfig
 from .modeling_bert import (BertModel, BertOnlyMLMHead, BertOnlyNSPHead,
                             BertPreTrainedModel, BertPreTrainingHeads)
-from .modeling_output import (BertForPreTrainingOutput, CausalLMOutput,
-                              MaskedLMOutput, MultipleChoiceModelOutput,
+from .modeling_output import (BertForPreTrainingOutput, BertModelOutput,
+                              CausalLMOutput, MaskedLMOutput,
+                              MultipleChoiceModelOutput,
                               NextSentencePredictorOutput,
                               QuestionAnsweringModelOutput,
                               SequenceClassifierOutput, TokenClassifierOutput)
@@ -30,7 +31,7 @@ class BertForPreTraining(BertPreTrainedModel):
         self.bert = BertModel(config)
 
         # Pretraining heads for masked language modeling and next sentence prediction
-        self.bert_heads = BertPreTrainingHeads(config)
+        self.bert_heads: BertPreTrainingHeads = BertPreTrainingHeads(config)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -57,6 +58,20 @@ class BertForPreTraining(BertPreTrainedModel):
         """
         Forward pass for BertForPretraining.
 
+        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
+            Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
+            config.vocab_size]` (see `input_ids` docstring) Tokens with indices set to `-100` are ignored (masked),
+            the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`
+
+        next_sentence_label (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
+            Labels for computing the next sequence prediction (classification) loss. Input should be a sequence
+            pair (see `input_ids` docstring) Indices should be in `[0, 1]`:
+
+            - 0 indicates sequence B is a continuation of sequence A,
+            - 1 indicates sequence B is a random sequence.
+        kwargs (`Dict[str, any]`, optional, defaults to *{}*):
+            Used to hide legacy arguments that have been deprecated.
+
         Args:
             input_ids (Tensor): Input token IDs.
             attention_mask (Tensor, optional): Attention mask.
@@ -75,7 +90,7 @@ class BertForPreTraining(BertPreTrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # Forward pass through BERT base model
-        outputs = self.bert(
+        outputs: BertModelOutput = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -113,6 +128,8 @@ class BertForPreTraining(BertPreTrainedModel):
         # Return output as BertForPreTrainingOutput object if return_dict is True
         return BertForPreTrainingOutput(
             loss=total_loss,
+            masked_lm_loss=masked_lm_loss,
+            next_sentence_loss=next_sentence_loss,
             prediction_logits=prediction_scores,
             seq_relationship_logits=seq_relationship_score,
             hidden_states=outputs.hidden_states,
@@ -203,7 +220,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         if labels is not None:
             use_cache = False
 
-        outputs = self.bert(
+        outputs: BertModelOutput = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -337,7 +354,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.bert(
+        outputs: BertModelOutput = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -469,7 +486,7 @@ class BertForNextSentencePrediction(BertPreTrainedModel):
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.bert(
+        outputs: BertModelOutput = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -539,7 +556,7 @@ class BertForSequenceClassification(BertPreTrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.bert(
+        outputs: BertModelOutput = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -637,7 +654,7 @@ class BertForMultipleChoice(BertPreTrainedModel):
         position_ids = position_ids.view(
             -1, position_ids.size(-1)) if position_ids is not None else None
 
-        outputs = self.bert(
+        outputs: BertModelOutput = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,

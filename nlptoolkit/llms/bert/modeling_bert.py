@@ -60,10 +60,12 @@ class BertEmbedding(nn.Module):
                                        eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self,
-                input_ids: Optional[Tensor] = None,
-                token_type_ids: Optional[Tensor] = None,
-                position_ids: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+    ) -> Tensor:
         """
         Forward pass of the BERT embedding module.
 
@@ -283,8 +285,12 @@ class BertAttention(nn.Module):
             Tuple[Tensor, Optional[Tensor]]: Processed hidden states and optional attention scores.
         """
         # Calculate self-attention and output
-        self_outputs = self.self_atten(hidden_states, attention_mask,
-                                       head_mask, output_attentions)
+        self_outputs = self.self_atten(
+            hidden_states,
+            attention_mask,
+            head_mask,
+            output_attentions,
+        )
         attention_output = self.output(self_outputs[0], hidden_states)
         # Include attention scores in the output if required
         outputs = (attention_output, ) + self_outputs[1:]
@@ -844,7 +850,7 @@ class BertModel(BertPreTrainedModel):
         attention_mask: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
-        head_mask: Optional[Tensor] = None,
+        head_mask: Optional[torch.Tensor] = None,
         use_cache: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -882,6 +888,13 @@ class BertModel(BertPreTrainedModel):
                 When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            past_key_values (tuple(tuple(Tensor)), optional):
+                The length of tuple equals to the number of layers, and each inner
+                tuple haves 4 tensors of shape `(batch_size, num_heads, sequence_length - 1, embed_size_per_head)`)
+                which contains precomputed key and value hidden states of the attention blocks.
+                If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
+                don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
+                `input_ids` of shape `(batch_size, sequence_length)`.
             use_cache (`bool`, optional):
                 If set to `True`, `past_key_values` key value states are returned.
                 Defaults to `None`.
@@ -937,10 +950,12 @@ class BertModel(BertPreTrainedModel):
         head_mask = self.get_head_mask(head_mask,
                                        self.config.num_hidden_layers)
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
-        encoder_outputs = self.encoder(
+        embedding_output = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            token_type_ids=token_type_ids,
+        )
+        encoder_outputs: BertEncoderOutput = self.encoder(
             embedding_output,
             attention_mask=extended_attention_mask,
             head_mask=head_mask,
