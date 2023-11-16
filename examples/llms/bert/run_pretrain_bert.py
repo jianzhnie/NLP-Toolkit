@@ -33,7 +33,7 @@ class MMBertForClassify(BaseModel):
         next_sentence_label: Optional[torch.Tensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+        return_dict: Optional[bool] = True,
         mode: str = 'loss',
     ):
         # Forward pass through BERT base model
@@ -57,6 +57,9 @@ class MMBertForClassify(BaseModel):
             }
         elif mode == 'predict':
             return (
+                outputs.loss,
+                outputs.masked_lm_loss,
+                outputs.next_sentence_loss,
                 outputs.prediction_logits,
                 outputs.seq_relationship_logits,
                 masked_lm_labels,
@@ -66,16 +69,38 @@ class MMBertForClassify(BaseModel):
 
 class Accuracy(BaseMetric):
     def process(self, data_batch, data_samples):
-        score, gt = data_samples
+        (
+            loss,
+            masked_lm_loss,
+            next_sentence_loss,
+            prediction_logits,
+            seq_relationship_logits,
+            masked_lm_labels,
+            next_sentence_label,
+        ) = data_samples
+
+        correct = ((seq_relationship_logits.argmax(
+            dim=1) == next_sentence_label).sum().cpu())
         self.results.append({
-            'batch_size': len(gt),
-            'correct': (score.argmax(dim=1) == gt).sum().cpu(),
+            'loss': loss,
+            'masked_lm_loss': masked_lm_loss,
+            'next_sentence_loss': next_sentence_loss,
+            'batch_size': len(next_sentence_label),
+            'correct': correct,
         })
 
     def compute_metrics(self, results):
         total_correct = sum(item['correct'] for item in results)
         total_size = sum(item['batch_size'] for item in results)
-        return dict(accuracy=100 * total_correct / total_size)
+        accuracy = 100 * total_correct / total_size
+
+        outputs = {
+            key: val
+            for key, val in results[0].items()
+            if key not in ['batch_size', 'correct']
+        }
+        outputs['accuracy'] = accuracy
+        return outputs
 
 
 def parse_args():
@@ -98,14 +123,35 @@ def main() -> None:
     model = BertForPreTraining(config)
     data_dir = '/home/robin/work_dir/llm/nlp-toolkit/text_data/wikitext-2/'
     train_set = BertDataset(data_dir=data_dir,
+                            data_split='train',
+                            max_seq_len=128)
+    valid_set = BertDataset(data_dir=data_dir,
                             data_split='valid',
                             max_seq_len=128)
-    train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
+    train_dataloader = DataLoader(train_set, batch_size=32, shuffle=True)
+    val_dataloader = DataLoader(valid_set, batch_size=32, shuffle=True)
+
+    train_dataloader = dict(
+        batch_size=32,
+        dataset=train_set,
+        sampler=dict(type='DefaultSampler', shuffle=True),
+        collate_fn=dict(type='default_collate'),
+    )
+    val_dataloader = dict(
+        batch_size=32,
+        dataset=valid_set,
+        sampler=dict(type='DefaultSampler', shuffle=False),
+        collate_fn=dict(type='default_collate'),
+    )
+
     runner = Runner(
         model=MMBertForClassify(model),
-        train_dataloader=train_loader,
+        train_dataloader=train_dataloader,
+        val_dataloader=val_dataloader,
         optim_wrapper=dict(optimizer=dict(type=torch.optim.Adam, lr=2e-5)),
-        train_cfg=dict(by_epoch=True, max_epochs=2),
+        train_cfg=dict(by_epoch=True, max_epochs=10, val_interval=1),
+        val_cfg=dict(),
+        val_evaluator=dict(type=Accuracy),
         work_dir='bert_work_dir',
         launcher=args.launcher,
     )
