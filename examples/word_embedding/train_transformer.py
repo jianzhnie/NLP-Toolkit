@@ -4,10 +4,9 @@ import time
 
 import torch
 import torch.nn as nn
+from data import WikiTextDataset
 from model import RNNModel, TransformerModel
 from torch.utils.data import DataLoader
-
-from data import WikiTextDataset
 
 
 def parse_args():
