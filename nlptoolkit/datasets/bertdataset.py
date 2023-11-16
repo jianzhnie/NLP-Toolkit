@@ -1,11 +1,3 @@
-'''
-Author: jianzhnie
-Date: 2022-03-04 17:13:34
-LastEditTime: 2022-03-04 17:16:27
-LastEditors: jianzhnie
-Description:
-
-'''
 import os
 import random
 import sys
@@ -115,11 +107,16 @@ class BertDataset(Dataset):
         self.vocab_words = list(self.vocab.token_to_idx.keys())
         self.bert_instances = self.get_bert_pretraing_instances(
             self.tokenized_paragraphs, max_seq_len)
-        (self.all_input_ids, self.all_token_type_ids, self.valid_lens,
-         self.all_masked_lm_labels, self.all_masked_lm_pred_positions,
-         self.all_masked_lm_pred_weights, self.all_masked_lm_pred_labels,
-         self.all_next_sentence_labels) = self.format_bert_inputs(
-             self.bert_instances, max_seq_len)
+        (
+            self.all_input_ids,
+            self.all_token_type_ids,
+            self.valid_lens,
+            self.all_masked_lm_labels,
+            self.all_masked_lm_pred_positions,
+            self.all_masked_lm_pred_weights,
+            self.all_masked_lm_pred_labels,
+            self.all_next_sentence_labels,
+        ) = self.format_bert_inputs(self.bert_instances, max_seq_len)
 
     def tokenize_text(self,
                       paragraphs: List[List[str]]) -> List[List[List[str]]]:
@@ -152,14 +149,16 @@ class BertDataset(Dataset):
             sentence for paragraph in self.tokenized_paragraphs
             for sentence in paragraph
         ]
-        vocab = Vocab.build_vocab(tokenized_sentences,
-                                  min_freq=1,
-                                  unk_token='<unk>',
-                                  pad_token='<pad>',
-                                  bos_token='<bos>',
-                                  eos_token='<eos>',
-                                  cls_token='<cls>',
-                                  seq_token='<sep>')
+        vocab = Vocab.build_vocab(
+            tokenized_sentences,
+            min_freq=1,
+            unk_token='<unk>',
+            pad_token='<pad>',
+            bos_token='<bos>',
+            eos_token='<eos>',
+            cls_token='<cls>',
+            seq_token='<sep>',
+        )
         return vocab
 
     def format_bert_inputs(
@@ -167,7 +166,7 @@ class BertDataset(Dataset):
         instances: List[TrainingInstance],
         max_seq_len: int,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
-               torch.Tensor, torch.Tensor, torch.Tensor]:
+               torch.Tensor, torch.Tensor, torch.Tensor, ]:
         """
         Formats BERT pretraining inputs from instances.
 
@@ -180,8 +179,17 @@ class BertDataset(Dataset):
                 Formatted BERT pretraining inputs (tokens, segments, valid lengths, MLM prediction positions, MLM weights, MLM labels, NSP labels).
         """
         max_num_mlm_preds = round(max_seq_len * 0.15)
-        all_input_ids, all_token_type_ids, all_masked_lm_labels, valid_lens = [], [], [], []
-        all_masked_lm_pred_positions, all_masked_lm_pred_weights, all_masked_lm_pred_labels = [], [], []
+        all_input_ids, all_token_type_ids, all_masked_lm_labels, valid_lens = (
+            [],
+            [],
+            [],
+            [],
+        )
+        (
+            all_masked_lm_pred_positions,
+            all_masked_lm_pred_weights,
+            all_masked_lm_pred_labels,
+        ) = [], [], []
         all_next_sentence_labels = []
 
         for idx, instance in enumerate(tqdm(instances)):
@@ -212,16 +220,14 @@ class BertDataset(Dataset):
             # Pad MLM prediction positions, MLM weights, and MLM labels
             masked_lm_padding_len = max_num_mlm_preds - len(
                 instance.masked_lm_pred_positions)
-            masked_lm_pred_positions = instance.masked_lm_pred_positions + [
-                0
-            ] * masked_lm_padding_len
+            masked_lm_pred_positions = (instance.masked_lm_pred_positions +
+                                        [0] * masked_lm_padding_len)
 
             masked_lm_pred_weights = [1.0] * len(
                 instance.masked_lm_pred_labels) + [0.0] * masked_lm_padding_len
 
-            masked_lm_pred_labels = instance.masked_lm_pred_labels + [
-                0
-            ] * masked_lm_padding_len
+            masked_lm_pred_labels = (instance.masked_lm_pred_labels +
+                                     [0] * masked_lm_padding_len)
 
             all_masked_lm_pred_positions.append(masked_lm_pred_positions)
             all_masked_lm_pred_weights.append(masked_lm_pred_weights)
@@ -231,8 +237,16 @@ class BertDataset(Dataset):
             all_next_sentence_labels.append(instance.is_next_sentence)
 
         # Convert lists to tensors and return
-        return all_input_ids, all_token_type_ids, valid_lens, all_masked_lm_labels, \
-            all_masked_lm_pred_positions, all_masked_lm_pred_weights, all_masked_lm_pred_labels, all_next_sentence_labels
+        return (
+            all_input_ids,
+            all_token_type_ids,
+            valid_lens,
+            all_masked_lm_labels,
+            all_masked_lm_pred_positions,
+            all_masked_lm_pred_weights,
+            all_masked_lm_pred_labels,
+            all_next_sentence_labels,
+        )
 
     def get_bert_pretraing_instances(
             self, paragraphs: List[List[str]],
@@ -256,8 +270,12 @@ class BertDataset(Dataset):
         # Get Masked Language Model (MLM) data
         bert_instances = []
         for tokens, segment_ids, is_next in examples:
-            masked_lm_tokens, masked_lm_labels, masked_lm_pred_positions, masked_lm_pred_labels = self.get_masked_lm_data_from_tokens(
-                tokens)
+            (
+                masked_lm_tokens,
+                masked_lm_labels,
+                masked_lm_pred_positions,
+                masked_lm_pred_labels,
+            ) = self.get_masked_lm_data_from_tokens(tokens)
 
             instance = TrainingInstance(
                 tokens=masked_lm_tokens,
@@ -272,8 +290,11 @@ class BertDataset(Dataset):
         return bert_instances
 
     def get_next_sentence(
-            self, sentence: List[str], next_sentence: List[str],
-            paragraphs: List[List[List[str]]]) -> Tuple[List[str], bool]:
+        self,
+        sentence: List[str],
+        next_sentence: List[str],
+        paragraphs: List[List[List[str]]],
+    ) -> Tuple[List[str], bool]:
         """
         Randomly selects the next sentence for NSP task.
 
@@ -359,19 +380,32 @@ class BertDataset(Dataset):
 
         # Predict 15% of the tokens
         num_mlm_preds = max(1, round(len(candidate_pred_positions) * 0.15))
-        masked_lm_tokens, masked_lm_labels, masked_lm_pred_positions, masked_lm_pred_labels = self.replace_mlm_tokens(
+        (
+            masked_lm_tokens,
+            masked_lm_labels,
+            masked_lm_pred_positions,
+            masked_lm_pred_labels,
+        ) = self.replace_mlm_tokens(
             tokens,
             candidate_pred_positions,
             num_mlm_preds,
             vocab_words=self.vocab_words,
         )
 
-        return masked_lm_tokens, masked_lm_labels, masked_lm_pred_positions, masked_lm_pred_labels
+        return (
+            masked_lm_tokens,
+            masked_lm_labels,
+            masked_lm_pred_positions,
+            masked_lm_pred_labels,
+        )
 
     def replace_mlm_tokens(
-            self, tokens: List[str], candidate_pred_positions: List[int],
-            num_mlm_preds: int,
-            vocab_words: List[str]) -> Tuple[List[int], List[Tuple[int, int]]]:
+        self,
+        tokens: List[str],
+        candidate_pred_positions: List[int],
+        num_mlm_preds: int,
+        vocab_words: List[str],
+    ) -> Tuple[List[int], List[Tuple[int, int]]]:
         """
         Replaces tokens with <mask> or random tokens to create MLM training data.
 

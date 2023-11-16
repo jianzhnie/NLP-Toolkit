@@ -1,19 +1,18 @@
-'''
+"""
 Author: jianzhnie
 Date: 2021-12-22 16:34:43
 LastEditTime: 2021-12-24 18:32:39
 LastEditors: jianzhnie
 Description:
 
-'''
+"""
 
 import logging
 import math
 from typing import Optional, Tuple, Union
 
 import torch
-import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, nn
 from transformers.modeling_utils import PreTrainedModel
 
 from .config_bert import BertConfig
@@ -23,18 +22,18 @@ logger = logging.getLogger(__name__)
 
 
 def gelu(x):
-    return torch.nn.functional.gelu(x)
+    return nn.functional.gelu(x)
 
 
 def swish(x):
-    return x * torch.sigmoid(x)
+    return x * nn.functional.sigmoid(x)
 
 
 # torch.nn.functional.gelu(x) # Breaks ONNX export
 ACT2FN = {
     'gelu': gelu,
-    'tanh': torch.tanh,
-    'relu': torch.nn.functional.relu,
+    'tanh': nn.functional.tanh,
+    'relu': nn.functional.relu,
     'swish': swish
 }
 
@@ -138,8 +137,10 @@ class BertSelfAttention(nn.Module):
         """
         # (batch_size, seq_len, hidden_size) ->
         # (batch_size, seq_len, num_attention_heads, attention_head_size)
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads,
-                                       self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.view(new_x_shape)
         # (batch_size, num_attention_heads, seq_len, attention_head_size)
         return x.permute(0, 2, 1, 3)
@@ -206,8 +207,8 @@ class BertSelfAttention(nn.Module):
             self.all_head_size, )
         context_layer = context_layer.view(new_context_layer_shape)
 
-        outputs = (context_layer,
-                   attention_probs) if output_attentions else (context_layer, )
+        outputs = ((context_layer, attention_probs) if output_attentions else
+                   (context_layer, ))
         return outputs
 
 
@@ -914,11 +915,13 @@ class BertModel(BertPreTrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~torch.transformers.model_outputs.BertModelOutput`.
         """
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = (output_attentions if output_attentions is not None
+                             else self.config.output_attentions)
         output_hidden_states = (output_hidden_states
                                 if output_hidden_states is not None else
                                 self.config.output_hidden_states)
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (return_dict if return_dict is not None else
+                       self.config.use_return_dict)
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
@@ -965,8 +968,8 @@ class BertModel(BertPreTrainedModel):
             return_dict=return_dict,
         )
         sequence_output = encoder_outputs[0]
-        pooled_output = self.pooler(
-            sequence_output) if self.pooler is not None else None
+        pooled_output = (self.pooler(sequence_output)
+                         if self.pooler is not None else None)
 
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
