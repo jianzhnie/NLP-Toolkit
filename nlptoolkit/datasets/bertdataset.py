@@ -98,8 +98,9 @@ class BertDataset(Dataset):
             max_seq_len: int = 512,
     ) -> None:
         super().__init__()
-        self.max_seq_len = max_seq_len
+
         self.tokenizer = tokenizer
+        self.max_seq_len = max_seq_len
         self.data_dir = os.path.join(data_dir, f'{data_split}.txt')
         self.paragraphs = self.preprocess_text_data(self.data_dir)
         self.tokenized_paragraphs = self.tokenize_text(self.paragraphs)
@@ -192,26 +193,31 @@ class BertDataset(Dataset):
         ) = [], [], []
         all_next_sentence_labels = []
 
-        for idx, instance in enumerate(tqdm(instances)):
+        for _, instance in enumerate(tqdm(instances)):
             # Tokenize and pad tokens
-            token_ids = self.vocab[instance.tokens]
-            token_ids = truncate_pad(token_ids,
-                                     max_seq_len,
-                                     padding_token_id=self.vocab['<pad>'])
-            all_input_ids.append(token_ids)
+            input_token_ids = self.vocab[instance.tokens]
+            input_token_ids = truncate_pad(
+                input_token_ids,
+                max_seq_len,
+                padding_token_id=self.vocab['<pad>'],
+            )
+            all_input_ids.append(input_token_ids)
 
-            # masked token labels
-            label_ids = []
-            label_ids = truncate_pad(label_ids,
-                                     max_seq_len,
-                                     padding_token_id=self.vocab['<pad>'])
+            # Masked token labels
+            label_ids = truncate_pad(
+                instance.masked_lm_labels,
+                max_seq_len,
+                padding_token_id=self.vocab['<pad>'],
+            )
 
             all_masked_lm_labels.append(label_ids)
 
             # Pad segments
-            token_type_ids = truncate_pad(instance.segment_ids,
-                                          max_seq_len,
-                                          padding_token_id=0)
+            token_type_ids = truncate_pad(
+                instance.segment_ids,
+                max_seq_len,
+                padding_token_id=self.vocab['<pad>'],
+            )
             all_token_type_ids.append(token_type_ids)
 
             # Compute valid lengths (excluding padding tokens)
@@ -379,16 +385,17 @@ class BertDataset(Dataset):
                 candidate_pred_positions.append(i)
 
         # Predict 15% of the tokens
-        num_mlm_preds = max(1, round(len(candidate_pred_positions) * 0.15))
+        num_masked_lm_preds = max(1,
+                                  round(len(candidate_pred_positions) * 0.15))
         (
             masked_lm_tokens,
             masked_lm_labels,
             masked_lm_pred_positions,
             masked_lm_pred_labels,
-        ) = self.replace_mlm_tokens(
+        ) = self.replace_masked_lm_tokens(
             tokens,
             candidate_pred_positions,
-            num_mlm_preds,
+            num_masked_lm_preds,
             vocab_words=self.vocab_words,
         )
 
@@ -399,11 +406,11 @@ class BertDataset(Dataset):
             masked_lm_pred_labels,
         )
 
-    def replace_mlm_tokens(
+    def replace_masked_lm_tokens(
         self,
         tokens: List[str],
         candidate_pred_positions: List[int],
-        num_mlm_preds: int,
+        num_masked_lm_preds: int,
         vocab_words: List[str],
     ) -> Tuple[List[int], List[Tuple[int, int]]]:
         """
@@ -412,7 +419,7 @@ class BertDataset(Dataset):
         Args:
             tokens (List[str]): List of tokens in a sentence.
             candidate_pred_positions (List[int]): List of indices where predictions can be made.
-            num_mlm_preds (int): Number of tokens to predict.
+            num_masked_lm_preds (int): Number of tokens to predict.
             vocab_words (List[str]): Vocab word list.
 
         Returns:
@@ -420,15 +427,15 @@ class BertDataset(Dataset):
         """
         # Create a copy of tokens for Masked Language Model (MLM) input,
         # where inputs might contain replaced '<mask>' or random tokens
-        mlm_input_tokens = tokens.copy()
-        mlm_pred_positions = []
-        mlm_pred_labels = []
+        masked_lm_input_tokens = tokens.copy()
+        masked_lm_pred_positions = []
+        masked_lm_pred_labels = []
         masked_lm_labels = [IGNORE_INDEX] * len(tokens)
 
         # Shuffle for 15% of random tokens for prediction in Masked Language Model (MLM) task
         random.shuffle(candidate_pred_positions)
         for mlm_pred_position in candidate_pred_positions:
-            if len(mlm_pred_positions) >= num_mlm_preds:
+            if len(masked_lm_pred_positions) >= num_masked_lm_preds:
                 break
             masked_token = None
             # 80% of the time, replace with <mask>
@@ -437,24 +444,28 @@ class BertDataset(Dataset):
             else:
                 # 10% of the time, keep the word unchanged
                 if random.random() < 0.5:
-                    masked_token = mlm_input_tokens[mlm_pred_position]
+                    masked_token = masked_lm_input_tokens[mlm_pred_position]
                 # 10% of the time, replace with a random word from vocabulary
                 else:
                     masked_token = random.choice(vocab_words)
 
-            mlm_input_tokens[mlm_pred_position] = masked_token
+            masked_lm_input_tokens[mlm_pred_position] = masked_token
             masked_lm_labels[mlm_pred_position] = self.vocab[masked_token]
 
-            mlm_pred_positions.append(mlm_pred_position)
-            mlm_pred_labels.append(tokens[mlm_pred_position])
-            sorted_ids = sorted(range(len(mlm_pred_positions)),
-                                key=lambda x: mlm_pred_positions[x])
+            masked_lm_pred_positions.append(mlm_pred_position)
+            masked_lm_pred_labels.append(tokens[mlm_pred_position])
+            sorted_ids = sorted(range(len(masked_lm_pred_positions)),
+                                key=lambda x: masked_lm_pred_positions[x])
 
-            mlm_pred_positions = [mlm_pred_positions[i] for i in sorted_ids]
-            mlm_pred_labels = [mlm_pred_labels[i] for i in sorted_ids]
-            mlm_pred_labels = self.vocab[mlm_pred_labels]
+            masked_lm_pred_positions = [
+                masked_lm_pred_positions[i] for i in sorted_ids
+            ]
+            masked_lm_pred_labels = [
+                masked_lm_pred_labels[i] for i in sorted_ids
+            ]
+            masked_lm_pred_labels = self.vocab[masked_lm_pred_labels]
 
-        return mlm_input_tokens, masked_lm_labels, mlm_pred_positions, mlm_pred_labels
+        return masked_lm_input_tokens, masked_lm_labels, masked_lm_pred_positions, masked_lm_pred_labels
 
     def preprocess_text_data(self, path: str) -> List[List[str]]:
         """
@@ -499,15 +510,8 @@ class BertDataset(Dataset):
             input_ids=torch.tensor(self.all_input_ids[idx], dtype=torch.long),
             token_type_ids=torch.tensor(self.all_token_type_ids[idx],
                                         dtype=torch.long),
-            valid_len=torch.tensor(self.valid_lens[idx], dtype=torch.float32),
             masked_lm_labels=torch.tensor(self.all_masked_lm_labels[idx],
                                           dtype=torch.long),
-            masked_lm_pred_positions=torch.tensor(
-                self.all_masked_lm_pred_positions[idx], dtype=torch.long),
-            masked_lm_pred_weight=torch.tensor(
-                self.all_masked_lm_pred_weights[idx], dtype=torch.float32),
-            masked_lm_pred_labels=torch.tensor(
-                self.all_masked_lm_pred_labels[idx], dtype=torch.long),
             next_sentence_label=torch.tensor(
                 self.all_next_sentence_labels[idx], dtype=torch.long),
         )
@@ -520,5 +524,5 @@ if __name__ == '__main__':
     bert_dataset = BertDataset(data_dir=data_dir,
                                data_split='valid',
                                max_seq_len=128)
-    for i in range(10000):
+    for i in range(10):
         print(bert_dataset[i])

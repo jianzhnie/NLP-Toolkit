@@ -10,6 +10,7 @@ import collections
 import io
 import json
 import os
+from collections import OrderedDict
 from typing import Dict, Iterable, List
 
 UNK_TOKEN = '<UNK>'
@@ -92,29 +93,27 @@ class Vocab(object):
         self.eos_token = eos_token
 
         # Handle special tokens
-        kwargs.update({
-            'unk_token': unk_token,
+        special_token_dict = OrderedDict({
             'pad_token': pad_token,
+            'unk_token': unk_token,
             'bos_token': bos_token,
             'eos_token': eos_token,
         })
-
+        special_token_dict.update(kwargs)
         # Check if special tokens are in kwargs
         special_tokens: List[str] = []
-        special_iter = kwargs.keys()
-        self.special_token_dict = {}
-        for special_token_name in special_iter:
+        self.special_token_dict = OrderedDict()
+        for (token_name, special_token) in special_token_dict.items():
             # Test if kwarg specifies a special token
-            if not special_token_name.endswith('_token'):
+            if not token_name.endswith('_token'):
                 raise ValueError(
                     '{} is invalid. Only keyword arguments '
                     "that end in '_token' are supported "
-                    'to declare special tokens.'.format(special_token_name))
+                    'to declare special tokens.'.format(token_name))
 
-            special_token = kwargs[special_token_name]
             if special_token is not None and special_token not in special_tokens:
                 special_tokens.append(special_token)
-                self.special_token_dict[special_token_name] = special_token
+                self.special_token_dict[token_name] = special_token
 
         # Map tokens to indices and indices to tokens
         if counter is None:
