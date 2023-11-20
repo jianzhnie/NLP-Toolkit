@@ -21,13 +21,13 @@ python train_bowcls.py \
 
 以上参数表示：
 
-* `lr`: 学习率， 默认为5e-4。
-* `batch_size`: 运行一个batch大小，默认为64。
-* `epochs`: 训练轮次，默认为5。
-* `vocab_path`: 需要加载的单词词表文件路径
-
+- `lr`: 学习率， 默认为5e-4。
+- `batch_size`: 运行一个batch大小，默认为64。
+- `epochs`: 训练轮次，默认为5。
+- `vocab_path`: 需要加载的单词词表文件路径
 
 ## 参考论文
+
 - Li, Shen, et al. "Analogical reasoning on chinese morphological and semantic relations." arXiv preprint arXiv:1805.06504 (2018).
 - Qiu, Yuanyuan, et al. "Revisiting correlations between intrinsic and extrinsic evaluations of word embeddings." Chinese Computational Linguistics and Natural Language Processing Based on Naturally Annotated Big Data. Springer, Cham, 2018. 209-221.
 - Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. GloVe: Global Vectors for Word Representation.
