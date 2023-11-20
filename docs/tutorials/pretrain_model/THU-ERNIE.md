@@ -1,4 +1,5 @@
 # ERNIE：Enhanced Language Representation with Informative Entities
+
 <br>
 
 ## 1. THU-ERNIE的由来
@@ -7,8 +8,8 @@
 
 这个想法很好，但将知识图谱的知识引入到语言模型存在**两个挑战**：
 
-* Structured Knowledge Encoding：如何为预训练模型提取和编码知识图谱的信息？
-* Heterogeneous Information Fusion：语言模型和知识图谱对单词的表示（representation）是完全不同的两个向量空间，这种情况下如何将两者进行融合？
+- Structured Knowledge Encoding：如何为预训练模型提取和编码知识图谱的信息？
+- Heterogeneous Information Fusion：语言模型和知识图谱对单词的表示（representation）是完全不同的两个向量空间，这种情况下如何将两者进行融合？
 
 对于第一个问题，**THU-ERNIE**使用[TAGME](https://arxiv.org/pdf/1006.3498v1.pdf)提取文本中的实体，并将这些实体链指到KG中的对应实体对象，然后找出这些实体对象对应的embedding，这些embedding是由一些知识表示方法，例如[TransE](https://proceedings.neurips.cc/paper/2013/file/1cecc7a77928ca8133fa24680a88d2f9-Paper.pdf)训练得到的。
 
@@ -30,11 +31,11 @@
 
 本节将详细探讨**K-Encoder**的内部结构以及**K-Encoder**是如何融合预训练文本信息和KG知识的。**图1b**展示了**K-Encoder**的内部细节信息。
 
-我们可以看到，其对文本序列 (token Input) 和KG知识(Entity Input)分别进行Multi-Head Self-Attention(MH-ATT)操作，假设在第$i$层中，token Input对应的embedding是$\{w_{1}^{(i-1)},w_{2}^{(i-1)},...,w_{n}^{(i-1)}\}$，Entity Input对应的embedding是$\{ e_1^{(i-1)},e_2^{(i-1)},...,e_n^{(i-1)}\}$，则Multi-Head Self-Attention操作的公式可以表示为：
+我们可以看到，其对文本序列 (token Input) 和KG知识(Entity Input)分别进行Multi-Head Self-Attention(MH-ATT)操作，假设在第$i$层中，token Input对应的embedding是${w\_{1}^{(i-1)},w\_{2}^{(i-1)},...,w\_{n}^{(i-1)}}$，Entity Input对应的embedding是${ e_1^{(i-1)},e_2^{(i-1)},...,e_n^{(i-1)}}$，则Multi-Head Self-Attention操作的公式可以表示为：
 
 $$
-\{\tilde{w}_{1}^{(i-1)},\tilde{w}_{2}^{(i-1)},...,\tilde{w}_{n}^{(i-1)}\} = \text{MH-ATT}(\{w_{1}^{(i-1)},w_{2}^{(i-1)},...,w_{n}^{(i-1)}\}) \\
-\{\tilde{e}_{1}^{(i-1)},\tilde{e}_{2}^{(i-1)},...,\tilde{e}_{m}^{(i-1)}\} = \text{MH-ATT}(\{e_{1}^{(i-1)},e_{2}^{(i-1)},...,e_{m}^{(i-1)}\})
+{\\tilde{w}_{1}^{(i-1)},\\tilde{w}_{2}^{(i-1)},...,\\tilde{w}_{n}^{(i-1)}} = \\text{MH-ATT}({w_{1}^{(i-1)},w\_{2}^{(i-1)},...,w\_{n}^{(i-1)}}) \\
+{\\tilde{e}_{1}^{(i-1)},\\tilde{e}_{2}^{(i-1)},...,\\tilde{e}_{m}^{(i-1)}} = \\text{MH-ATT}({e_{1}^{(i-1)},e\_{2}^{(i-1)},...,e\_{m}^{(i-1)}})
 $$
 
 然后Entity序列的输出将被对齐到token序列的第一个token上，例如实体"bob dylan"将被对齐到第一个单词"bob"上。接下里将这些MH-ATT的输入到Fusion层，在这里将进行文本信息和KG知识的信息融合。因为有些token没有对应的entity，有些token有对应的entity，所以这里需要分两种情况讨论。
@@ -42,20 +43,19 @@ $$
 对于那些**有**对应entity的token，信息融合的过程是这样的：
 
 $$
-h_j = \sigma(\tilde{W}_t^{(i)}\tilde{w}_j^{(i)}+\tilde{W}_e^{(i)}\tilde{e}_k^{(i)}+\tilde{b}^{(i)}) \\
-w_j^{(i)} = \sigma({W}_t^{(i)}{h}_j+b_t^{(i)}) \\
-e_k^{(i)} = \sigma({W}_e^{(i)}{h}_j+b_e^{(i)})
+h_j = \\sigma(\\tilde{W}\_t^{(i)}\\tilde{w}\_j^{(i)}+\\tilde{W}\_e^{(i)}\\tilde{e}\_k^{(i)}+\\tilde{b}^{(i)}) \\
+w_j^{(i)} = \\sigma({W}\_t^{(i)}{h}\_j+b_t^{(i)}) \\
+e_k^{(i)} = \\sigma({W}\_e^{(i)}{h}\_j+b_e^{(i)})
 $$
-
 
 对于那些**没有**对应entity的token，信息融合的过程是这样的：
 
 $$
-h_j = \sigma(\tilde{W}_t^{(i)}\tilde{w}_j^{(i)}+\tilde{b}^{(i)}) \\
-w_j^{(i)} = \sigma({W}_t^{(i)}{h}_j+b_t^{(i)})
+h_j = \\sigma(\\tilde{W}\_t^{(i)}\\tilde{w}\_j^{(i)}+\\tilde{b}^{(i)}) \\
+w_j^{(i)} = \\sigma({W}\_t^{(i)}{h}\_j+b_t^{(i)})
 $$
 
-其中这里的$\sigma(\cdot)$是个非线性的激活函数，通常可以使用GELU函数。最后一层的输出将被视作融合文本信息和KG知识的最终向量。
+其中这里的$\\sigma(\\cdot)$是个非线性的激活函数，通常可以使用GELU函数。最后一层的输出将被视作融合文本信息和KG知识的最终向量。
 
 ## 4. THU-ERNIE的预训练任务
 
@@ -63,10 +63,10 @@ $$
 
 由于KG中实体的数量往往过于庞大，对于要进行这个任务的token来讲，**THU-ERNIE**将会给定小范围的实体，让该token在这个范围内去计算要输出的实体分布，而不是全部的KG实体。
 
-给定token序列$\{w_{1},w_{2},...,w_{n}\}$和对应的实体序$\{ e_1,e_2,...,e_m\}$，对于要对齐的token $w_i$来讲，相应的对齐公式为：
+给定token序列${w\_{1},w\_{2},...,w\_{n}}$和对应的实体序${ e_1,e_2,...,e_m}$，对于要对齐的token $w_i$来讲，相应的对齐公式为：
 
 $$
-p(e_j|w_i) = \frac{exp(\text{linear}(w_i^o) \cdot e_j)}{\sum_{k=1}^{m}exp(\text{linear}(w_i^{o}) \cdot e_k)}
+p(e_j|w_i) = \\frac{exp(\\text{linear}(w_i^o) \\cdot e_j)}{\\sum\_{k=1}^{m}exp(\\text{linear}(w_i^{o}) \\cdot e_k)}
 $$
 
 类似与BERT对token的Mask策略，**THU-ERNIE**在Mask token-entity对齐的时候也采用的一定的策略，如下：

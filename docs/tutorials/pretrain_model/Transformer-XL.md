@@ -1,4 +1,5 @@
 # Transformer-XL： Attentive Language Models Beyonds a Fixed-Length Context
+
 <br>
 
 ## 1. Transformer-XL的由来
@@ -33,60 +34,59 @@
 
 在**模型评估**阶段，如**图2b**所示，**Transformer-XL**通过缓存前一个Segment的输出序列，当下一个Segment需要用这些输出时（前后两个Segment具有大部分的重复），不需要重新计算，从而加快了推理速度。
 
-下边我们来具体聊聊这些事情是怎么做的，假设前后的两个Segment分别为：$\text{s}_{\tau}=[x_{\tau,1},x_{\tau,2},...,x_{\tau,L}]$和$\text{s}_{\tau+1}=[x_{\tau+1,1},x_{\tau+1,2},...,x_{\tau+1,L}]$，其中序列长度为$L$。另外假定$h_{\tau}^n \in \mathbb{R}^{L \times d}$为由$\text{s}_{\tau}$计算得出的第$n$层的状态向量，则下一个Segment $\text{s}_{\tau+1}$的第$n$层可按照如下方式计算：
+下边我们来具体聊聊这些事情是怎么做的，假设前后的两个Segment分别为：$\\text{s}_{\\tau}=\[x_{\\tau,1},x\_{\\tau,2},...,x\_{\\tau,L}\]$和$\\text{s}_{\\tau+1}=\[x_{\\tau+1,1},x\_{\\tau+1,2},...,x\_{\\tau+1,L}\]$，其中序列长度为$L$。另外假定$h\_{\\tau}^n \\in \\mathbb{R}^{L \\times d}$为由$\\text{s}_{\\tau}$计算得出的第$n$层的状态向量，则下一个Segment $\\text{s}_{\\tau+1}$的第$n$层可按照如下方式计算：
 
 $$
-\begin{align}
-& \tilde{h}_{\tau+1}^{n-1} = \left[ \text{SG}(h_{\tau}^{n-1}) \; \circ \;h_{\tau+1}^{n-1} \right] \\
-& q_{\tau+1}^{n}, \; k_{\tau+1}^n, \; v_{\tau+1}^n = h_{\tau+1}^{n-1}W_{q}^{\mathrm{ T }}, \; \tilde{h}_{\tau+1}^{n-1}W_{k}^{\mathrm{ T }}, \; \tilde{h}_{\tau+1}^{n-1}W_{v}^{\mathrm{ T }} \\
-& h_{\tau+1}^n = \text{Transformer-Layer}(q_{\tau+1}^{n}, \; k_{\tau+1}^n, \; v_{\tau+1}^n)
-\end{align}
+\\begin{align}
+& \\tilde{h}_{\\tau+1}^{n-1} = \\left\[ \\text{SG}(h_{\\tau}^{n-1}) ; \\circ ;h\_{\\tau+1}^{n-1} \\right\] \\
+& q\_{\\tau+1}^{n}, ; k\_{\\tau+1}^n, ; v\_{\\tau+1}^n = h\_{\\tau+1}^{n-1}W\_{q}^{\\mathrm{ T }}, ; \\tilde{h}_{\\tau+1}^{n-1}W_{k}^{\\mathrm{ T }}, ; \\tilde{h}_{\\tau+1}^{n-1}W_{v}^{\\mathrm{ T }} \\
+& h\_{\\tau+1}^n = \\text{Transformer-Layer}(q\_{\\tau+1}^{n}, ; k\_{\\tau+1}^n, ; v\_{\\tau+1}^n)
+\\end{align}
 $$
 
-其中，$\text{SG}(h_{\tau}^{n-1}) $表示不使用梯度，$\left[ \text{SG}(h_{\tau}^{n-1}) \; \circ \;h_{\tau+1}^{n-1} \right]$表示将前后两个Segment的输出向量在序列维度上进行拼接。中间的公式表示获取Self-Attention计算中相应的$q,k,v$矩阵，其中在计算$q$的时候仅仅使用了当前Segment的向量，在计算$k$和$v$的时候同时使用前一个Segment和当前Segment的信息。最后通过Self-Attention融合计算，得出当前Segment的输出向量序列。
+其中，$\\text{SG}(h\_{\\tau}^{n-1}) $表示不使用梯度，$\\left\[ \\text{SG}(h\_{\\tau}^{n-1}) ; \\circ ;h\_{\\tau+1}^{n-1} \\right\]$表示将前后两个Segment的输出向量在序列维度上进行拼接。中间的公式表示获取Self-Attention计算中相应的$q,k,v$矩阵，其中在计算$q$的时候仅仅使用了当前Segment的向量，在计算$k$和$v$的时候同时使用前一个Segment和当前Segment的信息。最后通过Self-Attention融合计算，得出当前Segment的输出向量序列。
 
 ### 2.2 相对位置编码
 
 **Segment-Level recurrence mechanism**看起来已经做到了长序列建模，但是这里有个问题需要进一步讨论一下。我们知道，在**Vanilla Transformer**使用了绝对位置编码，我们来看看如果将绝对位置编码应用到Segment-Level recurrence mechanism中会怎样。
 
-还是假设前后的两个Segment分别为：$\text{s}_{\tau}=[x_{\tau,1},x_{\tau,2},...,x_{\tau,L}]$和$\text{s}_{\tau+1}=[x_{\tau+1,1},x_{\tau+1,2},...,x_{\tau+1,L}]$，其中序列长度为$L$。每个Segment的Position Embedding矩阵为$U_{1:L} \in \mathbb{R}^{L \times d}$,  每个Segment $\text{s}_{\tau}$的词向量矩阵为$E_{\text{s}_{\tau}} \in \mathbb{R}^{L \times d}$，在**Vanilla Transformer**中，两者相加输入模型参与计算，如下式所示：
+还是假设前后的两个Segment分别为：$\\text{s}_{\\tau}=\[x_{\\tau,1},x\_{\\tau,2},...,x\_{\\tau,L}\]$和$\\text{s}_{\\tau+1}=\[x_{\\tau+1,1},x\_{\\tau+1,2},...,x\_{\\tau+1,L}\]$，其中序列长度为$L$。每个Segment的Position Embedding矩阵为$U\_{1:L} \\in \\mathbb{R}^{L \\times d}$,  每个Segment $\\text{s}_{\\tau}$的词向量矩阵为$E_{\\text{s}\_{\\tau}} \\in \\mathbb{R}^{L \\times d}$，在**Vanilla Transformer**中，两者相加输入模型参与计算，如下式所示：
 
 $$
-h_{\tau+1} = f(h_{\tau},\; E_{\text{s}_{\tau+1}}+U_{1:L}) \\
-h_{\tau} = f(h_{\tau-1},\; E_{\text{s}_{\tau}}+U_{1:L})
+h\_{\\tau+1} = f(h\_{\\tau},; E\_{\\text{s}_{\\tau+1}}+U_{1:L}) \\
+h\_{\\tau} = f(h\_{\\tau-1},; E\_{\\text{s}_{\\tau}}+U_{1:L})
 $$
 
-很明显，如果按照这个方式计算，前后两个段$E_{\text{s}_{\tau}}$和$E_{\text{s}_{\tau+1}}$将具有相同的位置编码，这样两者信息融合的时候肯定会造成位置信息混乱。为了避免这份尴尬的操作，**Transformer-XL**使用了**相对位置编码**。
+很明显，如果按照这个方式计算，前后两个段$E\_{\\text{s}_{\\tau}}$和$E_{\\text{s}\_{\\tau+1}}$将具有相同的位置编码，这样两者信息融合的时候肯定会造成位置信息混乱。为了避免这份尴尬的操作，**Transformer-XL**使用了**相对位置编码**。
 
-**相对位置**是通过计算两个token之间的距离定义的，例如第5个token相对第2个token之间的距离是3， 那么位置$i$相对位置$j$的距离是$i-j$，假设序列之中的最大相对距离$L_{max}$，则我们可以定义这样的一个相对位置矩阵$R \in \mathbb{R}^{L_{max} \times d}$，其中$R_k$表示两个token之间距离是$k$的相对位置编码向量。注意在**Transformer-XL**中，相对位置编码向量不是可训练的参数，以$R_k = [r_{k,1}, r_{k,2},...,r_{k,d}]$为例，每个元素通过如下形式生成：
+**相对位置**是通过计算两个token之间的距离定义的，例如第5个token相对第2个token之间的距离是3， 那么位置$i$相对位置$j$的距离是$i-j$，假设序列之中的最大相对距离$L\_{max}$，则我们可以定义这样的一个相对位置矩阵$R \\in \\mathbb{R}^{L\_{max} \\times d}$，其中$R_k$表示两个token之间距离是$k$的相对位置编码向量。注意在**Transformer-XL**中，相对位置编码向量不是可训练的参数，以$R_k = \[r\_{k,1}, r\_{k,2},...,r\_{k,d}\]$为例，每个元素通过如下形式生成：
 
 $$
-r_{b,2j} = \text{sin}(\frac{b}{10000^{2j/d}}), \quad r_{b,2j+1} = \text{cos}(\frac{b}{10000^{(2j)/d}})
+r\_{b,2j} = \\text{sin}(\\frac{b}{10000^{2j/d}}), \\quad r\_{b,2j+1} = \\text{cos}(\\frac{b}{10000^{(2j)/d}})
 $$
 
 **Transformer-XL**将相对位置编码向量融入了Self-Attention机制的计算过程中，这里可能会有些复杂，我们先来看看**Vanilla Transformer**的Self-Attention计算过程，如下：
 
 $$
-\begin{align}
-A_{i,j}^{\text{abs}} &= (W_q(E_{x_i}+U_i))^{\text{T}}(W_k(E_{x_j}+U_j))) \\
-&= \underbrace {E_{x_i}^{\text{T}} W_q^{\text{T}} W_k E_{x_j}}_{(a)} + \underbrace {E_{x_i}^{\text{T}} W_q^{\text{T}} W_k U_j}_{(b)} + \underbrace {U_{i}^{\text{T}} W_q^{\text{T}} W_k E_{x_j}}_{(c)} + \underbrace {U_{i}^{\text{T}} W_q^{\text{T}} W_k U_{j}}_{(d)}
-\end{align}
+\\begin{align}
+A\_{i,j}^{\\text{abs}} &= (W_q(E\_{x_i}+U_i))^{\\text{T}}(W_k(E\_{x_j}+U_j))) \\
+&= \\underbrace {E\_{x_i}^{\\text{T}} W_q^{\\text{T}} W_k E\_{x_j}}_{(a)} + \\underbrace {E_{x_i}^{\\text{T}} W_q^{\\text{T}} W_k U_j}_{(b)} + \\underbrace {U_{i}^{\\text{T}} W_q^{\\text{T}} W_k E\_{x_j}}_{(c)} + \\underbrace {U_{i}^{\\text{T}} W_q^{\\text{T}} W_k U\_{j}}\_{(d)}
+\\end{align}
 $$
 
-其中$E_{x_i}$表示token $x_i$的词向量，$U_i$表示其绝对位置编码，根据这个展开公式，**Transformer-XL**将相对位置编码信息融入其中，如下：
+其中$E\_{x_i}$表示token $x_i$的词向量，$U_i$表示其绝对位置编码，根据这个展开公式，**Transformer-XL**将相对位置编码信息融入其中，如下：
 
 $$
-\begin{align}
-A_{i,j}^{\text{rel}} = \underbrace {E_{x_i}^{\text{T}} W_q^{\text{T}} W_{k,E} E_{x_j}}_{(a)} + \underbrace {E_{x_i}^{\text{T}} W_q^{\text{T}} W_{k,R} R_{i-j}}_{(b)} + \underbrace {u^{\text{T}} W_{k,E} E_{x_j}}_{(c)} + \underbrace {v^{\text{T}} W_{k,R} R_{i-j}}_{(d)}
-\end{align}
+\\begin{align}
+A\_{i,j}^{\\text{rel}} = \\underbrace {E\_{x_i}^{\\text{T}} W_q^{\\text{T}} W\_{k,E} E\_{x_j}}_{(a)} + \\underbrace {E_{x_i}^{\\text{T}} W_q^{\\text{T}} W\_{k,R} R\_{i-j}}_{(b)} + \\underbrace {u^{\\text{T}} W_{k,E} E\_{x_j}}_{(c)} + \\underbrace {v^{\\text{T}} W_{k,R} R\_{i-j}}\_{(d)}
+\\end{align}
 $$
-
 
 这里做了这样几处改变以融入相对位置编码：
 
-1. 在分项$(b)$和$(d)$中，使用相对位置编码$R_{i-j}$取代绝对位置编码$U_j$。
-2. 在分项$(c)$和$(d)$中，使用可训练参数$u$和$v$取代$U_{i}^{\text{T}} W_q^{\text{T}}$。因为$U_{i}^{\text{T}} W_q^{\text{T}}$表示第$i$个位置的query 向量，这个query向量对于其他要进行Attention的位置来说都是一样的，因此可以直接使用统一的可训练参数进行替换。
-3. 在所有分项中，使用$W_{k,E}$和$W_{k,R}$计算基于内容(词向量)的key向量和基于位置的key向量。
+1. 在分项$(b)$和$(d)$中，使用相对位置编码$R\_{i-j}$取代绝对位置编码$U_j$。
+2. 在分项$(c)$和$(d)$中，使用可训练参数$u$和$v$取代$U\_{i}^{\\text{T}} W_q^{\\text{T}}$。因为$U\_{i}^{\\text{T}} W_q^{\\text{T}}$表示第$i$个位置的query 向量，这个query向量对于其他要进行Attention的位置来说都是一样的，因此可以直接使用统一的可训练参数进行替换。
+3. 在所有分项中，使用$W\_{k,E}$和$W\_{k,R}$计算基于内容(词向量)的key向量和基于位置的key向量。
 
 式子中的每个分项分别代表的含义如下：
 
@@ -100,14 +100,14 @@ $$
 上边描述了**Transformer-XL**中的两个核心技术：**Segment-Level 循环机制**和**相对位置编码**，引入了这两项技术之后，**Transformer-XL**中从第$n-1$层到第$n$层完整的计算过程是这样的：
 
 $$
-\begin{align}
- \tilde{h}_{\tau}^{n-1} &= \left[ \text{SG}(h_{\tau-1}^{n-1}) \; \circ \;h_{\tau}^{n-1} \right] \\
- q_{\tau}^{n}, \; k_{\tau}^n, \; v_{\tau}^n &= h_{\tau}^{n-1}{W_{q}^n}^{\mathrm{ T }}, \; \tilde{h}_{\tau}^{n-1}{W_{k,E}^n}^{\mathrm{ T }}, \; \tilde{h}_{\tau}^{n-1}{W_{v}^n}^{\mathrm{ T }} \\
- A_{\tau,i,j}^{n} &= {q_{\tau, i}^{n}}^{\text{T}}k_{\tau,j}^{n} + {q_{\tau, i}^{n}}^{\text{T}}W_{k,R}^{n}R_{i-j} + u^{\text{T}}k_{\tau,j} + v^{\text{T}}W_{k,R}^{n}R_{i-j}  \\
-{\alpha}_{\tau}^n &= \text{Masked-Softmax}(A_{\tau}^n)v_{\tau}^n \\
-{\omicron}_{\tau}^n & = \text{LayerNorm}(\text{Linear}({\alpha}_{\tau}^n)+h_{\tau}^{n-1}) \\
-h_{\tau}^n &= \text{Positionwise-Feed-Forward}({\omicron}_{\tau}^n)
-\end{align}
+\\begin{align}
+\\tilde{h}_{\\tau}^{n-1} &= \\left\[ \\text{SG}(h_{\\tau-1}^{n-1}) ; \\circ ;h\_{\\tau}^{n-1} \\right\] \\
+q\_{\\tau}^{n}, ; k\_{\\tau}^n, ; v\_{\\tau}^n &= h\_{\\tau}^{n-1}{W\_{q}^n}^{\\mathrm{ T }}, ; \\tilde{h}_{\\tau}^{n-1}{W_{k,E}^n}^{\\mathrm{ T }}, ; \\tilde{h}_{\\tau}^{n-1}{W_{v}^n}^{\\mathrm{ T }} \\
+A\_{\\tau,i,j}^{n} &= {q\_{\\tau, i}^{n}}^{\\text{T}}k\_{\\tau,j}^{n} + {q\_{\\tau, i}^{n}}^{\\text{T}}W\_{k,R}^{n}R\_{i-j} + u^{\\text{T}}k\_{\\tau,j} + v^{\\text{T}}W\_{k,R}^{n}R\_{i-j}  \\
+{\\alpha}_{\\tau}^n &= \\text{Masked-Softmax}(A_{\\tau}^n)v\_{\\tau}^n \\
+{\\omicron}_{\\tau}^n & = \\text{LayerNorm}(\\text{Linear}({\\alpha}_{\\tau}^n)+h\_{\\tau}^{n-1}) \\
+h\_{\\tau}^n &= \\text{Positionwise-Feed-Forward}({\\omicron}\_{\\tau}^n)
+\\end{align}
 $$
 
 ## 3. 相关资料

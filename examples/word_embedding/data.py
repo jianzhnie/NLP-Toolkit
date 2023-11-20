@@ -13,8 +13,7 @@ from nlptoolkit.data.vocab import Vocab
 
 
 class WikiTextDataset(Dataset):
-    """
-    PyTorch Dataset for processing WikiText data.
+    """PyTorch Dataset for processing WikiText data.
 
     Args:
         data_dir (str): The directory containing the data files.
@@ -27,6 +26,7 @@ class WikiTextDataset(Dataset):
         data_lst (List[List[str]]): A list of tokenized sentences.
         vocab (Vocab): The vocabulary built from the tokenized data.
     """
+
     def __init__(
             self,
             data_dir: str,
@@ -79,8 +79,7 @@ class WikiTextDataset(Dataset):
         return ngram_data
 
     def preprocess(self, path: str) -> List[List[str]]:
-        """
-        Tokenizes a text file and returns a list of tokenized sentences.
+        """Tokenizes a text file and returns a list of tokenized sentences.
 
         Args:
             path (str): The path to the text file.

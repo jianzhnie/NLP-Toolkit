@@ -1,4 +1,5 @@
 # Longformer: The Long-Document Transformer
+
 <br>
 
 ## 1. Longformer的由来
@@ -8,8 +9,6 @@
 基于这些考虑，Longformer被提出来拓展模型在长序列建模的能力，它提出了一种时空复杂度同文本序列长度呈**线性**关系的Self-Attention，用以保证模型使用更低的时空复杂度建模长文档。
 
 这里需要注意的是Longformer是Transformer的Encoder端。
-
-
 
 ## 2. Longformer提出的Self-Attention
 
@@ -23,15 +22,15 @@ Longformer对长文档建模主要的改进是提出了新的Self-Attention模�
 
 ### 2.1 Sliding Window Attention
 
-如**图1b**所示，对于某个token，经典的Self-Attention能够看到并融合所有其他的token，但Sliding window attention设定了一个窗口$w$，它规定序列中的每个token只能看到$w$个token，其左右两侧能看到$\frac{1}{2}w$个token，因此它的时间复杂度是$O(n\times w)$。
+如**图1b**所示，对于某个token，经典的Self-Attention能够看到并融合所有其他的token，但Sliding window attention设定了一个窗口$w$，它规定序列中的每个token只能看到$w$个token，其左右两侧能看到$\\frac{1}{2}w$个token，因此它的时间复杂度是$O(n\\times w)$。
 
-你不需要担心这种设定无法建立整个序列的语义信息，因为transformer模型结构本身是层层叠加的结构，模型高层相比底层具有更宽广的感受野，自然能够能够看到更多的信息，因此它有能力去建模融合全部序列信息的全局表示，就行CNN那样。一个拥有$m$层的transformer，它在最上层的感受野尺寸为$m\times w$。
+你不需要担心这种设定无法建立整个序列的语义信息，因为transformer模型结构本身是层层叠加的结构，模型高层相比底层具有更宽广的感受野，自然能够能够看到更多的信息，因此它有能力去建模融合全部序列信息的全局表示，就行CNN那样。一个拥有$m$层的transformer，它在最上层的感受野尺寸为$m\\times w$。
 
 通过这种设定Longformer能够在建模质量和效率之间进行一个比较好的折中。
 
 ### 2.2 Dilated Sliding Window
 
-在对一个token进行Self-Attention操作时，普通的Sliding Window Attention只能考虑到长度为$w$的上下文，在不增加计算量的情况下，Longformer提出了Dilated Sliding Window，如**图1c**所示。在进行Self-Attention的两个相邻token之间会存在大小为$d$的间隙，这样序列中的每个token的感受野范围可扩展到$d\times w$。在第$m$层，感受野的范围将是$m\times d \times w$。
+在对一个token进行Self-Attention操作时，普通的Sliding Window Attention只能考虑到长度为$w$的上下文，在不增加计算量的情况下，Longformer提出了Dilated Sliding Window，如**图1c**所示。在进行Self-Attention的两个相邻token之间会存在大小为$d$的间隙，这样序列中的每个token的感受野范围可扩展到$d\\times w$。在第$m$层，感受野的范围将是$m\\times d \\times w$。
 
 作者在文中提到，在进行Multi-Head Self-Attention时，在某些Head上不设置Dilated Sliding Window以让模型聚焦在局部上下文，在某些Head上设置Dilated Sliding Window以让模型聚焦在更长的上下文序列，这样能够提高模型表现。
 
@@ -44,7 +43,7 @@ Longformer对长文档建模主要的改进是提出了新的Self-Attention模�
 那么这种融合全局信息的滑窗Attention具体如何实现呢，我们先来回顾一下经典的Self-Attention，公式如下：
 
 $$
-\text{Attention}(Q,K,V)=softmax(\frac{QK^T}{\sqrt{d_k}})
+\\text{Attention}(Q,K,V)=softmax(\\frac{QK^T}{\\sqrt{d_k}})
 $$
 
 即将原始的输入分别映射到了$Q,K,V$三个空间后进行Attention计算，Global+Sliding Window这里涉及到两种Attention，Longformer中分别将这两种Attention映射到了两个独立的空间，即使用$Q_s,K_s,V_s$来计算Sliding Window Attention，使用$Q_g,K_g,V_g$来计算Global Attention。

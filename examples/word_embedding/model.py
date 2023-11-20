@@ -11,6 +11,7 @@ from nlptoolkit.data.embeddings import PositionalEncoding
 
 class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
+
     def __init__(self,
                  rnn_type,
                  ntoken,
@@ -88,8 +89,8 @@ class RNNModel(nn.Module):
 
 
 class TransformerModel(nn.Transformer):
-    """
-    Container module with an encoder, a recurrent or transformer module, and a decoder.
+    """Container module with an encoder, a recurrent or transformer module, and
+    a decoder.
 
     Args:
         vocab_size (int): Size of the vocabulary.
@@ -99,6 +100,7 @@ class TransformerModel(nn.Transformer):
         num_layers (int): Number of transformer encoder layers.
         dropout (float, optional): Dropout probability. Default is 0.5.
     """
+
     def __init__(self,
                  vocab_size: int,
                  d_model: int,
@@ -136,8 +138,7 @@ class TransformerModel(nn.Transformer):
     def forward(self,
                 src: torch.Tensor,
                 has_mask: bool = True) -> torch.Tensor:
-        """
-        Forward pass of the transformer model.
+        """Forward pass of the transformer model.
 
         Args:
             src (torch.Tensor): Input sequence tensor of shape (sequence_length, batch_size).

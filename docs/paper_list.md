@@ -44,7 +44,7 @@
 
 代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bert](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bert)
 
-[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/bert](
+\[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/bert\](
 
 **GPT**（2018）
 
@@ -100,7 +100,7 @@ PaddleNLP代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/
 
 简介： RoBERTa 模型可以说是BERT 的改进版本，具有更大的模型参数量、更大bacth size、更多的训练数据。RoBERTa采用动态掩码，以及新的文本编码方式。RoBERTa建立在BERT的语言掩蔽策略的基础上，删除了BERT的"预测下一个句子”训练目标。
 
-代码链接：[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/roberta][https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/roberta]
+代码链接：\[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/roberta\]\[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers/roberta\]
 
 **XLM-RoBERTa**（2019）
 

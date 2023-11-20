@@ -16,6 +16,7 @@ sys.path.append('../../')
 
 
 class TransformerDataset(Dataset):
+
     def __init__(self, data):
         self.data = data
 
@@ -42,6 +43,7 @@ def collate_fn(examples):
 
 
 class PositionalEncoding(nn.Module):
+
     def __init__(self, d_model, dropout=0.1, max_len=512):
         super(PositionalEncoding, self).__init__()
 
@@ -61,6 +63,7 @@ class PositionalEncoding(nn.Module):
 
 
 class Transformer(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embedding_dim,

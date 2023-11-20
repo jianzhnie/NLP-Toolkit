@@ -51,19 +51,15 @@ Writing a dataset loading script
 
 下面是生成数据集所涉及的类和方法的一个快速概述:
 
-
-
 ![在这里插入图片描述](https://img-blog.csdnimg.cn/20210302205825405.jpg?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQyMzg4NzQy,size_16,color_FFFFFF,t_70#pic_center)
-
-
 
 左边是在库内部创建datasets.Dataset实例的一般结构。在右边，是每个特定数据集的加载脚本。要创建一个新的数据集的加载脚本，一般需要在datasets.DatasetBuilder类指定三个方法:
 
-- datasets.DatasetBuilder._info()
+- datasets.DatasetBuilder.\_info()
   - 负责将数据集的元数据指定为datasets.DatasetInfo数据类型，尤其是datasets.Features定义了数据集每一列的名字和类型
-- datasets.DatasetBuilder._split_generator()
+- datasets.DatasetBuilder.\_split_generator()
   - 负责加载或检索数据文件，通过 splits 和在需要时生成过程定义特定的参数组织文件
-- datasets.DatasetBuilder._generate_examples()
+- datasets.DatasetBuilder.\_generate_examples()
   - 负责加载 split 过的文件和生成在features格式的示例
 
 可选的，数据集加载脚本可以定义一个数据集要使用的配置，这个配置文件是datasets.DatasetBuilder从datasets.BuilderConfig继承的。这样的类允许我们自定义构建处理，例如，运行选择数据特定的子集或者加载数据集时使用特定的方法处理数据。
@@ -71,13 +67,13 @@ Writing a dataset loading script
 关于命名的注意:
 
 - 数据集类(dataset class)应该是驼峰命名法(camel case, 首字母大小)，
-- 数据集的名称使用蛇形命名法(snake case，小写加下划线 ‘_’)。例如：数据集book_corpus是 class BookCorpus(datasets.GeneratorBasedBuilder)
+- 数据集的名称使用蛇形命名法(snake case，小写加下划线 ‘\_’)。例如：数据集book_corpus是 class BookCorpus(datasets.GeneratorBasedBuilder)
 
 ## 添加数据集元数据
 
- Adding dataset metadata
+Adding dataset metadata
 
-datasets.DatasetBuilder._info() 方法负责将数据集元数据指定为datasets.DatasetInfo数据类型。尤其是datasets.Features定义了数据集每一列的名称。datasets.DatasetInfo是一组预定义的数据，无法扩展。完整的属性列表可以在包引用(package reference)中找到。
+datasets.DatasetBuilder.\_info() 方法负责将数据集元数据指定为datasets.DatasetInfo数据类型。尤其是datasets.Features定义了数据集每一列的名称。datasets.DatasetInfo是一组预定义的数据，无法扩展。完整的属性列表可以在包引用(package reference)中找到。
 
 需要指定的最重要属性:
 
@@ -90,9 +86,9 @@ datasets.DatasetBuilder._info() 方法负责将数据集元数据指定为datase
 - datasets.DatasetInfo.homepage:
   - 一个包含数据集原始主页 URL 的 str。
 
-### DatasetBuilder._info()
+### DatasetBuilder.\_info()
 
-例如，这里的datasets.DatasetBuilder._info()是SQuAD数据集的示例，来着 squad数据集加载脚本
+例如，这里的datasets.DatasetBuilder.\_info()是SQuAD数据集的示例，来着 squad数据集加载脚本
 
 ```python
 def _info(self):
@@ -178,23 +174,21 @@ features=datasets.Features(
 )
 ```
 
-
-
 ## 下载数据文件并组织拆分
 
- Downloading data files and organizing splits
+Downloading data files and organizing splits
 
-datasets.DatasetBuilder._split_generator()方法负责下载(或者检索本地数据文件)，根据分片(splits)进行组织，并在需要时生成过程中定义特定的参数
+datasets.DatasetBuilder.\_split_generator()方法负责下载(或者检索本地数据文件)，根据分片(splits)进行组织，并在需要时生成过程中定义特定的参数
 
-此方法以datasets.DownloadManager作为输入,这是一个实用程序，可用于下载文件（如果它们是本地文件或已经在缓存中，则可以从本地文件系统中检索它们）并返回一个datasets.SplitGenerator列表。datasets.SplitGenerator是一个简单的数据类型，包含split和关键字参数的名称DatasetBuilder._generate_examples() 方法将在下一部分中详细介绍。
+此方法以datasets.DownloadManager作为输入,这是一个实用程序，可用于下载文件（如果它们是本地文件或已经在缓存中，则可以从本地文件系统中检索它们）并返回一个datasets.SplitGenerator列表。datasets.SplitGenerator是一个简单的数据类型，包含split和关键字参数的名称DatasetBuilder.\_generate_examples() 方法将在下一部分中详细介绍。
 
 这些参数可以特定于每个split，并且，通常至少包括要为每个拆分加载的数据文件的本地路径
 
 - Using local data files:
 
-  如果你的数据不是在线数据，而是本地数据文件，那么datasets.BuilderConfig特别提供了两个参数。这两个参数是data_dir和data_files可以自由地用于提供目录路径或文件路径。这两个属性可以在调用datasets.load_dataset()时使用相关关键字参数，例如:dataset = datasets.load_dataset('my_script', data_files='my_local_data_file.csv'),并且，这个值通过访问self.config.data_dir和self.config.data_files在datasets.DatasetBuilder._split_generator()
+  如果你的数据不是在线数据，而是本地数据文件，那么datasets.BuilderConfig特别提供了两个参数。这两个参数是data_dir和data_files可以自由地用于提供目录路径或文件路径。这两个属性可以在调用datasets.load_dataset()时使用相关关键字参数，例如:dataset = datasets.load_dataset('my_script', data_files='my_local_data_file.csv'),并且，这个值通过访问self.config.data_dir和self.config.data_files在datasets.DatasetBuilder.\_split_generator()
 
-让我们来看datasets.DatasetBuilder._split_generator()方法的一个简单的示例。我们来看一个squad数据集加载脚本的例子:
+让我们来看datasets.DatasetBuilder.\_split_generator()方法的一个简单的示例。我们来看一个squad数据集加载脚本的例子:
 
 ```python
 class Squad(datasets.GeneratorBasedBuilder):
@@ -225,29 +219,32 @@ class Squad(datasets.GeneratorBasedBuilder):
 > - datasets.DownloadManager.download(),
 >
 > - datasets.DownloadManager.extract() 和
+>
 > - datasets.DownloadManager.iter_archive()
 
-请参考数据集上的包参考 datasets.DownloadManager 了解这些方法的详细信息。数据文件下载后, datasets.DatasetBuilder._split_generator（） 方法的下一个任务是对每个 datasets.DatasetBuilder._generate_examples() 方法调用的结果来准备使用 datasets.SplitGenerator。我们将在下一个会话中详细介绍。
+请参考数据集上的包参考 datasets.DownloadManager 了解这些方法的详细信息。数据文件下载后, datasets.DatasetBuilder.\_split_generator（） 方法的下一个任务是对每个 datasets.DatasetBuilder.\_generate_examples() 方法调用的结果来准备使用 datasets.SplitGenerator。我们将在下一个会话中详细介绍。
 
 datasets.SplitGenerator是一个简单的数据类型，包括:
 
 - name(string):
+
   - 关于分割(split)的名称（如果可能），可以使用数据集中提供的标准分割名称。Split可以使用：datasets.Split.TRAIN，datasets.Split.VALIDATION和datasets.Split.TEST，
 
 - gen_kwargs(dict):
-  - 关键字参数(keywords arguments)提供给datasets.DatasetBuilder._generate_examples()方法生成分割中的示例。
+
+  - 关键字参数(keywords arguments)提供给datasets.DatasetBuilder.\_generate_examples()方法生成分割中的示例。
   - 这些参数可以特定于每个分割，通常至少包含要为每个拆分加载的数据文件的本地路径，如上面的SQuAD示例所示。
 
 ## 在每个分割中生成样本
 
 Generating the samples in each split
 
-datasets.DatasetBuilder._generate_examples()是负责读取数据文件以进行分割，并产生示例，这些示例是在datasets.DatasetBuilder._info()设置的特定的feature格式。
+datasets.DatasetBuilder.\_generate_examples()是负责读取数据文件以进行分割，并产生示例，这些示例是在datasets.DatasetBuilder.\_info()设置的特定的feature格式。
 
-datasets.DatasetBuilder._generate_examples()的输入参数是由gen_kwargs字典定义的由之前详细介绍的datasets.DatasetBuilder._split_generator()方法。
+datasets.DatasetBuilder.\_generate_examples()的输入参数是由gen_kwargs字典定义的由之前详细介绍的datasets.DatasetBuilder.\_split_generator()方法。
 
-再一次，让我们以squad数据集加载脚本的简单示例为例：
-------------------------------------------------
+## 再一次，让我们以squad数据集加载脚本的简单示例为例：
+
 ```python
 def _generate_examples(self, filepath):
     """This function returns the examples in the raw (text) form."""
@@ -276,9 +273,9 @@ def _generate_examples(self, filepath):
                     }
 ```
 
-输入的参数是datasets.DatasetBuilder._split_generator()方法返回的每个dataset.SplitGenerator的gen_kwargs中提供的文件路径。
+输入的参数是datasets.DatasetBuilder.\_split_generator()方法返回的每个dataset.SplitGenerator的gen_kwargs中提供的文件路径。
 
-该方法读取并解析输入文件，并生成一个由id_(可以是任意的，但应该是唯一的(为了向后兼容TensorFlow数据集)和一个示例组成的元组。该示例是一个具有与datasets.DatasetBuilder._info()中定义的特性相同的结构和元素类型的字典。
+该方法读取并解析输入文件，并生成一个由id\_(可以是任意的，但应该是唯一的(为了向后兼容TensorFlow数据集)和一个示例组成的元组。该示例是一个具有与datasets.DatasetBuilder.\_info()中定义的特性相同的结构和元素类型的字典。
 
 注意:由于生成数据集是基于python生成器的，因此它不会将所有数据加载到内存中，因此它可以处理相当大的数据集。但是，在刷新到磁盘上的数据集文件之前，生成的示例存储在ArrowWriter缓冲区中，以便分批写入它们。如果您的数据集的样本占用了大量内存(带有图像或视频)，那么请确保为数据集生成器类的_writer_batch_size类属性指定一个低值。我们建议不要超过200MB。
 
@@ -292,11 +289,13 @@ Specifying several dataset configurations
 基本dataset.BuilderConfig类非常简单，只包含以下属性:
 
 - name(str)是数据集配置的名字。例如，如果不同的配置特定于不同的语言，则使用语言名来配置,
+
 - version可选的版本标识符,
 
 - data_dir(str)用于存储包含数据文件的本地文件夹的路径,
 
-- data_files(Union[Dict, List])可用于存储本地数据文件的路径,
+- data_files(Union\[Dict, List\])可用于存储本地数据文件的路径,
+
 - description(str) 可以用来对配置进行长篇描述.
 
 datasets.BuilderConfig仅作为一个信息容器使用，这些信息可以通过在datasets.DatasetBuilder实例的self.Config属性中访问来在– datasets.DatasetBuilder中构建数据集。
@@ -340,6 +339,7 @@ def self._generate_examples(file):
         for i, row in enumerate(data):
             yield i, row
 ```
+
 这里我们可以看到如何使用self.config.delimiter属性来控制读取CSV文件。
 
 数据集加载脚本的用户将能够选择一种或另一种方式来加载带有配置名称的CSV文件，甚至可以通过直接设置分隔符属性来选择完全不同的方式。例如使用这样的命令:
@@ -355,8 +355,8 @@ dataset = load_dataset('my_csv_loading_script', name='comma', delimiter='\t', da
 
 虽然在这种情况下使用配置属性来控制数据文件的读取/解析，但配置属性可以在处理的任何阶段使用，特别是:
 
-要控制在datasets.DatasetBuilder._info()方法中设置的datasets.DatasetInfo属性，例如特性，
-要控制在datasets.DatasetBuilder._split_generator()方法中下载的文件，例如根据配置定义的语言属性选择不同的url
+要控制在datasets.DatasetBuilder.\_info()方法中设置的datasets.DatasetInfo属性，例如特性，
+要控制在datasets.DatasetBuilder.\_split_generator()方法中下载的文件，例如根据配置定义的语言属性选择不同的url
 
 在[Super-GLUE加载脚本](https://github.com/huggingface/datasets/blob/master/datasets/super_glue/super_glue.py)中可以找到一个带有一些预定义配置的自定义配置类的例子，该脚本通过配置提供了对SuperGLUE基准测试的各种子数据集的控制。另一个例子是[Wikipedia加载脚本](https://github.com/huggingface/datasets/blob/master/datasets/wikipedia/wikipedia.py)，它通过配置提供对Wikipedia数据集语言的控制。
 
@@ -488,6 +488,7 @@ class Imdb(datasets.GeneratorBasedBuilder):
                         yield path, {"text": f.read().decode("utf-8"), "label": -1}
 
 ```
+
 ## 结果演示
 
 然后我们来演示这个读的效果

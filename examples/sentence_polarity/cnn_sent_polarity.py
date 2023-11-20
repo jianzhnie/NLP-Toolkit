@@ -21,6 +21,7 @@ sys.path.append('../../')
 
 
 class CnnDataset(Dataset):
+
     def __init__(self, data):
         self.data = data
 
@@ -40,6 +41,7 @@ def collate_fn(examples):
 
 
 class CNN(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim, filter_size, num_filter,
                  num_class):
         super(CNN, self).__init__()

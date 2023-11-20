@@ -20,6 +20,7 @@ sys.path.append('../../')
 
 
 class BowDataset(Dataset):
+
     def __init__(self, data):
         self.data = data
 
@@ -40,6 +41,7 @@ def collate_fn(examples):
 
 
 class MLP(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim, hidden_dim, num_class):
         super(MLP, self).__init__()
         self.embedding = nn.EmbeddingBag(vocab_size, embedding_dim)

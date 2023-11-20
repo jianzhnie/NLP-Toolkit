@@ -14,8 +14,7 @@ from nlptoolkit.data.vocab import Vocab
 
 
 class BoWClassifier(nn.Module):
-    """
-    Bag of Words 文本分类器
+    """Bag of Words 文本分类器.
 
     This class implements the Bag of Words Classification Network model to classify texts.
     At a high level, the model starts by embedding the tokens and running them through
@@ -35,8 +34,8 @@ class BoWClassifier(nn.Module):
     - num_classes: 分类数
     - hidden_size: 第一个全连接层隐藏层大小
     - dropout: dropout概率
-
     """
+
     def __init__(self,
                  vocab_size: int,
                  embed_size: int,
@@ -55,15 +54,13 @@ class BoWClassifier(nn.Module):
         self.fc2 = nn.Linear(hidden_size, num_classes)
 
     def forward(self, text: torch.Tensor):
-        """
-        前向传播过程
+        """前向传播过程.
 
         参数:
         - text: 输入文本,形状为 [batch_size, seq_len]
 
         返回:
         - output: 分类logits,形状为 [batch_size, num_classes]
-
         """
         # 获取词嵌入表示
         # [batch_size, seq_len, embed_size]
@@ -81,8 +78,7 @@ class BoWClassifier(nn.Module):
 
 
 class TorchDataset(Dataset):
-    """
-    PyTorch dataset for text classification or regression tasks.
+    """PyTorch dataset for text classification or regression tasks.
 
     Attributes:
         dataset: List of examples, each being a dict with keys 'text' and 'label'.
@@ -90,11 +86,11 @@ class TorchDataset(Dataset):
         vocab: Vocabulary for mapping tokens to indices.
         max_seq_len: Maximum sequence length after truncation.
     """
+
     def __init__(self, dataset: List[Dict], tokenizer: JiebaTokenizer,
                  vocab: Vocab, max_seq_len: int):
-        """
-        Initialize dataset with data, tokenizer, vocab and max sequence length.
-        """
+        """Initialize dataset with data, tokenizer, vocab and max sequence
+        length."""
         self.dataset = dataset
         self.tokenizer = tokenizer
         self.vocab = vocab
@@ -105,8 +101,7 @@ class TorchDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> Dict:
-        """
-        Return single example by index.
+        """Return single example by index.
 
         Args:
             index: Index of example.
@@ -140,9 +135,7 @@ class TorchDataset(Dataset):
                       inputs: List[int],
                       max_seq_len: int,
                       padding_token_id: int = 0) -> List[int]:
-        """
-        Truncate and pad sequence to max sequence length.
-        """
+        """Truncate and pad sequence to max sequence length."""
         if len(inputs) > max_seq_len:
             inputs = inputs[:max_seq_len]
         else:

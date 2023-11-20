@@ -18,6 +18,7 @@ from nlptoolkit.llms.bert.tasking_bert import BertForPreTraining
 
 
 class MMBertForClassify(BaseModel):
+
     def __init__(self, model: BertForPreTraining):
         super().__init__()
         self.model = model
@@ -68,6 +69,7 @@ class MMBertForClassify(BaseModel):
 
 
 class Accuracy(BaseMetric):
+
     def process(self, data_batch, data_samples):
         (
             loss,
@@ -99,6 +101,10 @@ class Accuracy(BaseMetric):
             for key, val in results[0].items()
             if key not in ['batch_size', 'correct']
         }
+        outputs = {
+            key: sum(item[key] for item in results) / len(results)
+            for key in outputs
+        }
         outputs['accuracy'] = accuracy
         return outputs
 
@@ -123,7 +129,7 @@ def main() -> None:
     model = BertForPreTraining(config)
     data_dir = '/home/robin/work_dir/llm/nlp-toolkit/text_data/wikitext-2/'
     train_set = BertDataset(data_dir=data_dir,
-                            data_split='train',
+                            data_split='valid',
                             max_seq_len=128)
     valid_set = BertDataset(data_dir=data_dir,
                             data_split='valid',
@@ -152,6 +158,15 @@ def main() -> None:
         train_cfg=dict(by_epoch=True, max_epochs=10, val_interval=1),
         val_cfg=dict(),
         val_evaluator=dict(type=Accuracy),
+        visualizer=dict(
+            type='Visualizer',
+            vis_backends=[
+                dict(
+                    type='WandbVisBackend',
+                    init_kwargs=dict(project='bert-pretrain'),
+                )
+            ],
+        ),
         work_dir='bert_work_dir',
         launcher=args.launcher,
     )

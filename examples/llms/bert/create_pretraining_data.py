@@ -18,8 +18,7 @@ from nlptoolkit.llms.bert.bert_tokenizer import convert_to_unicode
 
 # Define a named tuple called MaskedLmInstance
 class MaskedLmInstance(NamedTuple):
-    """
-    Represents a masked language model instance with index and label.
+    """Represents a masked language model instance with index and label.
 
     Attributes:
         index (int): Index of the masked token.
@@ -30,8 +29,8 @@ class MaskedLmInstance(NamedTuple):
 
 
 class TrainingInstance:
-    """
-    A single training instance (sentence pair) for masked language model training.
+    """A single training instance (sentence pair) for masked language model
+    training.
 
     Attributes:
         tokens (List[str]): List of tokens representing the input sentence pair.
@@ -40,6 +39,7 @@ class TrainingInstance:
         masked_lm_labels (List[str]): List of masked tokens corresponding to masked positions.
         is_random_next (bool): Indicates if the next sentence is randomly chosen.
     """
+
     def __init__(
         self,
         tokens: List[str],
@@ -48,8 +48,7 @@ class TrainingInstance:
         masked_lm_positions: List[int],
         masked_lm_labels: List[str],
     ):
-        """
-        Initializes a TrainingInstance object.
+        """Initializes a TrainingInstance object.
 
         Args:
             tokens (List[str]): List of tokens representing the input sentence pair.
@@ -65,8 +64,7 @@ class TrainingInstance:
         self.masked_lm_labels = masked_lm_labels
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the TrainingInstance object.
+        """Returns a string representation of the TrainingInstance object.
 
         Returns:
             str: String representation of the TrainingInstance.
@@ -86,8 +84,7 @@ class TrainingInstance:
         return outputs
 
     def __repr__(self) -> str:
-        """
-        Returns a string representation of the TrainingInstance object.
+        """Returns a string representation of the TrainingInstance object.
 
         Returns:
             str: String representation of the TrainingInstance.
@@ -102,8 +99,8 @@ def write_instance_to_example_file(
     max_predictions_per_seq: int,
     output_file: str,
 ) -> None:
-    """
-    Create TF example files from `TrainingInstance`s and save them in HDF5 format.
+    """Create TF example files from `TrainingInstance`s and save them in HDF5
+    format.
 
     Args:
         instances (List[TrainingInstance]): List of TrainingInstance objects.
@@ -209,8 +206,7 @@ def create_training_instances(
     max_predictions_per_seq: int,
     random_generator: random.Random,
 ) -> List[TrainingInstance]:
-    """
-    Create `TrainingInstance`s from raw text.
+    """Create `TrainingInstance`s from raw text.
 
     Args:
         input_files (List[str]): List of input file paths containing raw text data.
@@ -285,8 +281,7 @@ def create_instances_from_document(
     vocab_words: List[str],
     random_generator: random.Random,
 ) -> List[TrainingInstance]:
-    """
-    Creates `TrainingInstance`s for a single document.
+    """Creates `TrainingInstance`s for a single document.
 
     Args:
         all_documents (List[List[List[str]]]): List of documents where each document is a list of segments (lists of tokens).
@@ -428,8 +423,7 @@ def create_masked_lm_predictions(
     vocab_words: List[str],
     random_generator: random.Random,
 ) -> Tuple[List[str], List[int], List[str]]:
-    """
-    Creates predictions for the masked LM objective.
+    """Creates predictions for the masked LM objective.
 
     Args:
         tokens (List[str]): List of input tokens.
@@ -495,8 +489,7 @@ def truncate_seq_pair(
     max_num_tokens: int,
     random_generator: random.Random,
 ) -> None:
-    """
-    Truncates a pair of sequences to a maximum sequence length.
+    """Truncates a pair of sequences to a maximum sequence length.
 
     Args:
         tokens_a (List[str]): List of tokens from the first sequence.

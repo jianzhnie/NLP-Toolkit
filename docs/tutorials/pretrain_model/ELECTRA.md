@@ -1,7 +1,8 @@
 # ELECTRA
+
 ## 1.介绍
 
-掩码语言模型(masked langauge model, MLM)，类似BERT通过预训练方法使用[MASK]来替换文本中一些字符，破坏了文本的原始输入，然后训练模型来重建原始文本。尽管它们在下游NLP任务中产生了良好的结果，但是它们通常需要大量计算才有效。作为替代方案，作者提出了一种更有效的预训练任务，称为Replaced Token Detection(RTD)，字符替换探测。RTD方法不是掩盖输入，而是通过使用生成网络来生成一些合理替换字符来达到破坏输入的目的。然后，我们训练一个判别器模型，该模型可以预测当前字符是否被语言模型替换过。实验结果表明，这种新的预训练任务比MLM更有效，因为该任务是定义在所有文本输入上，而不是仅仅被掩盖的一小部分，在模型大小，数据和计算力相同的情况下，RTD方法所学习的上下文表示远远优于BERT所学习的上下文表示。
+掩码语言模型(masked langauge model, MLM)，类似BERT通过预训练方法使用\[MASK\]来替换文本中一些字符，破坏了文本的原始输入，然后训练模型来重建原始文本。尽管它们在下游NLP任务中产生了良好的结果，但是它们通常需要大量计算才有效。作为替代方案，作者提出了一种更有效的预训练任务，称为Replaced Token Detection(RTD)，字符替换探测。RTD方法不是掩盖输入，而是通过使用生成网络来生成一些合理替换字符来达到破坏输入的目的。然后，我们训练一个判别器模型，该模型可以预测当前字符是否被语言模型替换过。实验结果表明，这种新的预训练任务比MLM更有效，因为该任务是定义在所有文本输入上，而不是仅仅被掩盖的一小部分，在模型大小，数据和计算力相同的情况下，RTD方法所学习的上下文表示远远优于BERT所学习的上下文表示。
 
 ![](../../images/pretrain_model/electra/electra_glue.png)
 
@@ -15,13 +16,11 @@ ELECTRA最大的贡献是提出了新的预训练任务和框架，在上述简�
 
 ![](../../images/pretrain_model/electra/electra.png)
 
-
 ### 2.1 Replaced Token Detection
 
 但上述结构有个问题，输入句子经过生成器，输出改写过的句子，因为句子的字词是离散的，所以梯度无法反向传播，判别器的梯度无法传给生成器，于是生成器的目标还是MLM，判别器的目标是序列标注（判断每个字符是真是假），两者同时训练，但是判别器的梯度不会传给生成器，目标函数如下：
 
-$$min_{\theta_{G},\theta_{D}} \sum_{x \in X} L_{MLM}(x,\theta_{G})+\lambda L_{Disc}(x,\theta_{D})$$
-
+$$min\_{\\theta\_{G},\\theta\_{D}} \\sum\_{x \\in X} L\_{MLM}(x,\\theta\_{G})+\\lambda L\_{Disc}(x,\\theta\_{D})$$
 
 因为判别器的任务相对来说简单些，RTD损失相对MLM损失会很小，因此加上一个系数，论文中使用了50。经过预训练，在下游任务的使用中，作者直接给出生成器，在判别器进行微调。
 
@@ -29,12 +28,12 @@ $$min_{\theta_{G},\theta_{D}} \sum_{x \in X} L_{MLM}(x,\theta_{G})+\lambda L_{Di
 
 事实上，ELECTRA使用的生成-判别架构与GAN还是有不少差别，作者列出了如下几点：
 
-||ELECTRA|GAN|
-|----|----|----|
-|输入|真实文本|随机噪声|
-|目标|生成器学习语言模型，判别器学习区分真假文本|生成器尽可能欺骗判别器，判别器尽量区分真假图片|
-|反向传播|梯度无法从D传到G|梯度可以从D传到G|
-|特殊情况|生成出了真实文本，则标记为正例|生成的都是负例（假图片）|
+|          | ELECTRA                                    | GAN                                            |
+| -------- | ------------------------------------------ | ---------------------------------------------- |
+| 输入     | 真实文本                                   | 随机噪声                                       |
+| 目标     | 生成器学习语言模型，判别器学习区分真假文本 | 生成器尽可能欺骗判别器，判别器尽量区分真假图片 |
+| 反向传播 | 梯度无法从D传到G                           | 梯度可以从D传到G                               |
+| 特殊情况 | 生成出了真实文本，则标记为正例             | 生成的都是负例（假图片）                       |
 
 ### 2.2 权重共享
 
@@ -79,20 +78,19 @@ $$min_{\theta_{G},\theta_{D}} \sum_{x \in X} L_{MLM}(x,\theta_{G})+\lambda L_{Di
 BERT的loss只计算被替换的15%个token，而ELECTRA是全部都计算，所以作者又做了几个对比实验，探究哪种方式更好一些：
 
 1. ELECTRA 15%：让判别器只计算15% token上的损失；
-2. Replace MLM：训练BERT MLM，输入不用[MASK]进行替换，而是其他生成器。这样可以消除pretrain-finetune之间的差别；
+2. Replace MLM：训练BERT MLM，输入不用\[MASK\]进行替换，而是其他生成器。这样可以消除pretrain-finetune之间的差别；
 3. All-Tokens MLM :接着用Replace MLM，只不过BERT的目标函数变为预测所有的token，比较接近ELECTRA。
 
+| Model      | ELECTRA | All-Tokens MLM | Replace MLM | ELECTRA 15% | BERT |
+| ---------- | ------- | -------------- | ----------- | ----------- | ---- |
+| GLUE score | 85.0    | 84.3           | 82.4        | 82.4        | 82.2 |
 
-|Model|ELECTRA|All-Tokens MLM|Replace MLM|ELECTRA 15%|BERT|
-|----|----|----|----|----|----|
-|GLUE score|85.0|84.3|82.4|82.4|82.2|
-
-对比ELECTRA和ECLECTRA15%：在所有token上计算loss确实能提升效果;对比Replace MLM 和BERT：[MASK]标志确实会对BERT产生影响，而且BERT目前还有一个trick，就是被替换的10%情况下使用原token或其他token，如果没有这个trick估计效果会差一些;对比All-Tokens MLM和BERT：如果BERT预测所有token的话，效果会接近ELECTRA。
-
+对比ELECTRA和ECLECTRA15%：在所有token上计算loss确实能提升效果;对比Replace MLM 和BERT：\[MASK\]标志确实会对BERT产生影响，而且BERT目前还有一个trick，就是被替换的10%情况下使用原token或其他token，如果没有这个trick估计效果会差一些;对比All-Tokens MLM和BERT：如果BERT预测所有token的话，效果会接近ELECTRA。
 
 作者还发现，ELECTRA体积越小，相比于BERT就提升的越明显，说明fully trained的ELECTRA效果会更好。另外作者推断，由于ELECTRA是判别式任务，不用对整个数据分布建模，所以更parameter-efficient。
 
 ## 6. 总结
+
 BERT虽然对上下文有很强的编码能力，却缺乏细粒度语义的表示。下图可以明显体现出上述问题：
 
 ![](../../images/pretrain_model/electra/bert_cons.png)

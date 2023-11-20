@@ -15,6 +15,7 @@ sys.path.append('../../')
 
 
 class TransformerDataset(Dataset):
+
     def __init__(self, data):
         self.data = data
 
@@ -35,6 +36,7 @@ def collate_fn(examples):
 
 
 class Transformer(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embedding_dim,

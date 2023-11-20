@@ -32,6 +32,7 @@ def create_mask(src, tgt):
 
 # helper function to club together sequential operations
 def sequential_transforms(*transforms):
+
     def func(txt_input):
         for transform in transforms:
             txt_input = transform(txt_input)

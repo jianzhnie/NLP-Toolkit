@@ -6,6 +6,7 @@
  * @Description:
  *
 -->
+
 # ELMO
 
 ELMo是一个深度带上下文的词表征模型，能同时建模（1）单词使用的复杂特征（例如，语法和语义）；（2）这些特征在上下文中会有何变化（如歧义等）。这些词向量从深度双向语言模型（biLM）的隐层状态中衍生出来，biLM是在大规模的语料上面Pretrain的。它们可以灵活轻松地加入到现有的模型中，并且能在很多NLP任务中显著提升现有的表现，比如问答、文本蕴含和情感分析等。听起来非常的exciting，它的原理也十分reasonable！下面就将针对论文及其PyTorch源码进行剖析，具体的资料参见文末的传送门。
@@ -13,9 +14,11 @@ ELMo是一个深度带上下文的词表征模型，能同时建模（1）单词
 ELMO 这个名称既可以代表得到词向量的模型，也可以是得出的词向量本身，就像Word2Vec、GloVe这些名称一样，都是可以代表两个含义的。
 
 ## 1. ELMo原理
+
 之前我们一般比较常用的词嵌入的方法是诸如Word2Vec和GloVe这种，但这些词嵌入的训练方式一般都是上下文无关的，并且对于同一个词，不管它处于什么样的语境，它的词向量都是一样的，这样对于那些有歧义的词非常不友好。因此，论文就考虑到了要根据输入的句子作为上下文，来具体计算每个词的表征，提出了ELMo（Embeddings from Language Model）。它的基本思想，用大白话来说就是，还是用训练语言模型的套路，然后把语言模型中间隐含层的输出提取出来，作为这个词在当前上下文情境下的表征，简单但很有用！
 
 ## 2. ELMo整体模型结构
+
 对于ELMo的模型结构，其实论文中并没有给出具体的图（这点对于笔者这种想象力极差的人来说很痛苦），笔者通过整合论文里面的蛛丝马迹以及PyTorch的源码，得出它大概是下面这么个东西.
 
 <img src="./imgs/elmo.png" alt="PLMfamily" style="zoom:200%;" />
@@ -75,7 +78,8 @@ BiLM(
 
 这里只是对ELMo模型从全局上进行的一个统观，对每个模块里面的结构还是很懵逼？没关系，下面我们逐一来进行剖析：
 
-##  3 字符编码层
+## 3 字符编码层
+
 这一层即“Char Encode Layer”，它的输入维度是 B ∗ W ∗ C ，输出维度是 B ∗ W ∗ D，经查看源码，它的结构图长这样：
 
 <img src="imgs/elmo_1.png" alt="PLMfamily" style="zoom:200%;" />
@@ -96,13 +100,9 @@ BiLM(
 
 <img src="./imgs/elmo_2.png" alt="PLMfamily" style="zoom:200%;" />
 
-
 这里的 h 表示LSTM单元的hidden_size，可能会比较大，比如D=512,h=4096这样。所以在每一层结束后还需要一个Linear层将维度从 h 映射为 D，而后再输入到下一层中。最后的输出是将每一层的所有输出以及embedding的输出，进行stack，每一层的输出里面又是对每个timestep的正向和反向的输出进行concat，因而最后的输出维度为(L+1)∗B∗W∗2D，这里的 L+1 中的 +1 就代表着那一层embedding输出，其会复制成两份，以与biLMs每层的输出维度保持一致。
 
-
 ## 5. 生成ELMo词向量
-
-
 
 ELMo具有如下的优良特性：
 
@@ -111,10 +111,14 @@ ELMo具有如下的优良特性：
 - 基于字符：ELMo表示纯粹基于字符，然后经过CharCNN之后再作为词的表示，解决了OOV问题，而且输入的词表也很小。
 
 ## Reference
+
 - [ELMo解读（论文 + PyTorch源码](https://blog.csdn.net/Magical_Bubble/article/details/89160032)
 
 - 论文：https://arxiv.org/pdf/1802.05365.pdf
+
 - 项目首页：https://allennlp.org/elmo
+
 - 源码：https://github.com/allenai/allennlp （PyTorch，关于ELMo的部分戳这里）
-https://github.com/allenai/bilm-tf （TensorFlow）
+  https://github.com/allenai/bilm-tf （TensorFlow）
+
 - 多语言：https://github.com/HIT-SCIR/ELMoForManyLangs （哈工大CoNLL评测的多国语言ELMo，还有繁体中文的）

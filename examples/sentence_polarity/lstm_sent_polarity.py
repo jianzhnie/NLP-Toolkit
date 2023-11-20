@@ -15,6 +15,7 @@ sys.path.append('../../')
 
 
 class LstmDataset(Dataset):
+
     def __init__(self, data):
         self.data = data
 
@@ -35,6 +36,7 @@ def collate_fn(examples):
 
 
 class LSTM(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim, hidden_dim, num_class):
         super(LSTM, self).__init__()
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)

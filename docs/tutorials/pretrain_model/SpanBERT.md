@@ -1,7 +1,5 @@
 # SpanBERT: Improving Pre-training by Representing and Predicting Spans
 
-
-
 ## 1. SpanBERT的技术改进点
 
 相比于BERT，SpanBERT主要是在预训练阶段进行了调整，如图1所示，具体包含以下几部分：
@@ -64,20 +62,20 @@ SpanBERT期望Span边界的token能够尽可能多地汇总Span内部的信息�
 
 <center>图5 SBO样例图</center>
 
-具体来讲，给定一串序列$\text{X}=\{x_1, x_2, ..., x_n\}$​，假设Mask的连续token为$(x_s,...,x_e)$​, $x_s$​和$x_e$​代表起始token和末端token。SpanBERT将使用边界token $x_{s-1}$​和$x_{e+1}$​​来计算Span内部的每个token。
+具体来讲，给定一串序列$\\text{X}={x_1, x_2, ..., x_n}$​，假设Mask的连续token为$(x_s,...,x_e)$​, $x_s$​和$x_e$​代表起始token和末端token。SpanBERT将使用边界token $x\_{s-1}$​和$x\_{e+1}$​​来计算Span内部的每个token。
 
 $$
-y_i = f(x_{s-1}, x_{e+1}, P_{i-s+1})
+y_i = f(x\_{s-1}, x\_{e+1}, P\_{i-s+1})
 $$
 
-其中，$P_{i-s+1}$代表Span内部的token$x_i$相对于边界token$x_{s-1}$​的相对位置编码。以上公式具体是这么计算的。
+其中，$P\_{i-s+1}$代表Span内部的token$x_i$相对于边界token$x\_{s-1}$​的相对位置编码。以上公式具体是这么计算的。
 
 $$
-\begin{align}
-h_0 &= [x_{s-1};x_{e+1};P_{i-s+1}] \\
-h_1 &= \text{LayerNorm}(\text{GeLU}(W_1h_0))\\
-y_i &= \text{LayerNorm}(\text{GeLU}(W_2h_1))
-\end{align}
+\\begin{align}
+h_0 &= \[x\_{s-1};x\_{e+1};P\_{i-s+1}\] \\
+h_1 &= \\text{LayerNorm}(\\text{GeLU}(W_1h_0))\\
+y_i &= \\text{LayerNorm}(\\text{GeLU}(W_2h_1))
+\\end{align}
 $$
 
 ### 3.3 MLM与SBO融合计算
@@ -85,10 +83,10 @@ $$
 如上图所示， 在预测单词football的时候，即使用了MLM任务去预测单词football，同时又使用了SBO任务去预测football，最终将二者进行相加。相应公式为：
 
 $$
-\begin{align}
-L(x_i) &= L_{\text{MLM}}(x_i)+L_{\text{SBO}}(x_i) \\
-& = -\text{log}P(x_i|\text{x}_i) - \text{log}P(x_i|y_i)
-\end{align}
+\\begin{align}
+L(x_i) &= L\_{\\text{MLM}}(x_i)+L\_{\\text{SBO}}(x_i) \\
+& = -\\text{log}P(x_i|\\text{x}\_i) - \\text{log}P(x_i|y_i)
+\\end{align}
 $$
 
 ### 3.4 去掉NSP任务

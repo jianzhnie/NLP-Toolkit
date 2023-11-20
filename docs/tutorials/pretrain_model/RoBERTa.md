@@ -1,4 +1,5 @@
 # RoBERTa: A Robustly Optimized BERT Pretraining Approach
+
 <br>
 
 从模型结构上讲，相比BERT，**RoBERTa**基本没有什么创新，它更像是关于BERT在预训练方面进一步的探索。其改进了BERT很多的预训练策略，其结果显示，原始BERT可能训练不足，并没有充分地学习到训练数据中的语言知识。
@@ -9,11 +10,9 @@
 
 <center>图1 RoBERT的改进点</center>
 
-
-
 ## 1. Dynamic Masking
 
-BERT中有个**Masking Language Model(MLM)**预训练任务，在准备训练数据的时候，需要Mask掉一些token，训练过程中让模型去预测这些token，这里将数据Mask后，训练数据将不再变化，将使用这些数据一直训练直到结束，这种Mask方式被称为Static Masking。
+BERT中有个\*\*Masking Language Model(MLM)\*\*预训练任务，在准备训练数据的时候，需要Mask掉一些token，训练过程中让模型去预测这些token，这里将数据Mask后，训练数据将不再变化，将使用这些数据一直训练直到结束，这种Mask方式被称为Static Masking。
 
 如果在训练过程中，期望每轮的训练数据中，Mask的位置也相应地发生变化，这就是**Dynamic Masking**，**RoBERTa**使用的就是**Dynamic Masking**。
 
@@ -60,7 +59,6 @@ Byte-Pair Encodeing(BPE)是一种表示单词，生成词表的方式。BERT中�
 ![image-20210610202602241](https://raw.githubusercontent.com/1649759610/images_for_blog/master/image-20210610202602241.png)
 
 <center>图5 增加数据和训练步数实验效果图</center>
-
 
 ## 6. 相关资料
 

@@ -9,13 +9,14 @@ tokenize的目标是把输入的文本流，切分成一个个子串，每个子
 tokenize有三种粒度：**word/subword/char**
 
 - **word词**，是最自然的语言单元。对于英文等自然语言来说，存在着天然的分隔符，比如说空格，或者是一些标点符号，对词的切分相对容易。但是对于一些东亚文字包括中文来说，就需要某种分词算法才行。顺便说一下，Tokenizers 库中，基于规则切分部分，采用了spaCy和Moses两个库。如果基于词来做词汇表，由于长尾现象的存在，这个词汇表可能会超大。像Transformer XL库就用到了一个26.7万个单词的词汇表。这需要极大的embedding matrix才能存得下。embedding matrix是用于查找取用token的embedding vector的。这对于内存或者显存都是极大的挑战。常规的词汇表，一般大小不超过5万。
+
 - **char/字符,** 也就是说，我们的词汇表里只有最基本的字符。而一般来讲，字符的数量是少量有限的。这样做的问题是，由于字符数量太小，我们在为每个字符学习嵌入向量的时候，每个向量就容纳了太多的语义在内，学习起来非常困难。
+
 - **subword子词级**，它介于字符和单词之间。比如说Transformers可能会被分成Transform和ers两个部分。**这个方案平衡了词汇量和语义独立性，是相对较优的方案**。它的处理原则是，**常用词应该保持原状，生僻词应该拆分成子词以共享token压缩空间**。
 
 - AppleCare = Apple  + Care
+
 - iphone12 = iphone + 12
-
-
 
 ## Subword tokenization
 
@@ -52,7 +53,6 @@ Subword tokenization的核心思想是：“**频繁出现了词不应该被切�
 | T5, ALBERT, CamemBERT, XLM-RoBERTa and XLNet | SentencePiece  |
 |                      T5                      |    Unigram     |
 
-
 这里对BPE做一个简单的介绍，让我们对 sub-word tokenization 的原理有一个基本了解：
 
 ## Byte-Pair Encoding (BPE)
@@ -60,7 +60,9 @@ Subword tokenization的核心思想是：“**频繁出现了词不应该被切�
 BPE  — a frequency-based model
 
 - Byte Pair Encoding uses the frequency of subword patterns to shortlist them for merging.
+
 - The drawback of using frequency as the driving factor is that you can end up having ambiguous final encodings that might not be useful for the new input text.
+
 - It still has the scope of improvement in terms of generating unambiguous tokens.
 
 - 优点
@@ -171,7 +173,7 @@ Unigram — a probability-based model
 
 Loss= ∑ log(∑p(x))
 
- 假设训练文档中的所有词分别为 x1;x2...xN  ，而每个词tokenize的方法是一个集合 S(xi)  。当一个词汇表确定时，每个词tokenize的方法集合 S(xi) 就是确定的，而每种方法对应着一个概率p(x)。如果从词汇表中删除部分词，则某些词的tokenize的种类集合就会变少，log(*)中的求和项就会减少，从而增加整体loss。
+假设训练文档中的所有词分别为 x1;x2...xN  ，而每个词tokenize的方法是一个集合 S(xi)  。当一个词汇表确定时，每个词tokenize的方法集合 S(xi) 就是确定的，而每种方法对应着一个概率p(x)。如果从词汇表中删除部分词，则某些词的tokenize的种类集合就会变少，log(\*)中的求和项就会减少，从而增加整体loss。
 
 Unigram算法每次会从词汇表中挑出使得loss增长最小的10%~20%的词汇来删除。
 
@@ -181,7 +183,7 @@ Unigram算法每次会从词汇表中挑出使得loss增长最小的10%~20%的�
 
 SentencePiece，顾名思义，它是把一个句子看作一个整体，再拆成片段，而没有保留天然的词语的概念。一般地，它把空格space也当作一种特殊字符来处理，再用BPE或者Unigram算法来构造词汇表。
 
-比如，XLNetTokenizer就采用了_ 来代替空格，解码的时候会再用空格替换回来。
+比如，XLNetTokenizer就采用了\_ 来代替空格，解码的时候会再用空格替换回来。
 
 目前，Tokenizers库中，所有使用了SentencePiece的都是与Unigram算法联合使用的，比如ALBERT、XLNet、Marian和T5.
 

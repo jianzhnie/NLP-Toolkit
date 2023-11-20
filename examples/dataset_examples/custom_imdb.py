@@ -45,6 +45,7 @@ _CITATION = """\
 
 class IMDBReviewsConfig(datasets.BuilderConfig):
     """BuilderConfig for IMDBReviews."""
+
     def __init__(self, **kwargs):
         """BuilderConfig for IMDBReviews.
 

@@ -9,6 +9,7 @@ Transformer 网络架构架构由 Ashish Vaswani 等人在 Attention Is All You 
 Transformer改进了RNN被人诟病的训练慢的特点，利用self-attention可以实现快速并行。下面的章节会详细介绍Transformer的各个组成部分。
 
 ## 2.Transformer直观认识
+
 Transformer主要由encoder和decoder两部分组成。在Transformer的论文中，encoder和decoder均由6个encoder layer和decoder layer组成，通常我们称之为encoder block。
 
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/739aa8a15ec043f8920843fa142754276c10b5b082d64b39a7d0f795241ace82"  width="600px" /></center>
@@ -25,16 +26,14 @@ Transformer主要由encoder和decoder两部分组成。在Transformer的论文�
 
 decoder也包含encoder提到的两层网络，但是在这两层中间还有一层attention层，帮助当前节点获取到当前需要关注的重点内容。
 
-
-
 首先，模型需要对输入的数据进行一个embedding操作，enmbedding结束之后，输入到encoder层，self-attention处理完数据后把数据送给前馈神经网络，前馈神经网络的计算可以并行，得到的输出会输入到下一个encoder。
-
 
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/fa7dd09419ca4b9d972aa3b8f99926ccc41a60588cc34ae5aa730ce89e267cf0"  width="600px" /></center>
 <center><br>embedding和self-attention </br></center>
 <br></br>
 
 ## 3. Transformer的结构
+
 Transformer的结构解析出来如下图表示，包括Input Embedding, Position Embedding, Encoder, Decoder。
 
 ![](../../images/pretrain_model/Transformer/Transformer_architecture.png)
@@ -51,13 +50,12 @@ $$X=Embedding Lookup(X)+Position Encoding$$
 
 可以将Input Embedding看作是一个 lookup table，对于每个 word，进行 word embedding 就相当于一个lookup操作，查出一个对应结果。
 
-
 ### 3.1.2 Position Encoding
 
 Transformer模型中还缺少一种解释输入序列中单词顺序的方法。为了处理这个问题，transformer给encoder层和decoder层的输入添加了一个额外的向量Positional Encoding，维度和embedding的维度一样，这个向量采用了一种很独特的方法来让模型学习到这个值，这个向量能决定当前词的位置，或者说在一个句子中不同的词之间的距离。这个位置向量的具体计算方法有很多种，论文中的计算方法如下
 
-$$PE(pos,2i)=sin(pos/10000^{2i}/d_{model})$$
-$$PE(pos,2i+1)=cos(pos/10000^{2i}/d_{model})$$
+$$PE(pos,2i)=sin(pos/10000^{2i}/d\_{model})$$
+$$PE(pos,2i+1)=cos(pos/10000^{2i}/d\_{model})$$
 
 其中pos是指当前词在句子中的位置，i是指向量中每个值的index，可以看出，在偶数位置，使用正弦编码，在奇数位置，使用余弦编码.
 
@@ -67,32 +65,32 @@ $$PE(pos,2i+1)=cos(pos/10000^{2i}/d_{model})$$
 
 用公式把一个Transformer Encoder block 的计算过程整理一下
 
-+ 自注意力机制
+- 自注意力机制
 
-$$Q=XW_{Q}$$
-$$K=XW_{K}$$
-$$V=XW_{V}$$
+$$Q=XW\_{Q}$$
+$$K=XW\_{K}$$
+$$V=XW\_{V}$$
 
-$$X_{attention}=selfAttention(Q,K,V)$$
+$$X\_{attention}=selfAttention(Q,K,V)$$
 
-+ self-attention 残差连接与 Layer Normalization
+- self-attention 残差连接与 Layer Normalization
 
+$$X\_{attention}=LayerNorm(X\_{attention})$$
 
-$$X_{attention}=LayerNorm(X_{attention})$$
+- FeedForward，其实就是两层线性映射并用激活函数激活，比如说RELU
 
-+  FeedForward，其实就是两层线性映射并用激活函数激活，比如说RELU
+$$X\_{hidden}=Linear(RELU(Linear(X\_{attention})))$$
 
-$$X_{hidden}=Linear(RELU(Linear(X_{attention})))$$
+- FeedForward 残差连接与 Layer Normalization
 
-+ FeedForward 残差连接与 Layer Normalization
+$$X\_{hidden}=X\_{attention}+X\_{hidden}$$
 
-$$X_{hidden}=X_{attention}+X_{hidden}$$
+$$X\_{hidden}=LayerNorm(X\_{hidden})$$
 
-$$X_{hidden}=LayerNorm(X_{hidden})$$
-
-其中：$X_{hidden} \in R^{batch_size*seq_len*embed_dim}$
+其中：$X\_{hidden} \\in R^{batch_size*seq_len*embed_dim}$
 
 ### 3.2.1 自注意力机制
+
 - 首先，自注意力机制（self-attention）会计算出三个新的向量，在论文中，向量的维度是512维，我们把这三个向量分别称为Query、Key、Value，这三个向量是用embedding向量与一个矩阵相乘得到的结果，这个矩阵是随机初始化的，维度为（64，512）注意第二个维度需要和embedding的维度一样，其值在反向传播的过程中会一直进行更新，得到的这三个向量的维度是64低于embedding维度的。
 
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/8f322d81d9c3491d9b714e39986e482926755e9c86dd4266805cceb4add145c7"  width="600px" /></center>
@@ -112,6 +110,7 @@ $$X_{hidden}=LayerNorm(X_{hidden})$$
 <br></br>
 
 4、下一步就是把Value和softmax得到的值进行相乘，并相加，得到的结果即是self-attetion在当前节点的值。
+
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/5be4009ebf3f43ce9a9947785bb6058ba7289b9adf9b4aba8f6682d949cd4b4f"  width="600px" /></center>
 <center><br>dot product </br></center>
 <br></br>
@@ -126,26 +125,25 @@ $$X_{hidden}=LayerNorm(X_{hidden})$$
 
 用公式表达如下：
 
-$$Q=XW_{Q}$$
-$$K=XW_{K}$$
-$$V=XW_{V}$$
+$$Q=XW\_{Q}$$
+$$K=XW\_{K}$$
+$$V=XW\_{V}$$
 
-$$X_{attention}=selfAttention(Q,K,V)$$
-
+$$X\_{attention}=selfAttention(Q,K,V)$$
 
 ### 3.2.2  Self-Attention 复杂度
 
-Self-Attention时间复杂度：$O(n^2 \cdot d)$ ，这里，n是序列的长度，d是embedding的维度。
+Self-Attention时间复杂度：$O(n^2 \\cdot d)$ ，这里，n是序列的长度，d是embedding的维度。
 
 Self-Attention包括三个步骤：相似度计算，softmax和加权平均，它们分别的时间复杂度是：
 
-相似度计算可以看作大小为(n,d)和(d,n)的两个矩阵相乘： $(n,d) *(d,n) =(n^2 \cdot d)$，得到一个(n,n)的矩阵
+相似度计算可以看作大小为(n,d)和(d,n)的两个矩阵相乘： $(n,d) \*(d,n) =(n^2 \\cdot d)$，得到一个(n,n)的矩阵
 
 softmax就是直接计算了，时间复杂度为: $O(n^2)$
 
-加权平均可以看作大小为(n,n)和(n,d)的两个矩阵相乘：  $(n,d) *(d,n) =(n^2 \cdot d)$，得到一个(n,d)的矩阵
+加权平均可以看作大小为(n,n)和(n,d)的两个矩阵相乘：  $(n,d) \*(d,n) =(n^2 \\cdot d)$，得到一个(n,d)的矩阵
 
-因此，Self-Attention的时间复杂度是: $O(n^2 \cdot d)$
+因此，Self-Attention的时间复杂度是: $O(n^2 \\cdot d)$
 
 ### 3.2.3 Multi-head Attention
 
@@ -156,6 +154,7 @@ softmax就是直接计算了，时间复杂度为: $O(n^2)$
 <br></br>
 
 multi-head注意力的全过程如下，首先输入句子，“Thinking Machines”,在embedding模块把句子中的每个单词变成向量X，在encoder层中，除了第0层有embedding操作外，其他的层没有embedding操作；接着把X分成8个head，
+
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/4d634e35dea1472d9d6946b75c14f121fd274ec19e474f86bc4a903620d87f65"  width="600px" /></center>
 <center><br> multi-head attention总体结构 </br></center>
 <br></br>
@@ -168,53 +167,48 @@ Transformer/BERT中把 d ，也就是hidden_size/embedding_size这个维度做�
 
 这样点积可以看作大小为(m,n,a)和(m,a,n)的两个张量相乘，得到一个(m,n,n)的矩阵，其实就相当于(n,a)和(a,n)的两个矩阵相乘，做了m次，时间复杂度是：
 
-$$O(n^2 \cdot m \cdot a)=O(n^2 \cdot d)$$
+$$O(n^2 \\cdot m \\cdot a)=O(n^2 \\cdot d)$$
 
-因此Multi-Head Attention时间复杂度也是$O(n^2 \cdot d)$，复杂度相较单头并没有变化，主要还是transposes and reshapes 的操作，相当于把一个大矩阵相乘变成了多个小矩阵的相乘。
-
-
+因此Multi-Head Attention时间复杂度也是$O(n^2 \\cdot d)$，复杂度相较单头并没有变化，主要还是transposes and reshapes 的操作，相当于把一个大矩阵相乘变成了多个小矩阵的相乘。
 
 ### 3.2.5 残差连接
+
 经过 self-attention 加权之后输出，也就是Attention(Q,K,V) ，然后把他们加起来做残差连接
 
-$$X_{hidden}=X_{embedding}+self Attention(Q,K,V)$$
+$$X\_{hidden}=X\_{embedding}+self Attention(Q,K,V)$$
 
 除了self-attention这里做残差连接外，feed forward那个地方也需要残差连接，公式类似：
 
-$$X_{hidden}=X_{feed_forward}+X_{hidden}$$
-
+$$X\_{hidden}=X\_{feed_forward}+X\_{hidden}$$
 
 ### 3.2.6 Layer Normalization
 
 Layer Normalization 的作用是把神经网络中隐藏层归一为标准正态分布，也就是独立同分布，以起到加快训练速度，加速收敛的作用
-$$X_{hidden}=LayerNorm(X_{hidden})$$
+$$X\_{hidden}=LayerNorm(X\_{hidden})$$
 
-其中：$X_{hidden} \in R^{batch_size*seq_len*embed_dim}$
+其中：$X\_{hidden} \\in R^{batch_size*seq_len*embed_dim}$
 
 LayerNorm的详细操作如下：
 
-$$\mu_{L}=\dfrac{1}{m}\sum_{i=1}^{m}x_{i}$$
+$$\\mu\_{L}=\\dfrac{1}{m}\\sum\_{i=1}^{m}x\_{i}$$
 
 上式以矩阵为单位求均值；
 
-$$\delta^{2}=\dfrac{1}{m}\sum_{i=1}^{m}(x_{i}-\mu)^2$$
+$$\\delta^{2}=\\dfrac{1}{m}\\sum\_{i=1}^{m}(x\_{i}-\\mu)^2$$
 上式以矩阵为单位求方差
 
-$$ LN(x_{i})=\alpha \dfrac{x_{i}-\mu_{L}}{\sqrt{\delta^{2}+\epsilon}}+\beta $$
-然后用每一列的每一个元素减去这列的均值，再除以这列的标准差，从而得到归一化后的数值，加$\epsilon$是为了防止分母为0.此处一般初始化$\alpha$为全1，而$\beta$为全0.
+$$ LN(x\_{i})=\\alpha \\dfrac{x\_{i}-\\mu\_{L}}{\\sqrt{\\delta^{2}+\\epsilon}}+\\beta $$
+然后用每一列的每一个元素减去这列的均值，再除以这列的标准差，从而得到归一化后的数值，加$\\epsilon$是为了防止分母为0.此处一般初始化$\\alpha$为全1，而$\\beta$为全0.
 
 ### 3.2.7 Feed Forward
-
 
 ![](../../images/pretrain_model/Transformer/feed_forward.png)
 
 将Multi-Head Attention得到的向量再投影到一个更大的空间（论文里将空间放大了4倍）在那个大空间里可以更方便地提取需要的信息（使用Relu激活函数），最后再投影回token向量原来的空间
 
-$$FFN(x)=ReLU(W_{1}x+b_{1})W_{2}+b_{2}$$
+$$FFN(x)=ReLU(W\_{1}x+b\_{1})W\_{2}+b\_{2}$$
 
 借鉴SVM来理解：SVM对于比较复杂的问题通过将特征其投影到更高维的空间使得问题简单到一个超平面就能解决。这里token向量里的信息通过Feed Forward Layer被投影到更高维的空间，在高维空间里向量的各类信息彼此之间更容易区别。
-
-
 
 ## 3.3 Decoder
 
@@ -226,15 +220,14 @@ $$FFN(x)=ReLU(W_{1}x+b_{1})W_{2}+b_{2}$$
 <center><br> decoder self attention </br></center>
 <br></br>
 
-
 ### 3.3.1 Masked Self-Attention
-
 
 传统 Seq2Seq 中 Decoder 使用的是 RNN 模型，因此在训练过程中输入因此在训练过程中输入t时刻的词，模型无论如何也看不到未来时刻的词，因为循环神经网络是时间驱动的，只有当t时刻运算结束了，才能看到t+1时刻的词。而 Transformer Decoder 抛弃了 RNN，改为 Self-Attention，由此就产生了一个问题，在训练过程中，整个 ground truth 都暴露在 Decoder 中，这显然是不对的，我们需要对 Decoder 的输入进行一些处理，该处理被称为 Mask。
 
 Mask 非常简单，首先生成一个下三角全 0，上三角全为负无穷的矩阵，然后将其与 Scaled Scores 相加即可，之后再做 softmax，就能将 -inf 变为 0，得到的这个矩阵即为每个字之间的权重。
 
 ### 3.3.2 Masked Encoder-Decoder Attention
+
 其实这一部分的计算流程和前面 Masked Self-Attention 很相似，结构也一摸一样，唯一不同的是这里的K,V为 Encoder 的输出，Q为 Decoder 中 Masked Self-Attention 的输出
 
 <center><img src="https://ai-studio-static-online.cdn.bcebos.com/eeb0db3260814772afdc9c1566a4afaa7133168766f34670bdecb26875edcd3f"  width="600px" /></center>
@@ -255,12 +248,11 @@ softmax层将这些分数转换为概率（全部为正值，总和为1.0）。�
 
 ![](../../images/pretrain_model/Transformer/linear_softmax.png)
 
-
 ## 3.5 Transformer的权重共享
 
 Transformer在两个地方进行了权重共享：
 
-+ （1）Encoder和Decoder间的Embedding层权重共享；
+- （1）Encoder和Decoder间的Embedding层权重共享；
 
 《Attention is all you need》中Transformer被应用在机器翻译任务中，源语言和目标语言是不一样的，但它们可以共用一张大词表，对于两种语言中共同出现的词（比如：数字，标点等等）可以得到更好的表示，而且对于Encoder和Decoder，嵌入时都只有对应语言的embedding会被激活，因此是可以共用一张词表做权重共享的。
 
@@ -268,7 +260,7 @@ Transformer在两个地方进行了权重共享：
 
 但是，共用词表会使得词表数量增大，增加softmax的计算时间，因此实际使用中是否共享可能要根据情况权衡。
 
-+ （2）Decoder中Embedding层和FC层权重共享；
+- （2）Decoder中Embedding层和FC层权重共享；
 
 Embedding层可以说是通过onehot去取到对应的embedding向量，FC层可以说是相反的，通过向量（定义为 x）去得到它可能是某个词的softmax概率，取概率最大（贪婪情况下）的作为预测值。
 
@@ -283,4 +275,5 @@ Embedding层可以说是通过onehot去取到对应的embedding向量，FC层可
 本文详细介绍了Transformer的细节，包括Encoder，Decoder部分，输出解码的部分，Transformer的共享机制等等。
 
 ## 5. 参考文献
+
 [Attention Is All You Need](https://arxiv.org/abs/1706.03762)
