@@ -27,8 +27,7 @@ def train_one_epoch(
     device: str = 'cpu',
     log_interval: int = 10,
 ) -> float:
-    """
-    Train the seq2seq model for one epoch.
+    """Train the seq2seq model for one epoch.
 
     Args:
         model (nn.Module): The seq2seq model.
@@ -81,8 +80,7 @@ def evaluate(model: nn.Module,
              criterion: nn.CrossEntropyLoss,
              device: str = 'cpu',
              log_interval: int = 10) -> float:
-    """
-    Evaluate the seq2seq model on the validation or test data.
+    """Evaluate the seq2seq model on the validation or test data.
 
     Args:
         model (nn.Module): The seq2seq model.
@@ -119,8 +117,7 @@ def predict_seq2seq(model: RNNSeq2Seq,
                     tgt_vocab: Vocab,
                     max_seq_len: int = None,
                     device: str = 'cpu') -> str:
-    """
-    Predict the target sentence for a given source sentence.
+    """Predict the target sentence for a given source sentence.
 
     Args:
         model (RNNSeq2Seq): The sequence-to-sequence model.
@@ -191,8 +188,7 @@ def train_and_evaluate(
     log_interval: int = 10,
     save_model_path: str = 'rnn_nmt',
 ):
-    """
-    Train and evaluate the seq2seq model.
+    """Train and evaluate the seq2seq model.
 
     Args:
         model (nn.Module): The seq2seq model.

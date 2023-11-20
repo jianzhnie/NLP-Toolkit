@@ -22,8 +22,7 @@ from nlptoolkit.losses.mask_softmax import masked_softmax
 
 
 def transpose_qkv(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
-    """
-    Transpose input tensor inputs for multi-head attention.
+    """Transpose input tensor inputs for multi-head attention.
 
     Args:
         inputs (torch.Tensor): Input tensor.
@@ -31,7 +30,6 @@ def transpose_qkv(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
 
     Returns:
         torch.Tensor: Transposed tensor.
-
     """
     # inputs shape: (batch_size, num_queries or num_key_value_pairs, num_hiddens)
     inputs = inputs.reshape(inputs.shape[0], inputs.shape[1], num_heads, -1)
@@ -44,8 +42,7 @@ def transpose_qkv(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
 
 
 def transpose_output(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
-    """
-    Transpose and reshape output tensor from multi-head attention.
+    """Transpose and reshape output tensor from multi-head attention.
 
     Args:
         inputs (torch.Tensor): Output tensor.
@@ -53,7 +50,6 @@ def transpose_output(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
 
     Returns:
         torch.Tensor: Transposed and reshaped tensor.
-
     """
     # inputs shape: (batch_size * num_heads, num_queries or num_key_value_pairs, num_hiddens / num_heads)
     inputs = inputs.reshape(-1, num_heads, inputs.shape[1], inputs.shape[2])
@@ -66,8 +62,7 @@ def transpose_output(inputs: torch.Tensor, num_heads: int) -> torch.Tensor:
 
 
 class AdditiveAttention(nn.Module):
-    """
-    Additive Attention mechanism.
+    """Additive Attention mechanism.
 
     Args:
         key_size (int): Size of the key vectors.
@@ -79,19 +74,17 @@ class AdditiveAttention(nn.Module):
     Methods:
         forward(queries, keys, values, valid_lens):
             Perform additive attention and return the attention-weighted values.
-
     """
+
     def __init__(self, key_size: int, query_size: int, num_hiddens: int,
                  dropout: float):
-        """
-        Initialize the AdditiveAttention module.
+        """Initialize the AdditiveAttention module.
 
         Args:
             key_size (int): Size of the key vectors.
             query_size (int): Size of the query vectors.
             num_hiddens (int): Number of hidden units in the attention mechanism.
             dropout (float): Dropout probability for regularization.
-
         """
         super(AdditiveAttention, self).__init__()
         self.W_k = nn.Linear(key_size, num_hiddens, bias=False)
@@ -101,8 +94,7 @@ class AdditiveAttention(nn.Module):
 
     def forward(self, queries: torch.Tensor, keys: torch.Tensor,
                 values: torch.Tensor, valid_lens: Optional[Tensor]) -> Tensor:
-        """
-        Compute additive attention.
+        """Compute additive attention.
 
         Args:
             queries (torch.Tensor): The query tensor of shape (batch_size, num_queries, d).
@@ -112,7 +104,6 @@ class AdditiveAttention(nn.Module):
 
         Returns:
             Tensor: The attention-weighted output tensor.
-
         """
         queries, keys = self.W_q(queries), self.W_k(keys)
 
@@ -140,8 +131,7 @@ class AdditiveAttention(nn.Module):
 
 
 class DotProductAttention(nn.Module):
-    """
-    Scaled Dot Product Attention.
+    """Scaled Dot Product Attention.
 
     Args:
         dropout (float): Dropout probability for regularization.
@@ -149,15 +139,13 @@ class DotProductAttention(nn.Module):
     Methods:
         forward(queries, keys, values, valid_lens=None):
             Perform scaled dot product attention and return the attention-weighted values.
-
     """
+
     def __init__(self, dropout: float):
-        """
-        Initialize the DotProductAttention module.
+        """Initialize the DotProductAttention module.
 
         Args:
             dropout (float): Dropout probability for regularization.
-
         """
         super(DotProductAttention, self).__init__()
         self.dropout = nn.Dropout(dropout)
@@ -167,8 +155,7 @@ class DotProductAttention(nn.Module):
                 keys: torch.Tensor,
                 values: torch.Tensor,
                 valid_lens: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Compute scaled dot product attention.
+        """Compute scaled dot product attention.
 
         Args:
             queries (torch.Tensor): The query tensor of shape (batch_size, num_queries, d).
@@ -178,7 +165,6 @@ class DotProductAttention(nn.Module):
 
         Returns:
             Tensor: The attention-weighted output tensor.
-
         """
         d = queries.shape[-1]
 
@@ -199,8 +185,7 @@ class DotProductAttention(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    """
-    Multi-Head Attention Layer.
+    """Multi-Head Attention Layer.
 
     1. 为了避免计算代价和参数代价的大幅增长， 我们设定 𝑝_𝑞=𝑝_𝑘=𝑝_𝑣=𝑝_𝑜/ℎ$ 。
     2. 值得注意的是，如果我们将查询、键和值的线性变换的输出数量设置为  𝑝_𝑞ℎ=𝑝_𝑘ℎ=𝑝_𝑣ℎ=𝑝_𝑜 ， 则可以并行计算 ℎ 个头。
@@ -214,8 +199,8 @@ class MultiHeadAttention(nn.Module):
         num_heads (int): Number of attention heads.
         dropout (float): Dropout probability for attention scores.
         bias (bool, optional): Whether to include bias terms in linear transformations.
-
     """
+
     def __init__(
         self,
         key_size: int,
@@ -241,8 +226,7 @@ class MultiHeadAttention(nn.Module):
         values: torch.Tensor,
         valid_lens: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """
-        Forward pass of the multi-head attention layer.
+        """Forward pass of the multi-head attention layer.
 
         Args:
             queries (torch.Tensor): Query vectors. Shape: [batch_size, num_queries, query_size]
@@ -252,7 +236,6 @@ class MultiHeadAttention(nn.Module):
 
         Returns:
             torch.Tensor: Output of the multi-head attention layer.
-
         """
         # Linear transformations for queries, keys, and values
         queries = transpose_qkv(self.W_q(queries), self.num_heads)

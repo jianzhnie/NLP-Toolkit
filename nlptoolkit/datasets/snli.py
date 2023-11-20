@@ -40,6 +40,7 @@ def read_snli(data_dir, is_train):
 
 class SNLIDataset(torch.utils.data.Dataset):
     """用于加载SNLI数据集的自定义数据集."""
+
     def __init__(self, dataset, num_steps, vocab=None):
         self.num_steps = num_steps
         all_premise_tokens = tokenize(dataset[0])
@@ -69,6 +70,7 @@ class SNLIDataset(torch.utils.data.Dataset):
 
 
 class SNLIBERTDataset(torch.utils.data.Dataset):
+
     def __init__(self, dataset, max_len, vocab=None):
         all_premise_hypothesis_tokens = [[
             p_tokens, h_tokens

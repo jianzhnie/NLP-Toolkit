@@ -38,7 +38,7 @@ class CNNEncoder(nn.Module):
         num_filter(int):
             This is the output dim for each convolutional layer, which is the number of "filters"
             learned by that layer.
-        ngram_filter_sizes(Tuple[int], optinal):
+        ngram_filter_sizes(Tuple[int], optional):
             This specifies both the number of convolutional layers we will create and their sizes.  The
             default of `(2, 3, 4, 5)` will have four convolutional layers, corresponding to encoding
             ngrams of size 2 to 5 with some number of filters.
@@ -51,6 +51,7 @@ class CNNEncoder(nn.Module):
             giving an output of shape `len(ngram_filter_sizes) * num_filter`.
             Defaults to `None`.
     """
+
     def __init__(self,
                  emb_dim,
                  num_filter,
@@ -104,7 +105,7 @@ class CNNEncoder(nn.Module):
                 Shape as `(batch_size, num_tokens, emb_dim)` and dtype as `float32` or `float64`.
                 Tensor containing the features of the input sequence.
             mask (Tensor, optional):
-                Shape shoule be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`.
+                Shape should be same as `inputs` and dtype as `int32`, `int64`, `float32` or `float64`.
                 Its each elements identify whether the corresponding input token is padding or not.
                 If True, not padding token. If False, padding token.
                 Defaults to `None`.
@@ -151,6 +152,7 @@ class CNNModel(nn.Module):
     Lastly, we take the output of the encoder to create a final representation,
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     """
+
     def __init__(self,
                  vocab_size,
                  num_classes,
@@ -195,6 +197,7 @@ class TextCNNModel(nn.Module):
     Lastly, we take the output of the encoder to create a final representation,
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     """
+
     def __init__(self,
                  vocab_size,
                  num_classes,

@@ -24,6 +24,7 @@ from nlptoolkit.utils.data_utils import (BOS_TOKEN, EOS_TOKEN, PAD_TOKEN,
 
 
 class RNNlmDataset(Dataset):
+
     def __init__(self, corpus, vocab):
         self.data = []
         self.bos = vocab[BOS_TOKEN]
@@ -55,6 +56,7 @@ class RNNlmDataset(Dataset):
 
 
 class NGramDataset(Dataset):
+
     def __init__(self, corpus, vocab: Vocab, context_size=2):
         self.data = []
         self.bos = vocab.bos_token
@@ -87,6 +89,7 @@ class NGramDataset(Dataset):
 
 
 class CbowDataset(Dataset):
+
     def __init__(self, corpus, vocab: Vocab, context_size=2):
         self.data = []
         self.bos = vocab.bos_token
@@ -116,6 +119,7 @@ class CbowDataset(Dataset):
 
 
 class SkipGramDataset(Dataset):
+
     def __init__(self, corpus, vocab, context_size=2):
         self.data = []
         self.bos = vocab[BOS_TOKEN]
@@ -148,6 +152,7 @@ class SkipGramDataset(Dataset):
 
 class NegativeSampleingSkipGramDataset(Dataset):
     """Negative Sampleing for Skip-Gram Dataset."""
+
     def __init__(self,
                  corpus,
                  vocab: Vocab,
@@ -202,6 +207,7 @@ class NegativeSampleingSkipGramDataset(Dataset):
 
 
 class GloveDataset(Dataset):
+
     def __init__(self, corpus, vocab: Vocab, context_size=2):
         # 记录词与上下文在给定语料中的共现次数
         self.cooccur_counts = defaultdict(float)
@@ -241,8 +247,7 @@ class GloveDataset(Dataset):
 
 
 class Word2VecDataset(object):
-    """
-    实现了 Word2Vec 训练所需的一些工具和数据处理函数的类。这个类包括了以下功能：
+    """实现了 Word2Vec 训练所需的一些工具和数据处理函数的类。这个类包括了以下功能：
 
     1. 初始化 Word2VecToolkit，并构建词汇表（Vocab）。
 
@@ -262,9 +267,9 @@ class Word2VecDataset(object):
 
     9. generate_cbow_sample 生成CBOW模型的采样数据，包括上下文词和中心词。
     """
+
     def __init__(self, sentences: List[List[str]], threshold: float = 1e-4):
-        """
-        Initialize the Word2Vec Toolkit.
+        """Initialize the Word2Vec Toolkit.
 
         Args:
             sentences (List[List[str]]): A list of lists containing tokenized sentences.
@@ -284,8 +289,8 @@ class Word2VecDataset(object):
         self.threshold = threshold
 
     def should_keep_token(self, token: str, num_tokens: int) -> bool:
-        """
-        Determine whether to keep a token based on word frequencies and threshold.
+        """Determine whether to keep a token based on word frequencies and
+        threshold.
 
         Args:
             token (str): The token to evaluate.
@@ -299,8 +304,7 @@ class Word2VecDataset(object):
         return flag
 
     def get_subsampled_datasets(self) -> List[List[str]]:
-        """
-        Perform word subsampling based on word frequencies and threshold.
+        """Perform word subsampling based on word frequencies and threshold.
 
         Returns:
             List[List[str]]: List of sentences with subsampled words.
@@ -313,8 +317,7 @@ class Word2VecDataset(object):
         return self.subsampled_datasets
 
     def get_word_frequency(self, token: str) -> Tuple[int, int]:
-        """
-        Get the frequency of a specific token.
+        """Get the frequency of a specific token.
 
         Args:
             token (str): The token to query.
@@ -343,8 +346,7 @@ class Word2VecDataset(object):
     def get_negative_sample(self,
                             contexts: List[str],
                             n_negatives: int = 5) -> List[List[str]]:
-        """
-        Generate negative samples for Skipgram datasets.
+        """Generate negative samples for Skipgram datasets.
 
         Args:
             contexts List[str]: Lists of contexts.
@@ -364,8 +366,7 @@ class Word2VecDataset(object):
     def get_negative_datasets(self,
                               all_contexts: List[List[str]],
                               n_negatives: int = 5) -> List[List[str]]:
-        """
-        Generate negative samples for Skipgram datasets.
+        """Generate negative samples for Skipgram datasets.
 
         Args:
             contexts List[List[str]]: Lists of contexts.
@@ -384,8 +385,7 @@ class Word2VecDataset(object):
             self,
             sentences,
             context_size: int = 2) -> Tuple[List[List[str]], List[List[str]]]:
-        """
-        Generate Skipgram datasets.
+        """Generate Skipgram datasets.
 
         Args:
             context_size (int): The context window size.
@@ -407,8 +407,7 @@ class Word2VecDataset(object):
     def generate_ngram_sample(
             self, sentence: List[str],
             context_size: int) -> List[Tuple[List[str], str]]:
-        """
-        Generate an n-gram dataset from a given sentence.
+        """Generate an n-gram dataset from a given sentence.
 
         Args:
             sentence (List[str]): The input sentence as a list of words.
@@ -442,8 +441,8 @@ class Word2VecDataset(object):
             sentence: List[str],
             context_size: int,
             use_random_window: bool = True) -> List[Tuple[List[str], str]]:
-        """
-        Generate a CBOW (Continuous Bag of Words) dataset from a given sentence.
+        """Generate a CBOW (Continuous Bag of Words) dataset from a given
+        sentence.
 
         Args:
             sentence (List[str]): The input sentence as a list of words.
@@ -494,8 +493,7 @@ class Word2VecDataset(object):
             context_size: int,
             use_random_window: bool = True
     ) -> Tuple[List[str], List[List[str]]]:
-        """
-        Generate an Skip-gram dataset from a given sentence.
+        """Generate an Skip-gram dataset from a given sentence.
         返回跳元模型中的中心词和上下文词.
 
         在Word2Vec中，上下文窗口是指在训练过程中，用来确定中心词周围哪些词作为上下文进行预测的窗口大小。这个窗口的大小可以影响到模型的性能和训练效果。
@@ -561,8 +559,7 @@ class Word2VecDataset(object):
 
 
 class RandomGenerator:
-    """
-    Randomly sample integers from a population based on given weights.
+    """Randomly sample integers from a population based on given weights.
 
     It is used for making random selections from a given sequence (list, string, or any iterable) with replacement.
     This means that items can be selected more than once, and the probability of each item being selected is uniform.
@@ -576,6 +573,7 @@ class RandomGenerator:
         >>> generator = RandomGenerator(population = ['apple', 'banana', 'cherry', 'date'], weights = [0.2, 0.3, 0.4, 0.1])
         >>> sample = [generator.draw() for _ in range(10)]
     """
+
     def __init__(self,
                  population: List[int] = None,
                  weights: List[float] = None):
@@ -585,8 +583,7 @@ class RandomGenerator:
         self.i = 0
 
     def draw(self) -> int:
-        """
-        Draw a random sample based on the provided weights.
+        """Draw a random sample based on the provided weights.
 
         Returns:
             int: A randomly sampled integer.

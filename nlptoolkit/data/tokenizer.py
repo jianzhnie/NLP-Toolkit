@@ -1,5 +1,4 @@
-"""
-在自然语言处理（NLP）和文本处理领域，有许多不同的词元化方法，常用的包括以下几种：
+"""在自然语言处理（NLP）和文本处理领域，有许多不同的词元化方法，常用的包括以下几种：
 
 1.空格分词（Whitespace Tokenization）：
 
@@ -44,6 +43,7 @@ from .vocab import Vocab
 
 
 class BaseTokenizer(object):
+
     def __init__(self, vocab: Vocab):
         self.vocab = vocab
 
@@ -55,8 +55,7 @@ class BaseTokenizer(object):
 
 
 class Tokenizer:
-    """
-    Tokenizes text lines into word or character tokens.
+    """Tokenizes text lines into word or character tokens.
 
     Args:
         lang (str, optional): Language identifier. Default is 'en'.
@@ -72,14 +71,14 @@ class Tokenizer:
 
     Defined in :numref:`sec_utils`
     """
+
     def __init__(self, lang: str = 'en'):
         self.lang = lang
 
     def tokenize(self,
                  sentence: str,
                  token: str = 'word') -> Union[List[str], List[List[str]]]:
-        """
-        Tokenize the input sentence into word or character tokens.
+        """Tokenize the input sentence into word or character tokens.
 
         Args:
             sentence (str): The input sentence to tokenize.
@@ -95,7 +94,6 @@ class Tokenizer:
         ```
         tokens = tokenizer.tokenize("Hello, World!", token='word')
         ```
-
         """
         # 将句子中的特殊字符（如星号、引号、换行符、反斜杠、加号、减号、斜杠、等号、括号、单引号、冒号、方括号、竖线、感叹号和分号）
         # 替换为一个空格。
@@ -122,14 +120,16 @@ class Tokenizer:
 
 
 class JiebaTokenizer(BaseTokenizer):
-    """
-    Constructs a tokenizer based on `jieba <https://github.com/fxsjy/jieba>`__.
-    It supports :meth:`cut` method to split the text to tokens, and :meth:`encode`
-    method to covert text to token ids.
+    """Constructs a tokenizer based on `jieba.
+
+    <https://github.com/fxsjy/jieba>`__. It supports :meth:`cut` method to
+    split the text to tokens, and :meth:`encode` method to convert text to token
+    ids.
 
     Args:
         vocab(paddlenlp.data.Vocab): An instance of :class:`paddlenlp.data.Vocab`.
     """
+
     def __init__(self, vocab: Vocab):
         super(JiebaTokenizer, self).__init__(vocab)
 
@@ -143,11 +143,10 @@ class JiebaTokenizer(BaseTokenizer):
         self.tokenizer.initialized = True
 
     def cut(self, sentence, cut_all=False, use_hmm=True):
-        """
-        The method used to cut the text to tokens.
+        """The method used to cut the text to tokens.
 
         Args:
-            sentence(str): The text that needs to be cuted.
+            sentence(str): The text that needs to be cut.
             cut_all(bool, optional): Whether to use the full mode. If True,
                 using full mode that gets all the possible words from the
                 sentence, which is fast but not accurate. If False, using
@@ -186,7 +185,7 @@ class JiebaTokenizer(BaseTokenizer):
         ids using `vocab`.
 
         Args:
-            sentence(str): The text that needs to be cuted.
+            sentence(str): The text that needs to be cut.
             cut_all(bool, optional): Whether to use the full mode. If True,
                 using full mode that gets all the possible words from the
                 sentence, which is fast but not accurate. If False, using

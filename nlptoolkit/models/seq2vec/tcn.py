@@ -17,6 +17,7 @@ class Chomp1d(nn.Module):
     Args:
         chomp_size (int): The number of elements removed.
     """
+
     def __init__(self, chomp_size):
         super(Chomp1d, self).__init__()
         self.chomp_size = chomp_size
@@ -39,6 +40,7 @@ class TemporalBlock(nn.Module):
         padding ([int]): The size of zeros to be padded.
         dropout (float, optional): Probability of dropout the units. Defaults to 0.2.
     """
+
     def __init__(self,
                  n_inputs,
                  n_outputs,
@@ -108,6 +110,7 @@ class TCNEncoder(nn.Module):
         kernel_size (int): The kernel size. Defaults to 2.
         dropout (float): The dropout probability. Defaults to 0.2.
     """
+
     def __init__(self, input_size, num_channels, kernel_size=2, dropout=0.2):
         super(TCNEncoder, self).__init__()
         self.input_size = input_size
@@ -134,7 +137,8 @@ class TCNEncoder(nn.Module):
         """Returns the dimension of the vector input for each element in the
         sequence input to a `TCNEncoder`.
 
-        This is not the shape of the input tensor, but the last element of that shape.
+        This is not the shape of the input tensor, but the last element of that
+        shape.
         """
         return self.input_size
 
@@ -142,7 +146,8 @@ class TCNEncoder(nn.Module):
         """Returns the dimension of the final vector output by this
         `TCNEncoder`.
 
-        This is not the shape of the returned tensor, but the last element of that shape.
+        This is not the shape of the returned tensor, but the last element of
+        that shape.
         """
         return self.output_dim
 

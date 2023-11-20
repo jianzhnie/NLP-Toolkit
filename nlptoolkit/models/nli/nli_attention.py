@@ -13,6 +13,7 @@ from torch.nn import functional as F
 
 
 class MLP(nn.Module):
+
     def __init__(self, num_inputs, num_hiddens, flatten):
         super().__init__()
         net = []
@@ -34,6 +35,7 @@ class MLP(nn.Module):
 
 
 class Attend(nn.Module):
+
     def __init__(self, num_inputs, num_hiddens, **kwargs):
         super(Attend, self).__init__(**kwargs)
         self.f = MLP(num_inputs, num_hiddens, flatten=False)
@@ -65,6 +67,7 @@ class Compare(nn.Module):
     - 𝐯𝐴,𝑖=𝑔([𝐚𝑖,𝜷𝑖]),𝑖=1,…,𝑚
     - 𝐯𝐵,𝑗=𝑔([𝐛𝑗,𝜶𝑗]),𝑗=1,…,𝑛.
     """
+
     def __init__(self, num_inputs, num_hiddens, **kwargs):
         super(Compare, self).__init__(**kwargs)
         self.g = MLP(num_inputs, num_hiddens, flatten=False)
@@ -82,6 +85,7 @@ class Aggregate(nn.Module):
     - 𝐯𝐴=∑𝑖=1𝑚𝐯𝐴,𝑖,
     - 𝐯𝐵=∑𝑗=1𝑛𝐯𝐵,𝑗.
     """
+
     def __init__(self, num_inputs, num_hiddens, num_outputs, **kwargs):
         super(Aggregate, self).__init__(**kwargs)
         self.h = MLP(num_inputs, num_hiddens, flatten=True)
@@ -97,6 +101,7 @@ class Aggregate(nn.Module):
 
 
 class DecomposableAttention(nn.Module):
+
     def __init__(self,
                  vocab,
                  embed_size,

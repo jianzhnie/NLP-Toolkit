@@ -142,8 +142,7 @@ PRETRAINED_INIT_CONFIGURATION = {
 
 
 def convert_to_unicode(text: Union[str, bytes]) -> str:
-    """
-    Converts the input `text` to Unicode assuming UTF-8 encoding.
+    """Converts the input `text` to Unicode assuming UTF-8 encoding.
 
     Args:
         text (Union[str, bytes]): The input text, which can be either a string or bytes.
@@ -166,8 +165,7 @@ def convert_to_unicode(text: Union[str, bytes]) -> str:
 
 
 def _is_whitespace(char: str) -> bool:
-    """
-    Checks whether the input character is a whitespace character.
+    """Checks whether the input character is a whitespace character.
 
     Args:
         char (str): Input character to be checked.
@@ -184,8 +182,7 @@ def _is_whitespace(char: str) -> bool:
 
 
 def _is_control(char: str) -> bool:
-    """
-    Checks whether the input character is a control character.
+    """Checks whether the input character is a control character.
 
     Args:
         char (str): Input character to be checked.
@@ -202,8 +199,7 @@ def _is_control(char: str) -> bool:
 
 
 def _is_punctuation(char: str) -> bool:
-    """
-    Checks whether the input character is a punctuation character.
+    """Checks whether the input character is a punctuation character.
 
     Args:
         char (str): Input character to be checked.
@@ -223,8 +219,8 @@ def _is_punctuation(char: str) -> bool:
 
 
 def load_vocab(vocab_file: str) -> OrderedDict[str, int]:
-    """
-    Loads a vocabulary file into an ordered dictionary where keys are tokens and values are indices.
+    """Loads a vocabulary file into an ordered dictionary where keys are tokens
+    and values are indices.
 
     Args:
         vocab_file (str): Path to the vocabulary file.
@@ -251,8 +247,7 @@ def load_vocab(vocab_file: str) -> OrderedDict[str, int]:
 
 
 def whitespace_tokenize(text: str) -> List[str]:
-    """
-    Tokenizes a piece of text based on whitespace.
+    """Tokenizes a piece of text based on whitespace.
 
     Args:
         text (str): Input text to be tokenized.
@@ -266,8 +261,8 @@ def whitespace_tokenize(text: str) -> List[str]:
 
 
 class BasicTokenizer(object):
-    """
-    Constructs a BasicTokenizer that will run basic tokenization (punctuation splitting, lower casing, etc.).
+    """Constructs a BasicTokenizer that will run basic tokenization
+    (punctuation splitting, lower casing, etc.).
 
     Args:
         do_lower_case (`bool`, *optional*, defaults to `True`):
@@ -287,6 +282,7 @@ class BasicTokenizer(object):
             In some instances we want to skip the basic punctuation splitting so that later tokenization can capture
             the full context of the words, such as contractions.
     """
+
     def __init__(
         self,
         do_lower_case: bool = True,
@@ -304,8 +300,8 @@ class BasicTokenizer(object):
         self.do_split_on_punc = do_split_on_punc
 
     def tokenize(self, text: str, never_split=None) -> List[str]:
-        """
-        Basic Tokenization of a piece of text. For sub-word tokenization, see WordPieceTokenizer.
+        """Basic Tokenization of a piece of text. For sub-word tokenization,
+        see WordPieceTokenizer.
 
         Args:
             text (str): Input text to be tokenized.
@@ -357,8 +353,7 @@ class BasicTokenizer(object):
         return output_tokens
 
     def _run_strip_accents(self, text: str) -> str:
-        """
-        Strips accents from a piece of text.
+        """Strips accents from a piece of text.
 
         Args:
             text (str): Input text from which accents need to be stripped.
@@ -379,8 +374,7 @@ class BasicTokenizer(object):
         return ''.join(output)
 
     def _run_split_on_punc(self, text: str, never_split=None) -> List[str]:
-        """
-        Splits punctuation on a piece of text.
+        """Splits punctuation on a piece of text.
 
         Args:
             text (str): Input text to be split.
@@ -416,8 +410,7 @@ class BasicTokenizer(object):
         return [''.join(x) for x in output]
 
     def _tokenize_chinese_chars(self, text: str) -> str:
-        """
-        Adds whitespace around any CJK character.
+        """Adds whitespace around any CJK character.
 
         Args:
             text (str): Input text in which whitespace needs to be added around CJK characters.
@@ -441,8 +434,7 @@ class BasicTokenizer(object):
         return ''.join(output)
 
     def _is_chinese_char(self, cp: int) -> bool:
-        """
-        Checks whether CP is the codepoint of a CJK character.
+        """Checks whether CP is the codepoint of a CJK character.
 
         Args:
             cp (int): Unicode code point of a character.
@@ -479,8 +471,7 @@ class BasicTokenizer(object):
         return False
 
     def _clean_text(self, text: str) -> str:
-        """
-        Performs invalid character removal and whitespace cleanup on text.
+        """Performs invalid character removal and whitespace cleanup on text.
 
         Args:
             text (str): Input text to be cleaned.
@@ -506,9 +497,9 @@ class BasicTokenizer(object):
 
 class WordpieceTokenizer(object):
     """Runs WordPiece tokenization."""
+
     def __init__(self, vocab, unk_token='[UNK]', max_input_chars_per_word=100):
-        """
-        Initializes the WordPiece tokenizer.
+        """Initializes the WordPiece tokenizer.
 
         Args:
             vocab (dict): Vocabulary mapping from subwords to indices.
@@ -520,11 +511,11 @@ class WordpieceTokenizer(object):
         self.max_input_chars_per_word = max_input_chars_per_word
 
     def tokenize(self, text: str) -> list:
-        """
-        Tokenizes a piece of text into its word pieces. This uses a greedy longest-match-first algorithm to perform
-        tokenization using the given vocabulary.
+        """Tokenizes a piece of text into its word pieces. This uses a greedy
+        longest-match-first algorithm to perform tokenization using the given
+        vocabulary.
 
-        For example, `input = "unaffable"` wil return as output `["un", "##aff", "##able"]`.
+        For example, `input = "unaffable"` will return as output `["un", "##aff", "##able"]`.
 
         Args:
             text: A single token or whitespace separated tokens. This should have
@@ -680,8 +671,7 @@ class BertTokenizer(PreTrainedTokenizer):
         return dict(self.vocab, **self.added_tokens_encoder)
 
     def _tokenize(self, text, split_special_tokens=False):
-        """
-        Tokenizes a piece of text into its WordPiece tokens.
+        """Tokenizes a piece of text into its WordPiece tokens.
 
         Args:
             text (str): Input text to be tokenized.
@@ -721,9 +711,9 @@ class BertTokenizer(PreTrainedTokenizer):
             self,
             token_ids_0: List[int],
             token_ids_1: Optional[List[int]] = None) -> List[int]:
-        """
-        Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. A BERT sequence has the following format:
+        """Build model inputs from a sequence or a pair of sequence for
+        sequence classification tasks by concatenating and adding special
+        tokens. A BERT sequence has the following format:
 
         - single sequence: `[CLS] X [SEP]`
         - pair of sequences: `[CLS] A [SEP] B [SEP]`
@@ -748,9 +738,9 @@ class BertTokenizer(PreTrainedTokenizer):
             token_ids_0: List[int],
             token_ids_1: Optional[List[int]] = None,
             already_has_special_tokens: bool = False) -> List[int]:
-        """
-        Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
-        special tokens using the tokenizer `prepare_for_model` method.
+        """Retrieve sequence ids from a token list that has no special tokens
+        added. This method is called when adding special tokens using the
+        tokenizer `prepare_for_model` method.
 
         Args:
             token_ids_0 (`List[int]`):

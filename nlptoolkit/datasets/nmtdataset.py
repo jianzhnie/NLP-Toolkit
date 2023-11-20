@@ -22,6 +22,7 @@ class NMTDataset(Dataset):
         src_vocab (Vocab): Vocabulary for source language.
         tgt_vocab (Vocab): Vocabulary for target language.
     """
+
     def __init__(self, file_path: str = 'data', max_seq_len: int = 10):
         self.file_path = file_path
         self.max_seq_len = max_seq_len
@@ -38,8 +39,7 @@ class NMTDataset(Dataset):
 
     def load_and_preprocess_data(
             self) -> Tuple[List[List[str]], List[List[str]]]:
-        """
-        Load and preprocess the machine translation dataset.
+        """Load and preprocess the machine translation dataset.
 
         Returns:
             Tuple[List[List[str]], List[List[str]]]: A tuple containing two lists.

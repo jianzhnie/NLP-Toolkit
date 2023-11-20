@@ -6,13 +6,13 @@ import torch.nn as nn
 from torch import Tensor
 
 sys.path.append('../../../')
+from nlptoolkit.llms.vanilla.attention import AdditiveAttention
 from nlptoolkit.models.seq2seq.rnn_mt import RNNEncoder
-from nlptoolkit.transformers.vanilla.attention import AdditiveAttention
 
 
 class RNNAttentionDecoder(nn.Module):
-    """
-    RNN-based decoder with Bahdanau attention for sequence-to-sequence learning.
+    """RNN-based decoder with Bahdanau attention for sequence-to-sequence
+    learning.
 
     带有Bahdanau注意力的循环神经网络解码器。
 
@@ -26,14 +26,14 @@ class RNNAttentionDecoder(nn.Module):
 
     在每个解码时间步骤中，解码器上一个时间步的最终层隐状态将用作查询。 因此，注意力输出和输入嵌入都连结为循环神经网络解码器的输入。
     """
+
     def __init__(self,
                  vocab_size: int,
                  embed_size: int,
                  hidden_size: int,
                  num_layers: int,
                  dropout: float = 0.0):
-        """
-        Initialize the RNN Attention Decoder.
+        """Initialize the RNN Attention Decoder.
 
         Args:
             vocab_size (int): Size of the target vocabulary.
@@ -69,8 +69,7 @@ class RNNAttentionDecoder(nn.Module):
     def forward(self, inputs: Tensor, encoder_outputs: Tensor,
                 encoder_hidden_states: Tensor,
                 encoder_valid_lens: Tensor) -> Tuple[Tensor, Tensor]:
-        """
-        Forward pass of the RNN Attention Decoder.
+        """Forward pass of the RNN Attention Decoder.
 
         Args:
             inputs (Tensor): Target sequences (word indices) for decoding,
@@ -134,8 +133,7 @@ class RNNAttentionDecoder(nn.Module):
 
 
 class RNNeq2SeqModel(nn.Module):
-    """
-    The Seq2Seq model with attention for sequence-to-sequence learning.
+    """The Seq2Seq model with attention for sequence-to-sequence learning.
 
     Args:
         src_vocab_size (int): Source vocabulary size.
@@ -145,6 +143,7 @@ class RNNeq2SeqModel(nn.Module):
         num_layers (int): Number of RNN layers in the encoder and decoder.
         dropout (float, optional): Dropout probability (default: 0.0).
     """
+
     def __init__(
         self,
         src_vocab_size: int,
@@ -167,8 +166,7 @@ class RNNeq2SeqModel(nn.Module):
                                            hidden_size, num_layers, dropout)
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the Seq2Seq model.
+        """Forward pass of the Seq2Seq model.
 
         Args:
             src (torch.Tensor): Source input tensor of shape (batch_size, src_seq_len).

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 class CNNEncoder(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embed_dim,
@@ -111,6 +112,7 @@ class CNNEncoder(nn.Module):
 
 
 class CNNDecoder(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embed_dim,
@@ -277,6 +279,7 @@ class CNNDecoder(nn.Module):
 
 
 class CNNSeq2Seq(nn.Module):
+
     def __init__(self,
                  src_vocab_size,
                  trg_vocab_size,

@@ -11,6 +11,7 @@ import torch.nn as nn
 
 
 class GloveModel(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim):
         super(GloveModel, self).__init__()
         # 词嵌入及偏置向量

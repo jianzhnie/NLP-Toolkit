@@ -54,6 +54,7 @@ class LSTMEncoder(nn.Module):
             time step at last layer) to create a single vector.
             Defaults to `None`.
     """
+
     def __init__(self,
                  input_size,
                  hidden_size,
@@ -146,6 +147,7 @@ class LSTMEncoder(nn.Module):
 
 
 class LSTMModel(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  num_classes,

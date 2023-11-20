@@ -32,6 +32,7 @@ class PositionalEncoding(nn.Module):
     Examples:
         >>> pos_encoder = PositionalEncoding(embed_size)
     """
+
     def __init__(self,
                  embed_size: int = 512,
                  dropout: float = 0.1,

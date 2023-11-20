@@ -5,8 +5,7 @@ import torch.nn as nn
 
 
 class RNNEncoder(nn.Module):
-    """
-    RNN Encoder module for sequence-to-sequence learning.
+    """RNN Encoder module for sequence-to-sequence learning.
 
     Args:
         vocab_size (int): The size of the vocabulary.
@@ -15,6 +14,7 @@ class RNNEncoder(nn.Module):
         num_layers (int): The number of GRU layers.
         dropout (float): Dropout probability (default: 0.5).
     """
+
     def __init__(self,
                  vocab_size: int,
                  embed_size: int,
@@ -40,8 +40,7 @@ class RNNEncoder(nn.Module):
         self.apply(self.init_param)
 
     def init_param(self, module: nn.Module):
-        """
-        Initialize weights for sequence-to-sequence learning.
+        """Initialize weights for sequence-to-sequence learning.
 
         Args:
             module (nn.Module): The module for weight initialization.
@@ -54,8 +53,7 @@ class RNNEncoder(nn.Module):
                     nn.init.xavier_uniform_(param)
 
     def forward(self, src: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the encoder.
+        """Forward pass of the encoder.
 
         Args:
             src (torch.Tensor): Input sequences with shape [batch_size, seq_len].
@@ -78,8 +76,7 @@ class RNNEncoder(nn.Module):
 
 
 class RNNDecoder(nn.Module):
-    """
-    The RNN decoder for sequence-to-sequence learning.
+    """The RNN decoder for sequence-to-sequence learning.
 
     Args:
         vocab_size (int): Size of the vocabulary.
@@ -88,6 +85,7 @@ class RNNDecoder(nn.Module):
         num_layers (int): Number of RNN layers.
         dropout (float): Dropout probability (default: 0.5).
     """
+
     def __init__(self,
                  vocab_size: int,
                  embed_size: int,
@@ -118,8 +116,7 @@ class RNNDecoder(nn.Module):
         self.apply(self.init_param)
 
     def init_param(self, module: nn.Module):
-        """
-        Initialize weights for sequence-to-sequence learning.
+        """Initialize weights for sequence-to-sequence learning.
 
         Args:
             module (nn.Module): The module for weight initialization.
@@ -133,8 +130,7 @@ class RNNDecoder(nn.Module):
 
     def forward(self, input: torch.Tensor, hidden: torch.Tensor,
                 context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the RNN Decoder.
+        """Forward pass of the RNN Decoder.
 
         Args:
             input (torch.Tensor): Input tokens (batch_size, seq_len).
@@ -161,8 +157,8 @@ class RNNDecoder(nn.Module):
 
 
 class RNNSeq2Seq(nn.Module):
-    """
-    Sequence-to-Sequence (Seq2Seq) model using an encoder-decoder architecture.
+    """Sequence-to-Sequence (Seq2Seq) model using an encoder-decoder
+    architecture.
 
     Args:
         src_vocab_size (int): Size of the source vocabulary.
@@ -172,6 +168,7 @@ class RNNSeq2Seq(nn.Module):
         num_layers (int): Number of RNN layers.
         dropout (float, optional): Dropout probability (default: 0.0).
     """
+
     def __init__(
         self,
         src_vocab_size: int,
@@ -194,8 +191,7 @@ class RNNSeq2Seq(nn.Module):
                                   num_layers, dropout)
 
     def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the Seq2Seq model.
+        """Forward pass of the Seq2Seq model.
 
         Args:
             src (torch.Tensor): Source input tensor of shape (batch_size, src_seq_len).

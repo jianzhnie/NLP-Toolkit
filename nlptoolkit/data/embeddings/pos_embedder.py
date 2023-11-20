@@ -21,6 +21,7 @@ class PositionalEmbedding(nn.Module):
         max_length (int):
             The maximum length of sequences.
     """
+
     def __init__(self, emb_dim, max_length):
         super(PositionalEmbedding, self).__init__()
         self.emb_dim = emb_dim

@@ -16,8 +16,8 @@ from rnn import NaiveRNNTanhCell
 
 
 class BiRNNModel(nn.Module):
-    """
-    Bidirectional Recurrent Model that supports custom LSTM, GRU, and RNN cell variants.
+    """Bidirectional Recurrent Model that supports custom LSTM, GRU, and RNN
+    cell variants.
 
     Args:
         mode (str): The RNN cell type ('LSTM', 'GRU', 'RNN').
@@ -34,6 +34,7 @@ class BiRNNModel(nn.Module):
         output, hidden_states = model(input_data)
     ```
     """
+
     def __init__(self,
                  mode: str,
                  input_size: int,
@@ -73,8 +74,7 @@ class BiRNNModel(nn.Module):
         input: torch.Tensor,
         hidden: Union[None, Tuple[torch.Tensor]] = None
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        """
-        Perform the forward pass of the Bidirectional RNN model.
+        """Perform the forward pass of the Bidirectional RNN model.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).

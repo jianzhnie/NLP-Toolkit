@@ -15,8 +15,7 @@ import torch.nn as nn
 
 
 class NaiveGRUCell(nn.Module):
-    """
-    A custom implementation of a GRU (Gated Recurrent Unit) layer.
+    """A custom implementation of a GRU (Gated Recurrent Unit) layer.
 
     - 𝐑𝑡=𝜎(𝐗𝑡𝐖𝑥𝑟+𝐇𝑡−1𝐖ℎ𝑟+𝐛𝑟),
     - 𝐙𝑡=𝜎(𝐗𝑡𝐖𝑥𝑧+𝐇𝑡−1𝐖ℎ𝑧+𝐛𝑧),
@@ -44,6 +43,7 @@ class NaiveGRUCell(nn.Module):
     Reference:
         https://d2l.ai
     """
+
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
         self.input_size = input_size
@@ -68,8 +68,7 @@ class NaiveGRUCell(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        """
-        Initialize weights and biases with uniform random values.
+        """Initialize weights and biases with uniform random values.
 
         Weight initialization follows the Xavier initialization scheme.
 
@@ -83,8 +82,7 @@ class NaiveGRUCell(nn.Module):
     def forward(self,
                 input: torch.Tensor,
                 hx: torch.Tensor = None) -> torch.Tensor:
-        """
-        Forward pass of the GRU cell.
+        """Forward pass of the GRU cell.
 
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, input_size).
@@ -118,8 +116,7 @@ class NaiveGRUCell(nn.Module):
 
 
 class GRULayer(nn.Module):
-    """
-    A custom implementation of a GRU layer.
+    """A custom implementation of a GRU layer.
 
     Args:
         input_size (int): The number of expected features in the input.
@@ -128,6 +125,7 @@ class GRULayer(nn.Module):
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
     """
+
     def __init__(self, input_size: int, hidden_size: int):
         super(GRULayer, self).__init__()
         self.input_size = input_size
@@ -141,8 +139,7 @@ class GRULayer(nn.Module):
         input: torch.Tensor,
         hidden: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the GRU layer.
+        """Forward pass of the GRU layer.
 
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
@@ -175,8 +172,7 @@ class GRULayer(nn.Module):
 
 
 class MultiLayerGRU(nn.Module):
-    """
-    Multi-layer GRU model implemented using multiple GRULayer layers.
+    """Multi-layer GRU model implemented using multiple GRULayer layers.
 
     Args:
         input_size (int): The size of the input features.
@@ -191,6 +187,7 @@ class MultiLayerGRU(nn.Module):
         output, layer_hidden_states = gru_model(input_data)
     ```
     """
+
     def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1):
         super(MultiLayerGRU, self).__init__()
 
@@ -213,8 +210,7 @@ class MultiLayerGRU(nn.Module):
         input: torch.Tensor,
         hidden: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Perform the forward pass of the multi-layer GRU model.
+        """Perform the forward pass of the multi-layer GRU model.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).

@@ -37,6 +37,7 @@ class TokenEmbedder(nn.Module):
         bos_id (int, optional):
             The start token id and also is used as padding id. Defaults to 0.
     """
+
     def __init__(self, vocab_size: int, emb_dim: int):
         super(TokenEmbedder, self).__init__()
         self.embedding = nn.Embedding(vocab_size, emb_dim)

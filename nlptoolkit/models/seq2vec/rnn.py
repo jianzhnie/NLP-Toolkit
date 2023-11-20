@@ -55,6 +55,7 @@ class RNNEncoder(nn.Module):
             step at last layer) to create a single vector.
             Defaults to `None`.
     """
+
     def __init__(self,
                  input_size,
                  hidden_size,
@@ -147,6 +148,7 @@ class RNNEncoder(nn.Module):
 
 
 class RNNModel(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  num_classes,

@@ -16,8 +16,8 @@ IGNORE_INDEX = -100
 
 
 class TrainingInstance:
-    """
-    A single training instance (sentence pair) for masked language model training.
+    """A single training instance (sentence pair) for masked language model
+    training.
 
     Args:
         tokens (List[str]): List of tokens representing the masked input of the sentence pair.
@@ -27,6 +27,7 @@ class TrainingInstance:
         masked_lm_pred_positions (List[int]): List of positions where tokens are masked during training.
         masked_lm_pred_labels (List[str]): List of masked tokens corresponding to masked positions.
     """
+
     def __init__(
         self,
         tokens: List[str],
@@ -44,8 +45,7 @@ class TrainingInstance:
         self.masked_lm_pred_labels = masked_lm_pred_labels
 
     def __str__(self) -> str:
-        """
-        Returns a string representation of the TrainingInstance object.
+        """Returns a string representation of the TrainingInstance object.
 
         Returns:
             str: String representation of the TrainingInstance.
@@ -66,8 +66,7 @@ class TrainingInstance:
         return outputs
 
     def __repr__(self) -> str:
-        """
-        Returns a string representation of the TrainingInstance object.
+        """Returns a string representation of the TrainingInstance object.
 
         Returns:
             str: String representation of the TrainingInstance.
@@ -76,8 +75,7 @@ class TrainingInstance:
 
 
 class BertDataset(Dataset):
-    """
-    Dataset class for BERT pretraining tasks.
+    """Dataset class for BERT pretraining tasks.
 
     Args:
         data_dir (str): Directory containing the data files.
@@ -90,6 +88,7 @@ class BertDataset(Dataset):
 
         bert_dataset = BertDataset(data_dir=data_dir, max_seq_len=128)
     """
+
     def __init__(
             self,
             data_dir: str,
@@ -121,8 +120,7 @@ class BertDataset(Dataset):
 
     def tokenize_text(self,
                       paragraphs: List[List[str]]) -> List[List[List[str]]]:
-        """
-        Tokenize paragraphs and sentences in the text.
+        """Tokenize paragraphs and sentences in the text.
 
         Args:
             paragraphs (List[List[str]]): List of paragraphs.
@@ -140,8 +138,7 @@ class BertDataset(Dataset):
         return tokenized_paragraphs
 
     def build_vocab(self) -> Vocab:
-        """
-        Build vocabulary from tokenized sentences.
+        """Build vocabulary from tokenized sentences.
 
         Returns:
             Vocab: Vocabulary object.
@@ -168,8 +165,7 @@ class BertDataset(Dataset):
         max_seq_len: int,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,
                torch.Tensor, torch.Tensor, torch.Tensor, ]:
-        """
-        Formats BERT pretraining inputs from instances.
+        """Formats BERT pretraining inputs from instances.
 
         Args:
             instances (List[TrainingInstance]): List of BERT pretraining instances.
@@ -257,8 +253,7 @@ class BertDataset(Dataset):
     def get_bert_pretraing_instances(
             self, paragraphs: List[List[str]],
             max_seq_len: int) -> List[Tuple[List[str], List[int], bool]]:
-        """
-        Get BERT pretraining data from tokenized paragraphs.
+        """Get BERT pretraining data from tokenized paragraphs.
 
         Args:
             paragraphs (List[List[str]]): List of tokenized paragraphs.
@@ -301,8 +296,7 @@ class BertDataset(Dataset):
         next_sentence: List[str],
         paragraphs: List[List[List[str]]],
     ) -> Tuple[List[str], bool]:
-        """
-        Randomly selects the next sentence for NSP task.
+        """Randomly selects the next sentence for NSP task.
 
         Args:
             sentence (List[str]): Current sentence.
@@ -323,8 +317,7 @@ class BertDataset(Dataset):
     def get_nsp_data_from_paragraph(
             self, paragraph: List[str], paragraphs: List[List[List[str]]],
             max_seq_len: int) -> List[Tuple[List[str], bool]]:
-        """
-        Generate NSP (Next Sentence Prediction) data from a paragraph.
+        """Generate NSP (Next Sentence Prediction) data from a paragraph.
 
         Args:
             paragraph (List[List[str]]): Tokenized paragraph.
@@ -349,8 +342,7 @@ class BertDataset(Dataset):
             self,
             tokens_a: List[str],
             tokens_b: List[str] = None) -> Tuple[List[str], List[int]]:
-        """
-        Get tokens and segments for BERT input.
+        """Get tokens and segments for BERT input.
 
         Args:
             tokens_a (List[str]): Tokens of the sentence.
@@ -369,8 +361,7 @@ class BertDataset(Dataset):
 
     def get_masked_lm_data_from_tokens(
             self, tokens: List[str]) -> Tuple[List[int], List[int], List[int]]:
-        """
-        Generates Masked Language Model (MLM) data from a list of tokens.
+        """Generates Masked Language Model (MLM) data from a list of tokens.
 
         Args:
             tokens (List[str]): List of tokens in a sentence.
@@ -413,8 +404,8 @@ class BertDataset(Dataset):
         num_masked_lm_preds: int,
         vocab_words: List[str],
     ) -> Tuple[List[int], List[Tuple[int, int]]]:
-        """
-        Replaces tokens with <mask> or random tokens to create MLM training data.
+        """Replaces tokens with <mask> or random tokens to create MLM training
+        data.
 
         Args:
             tokens (List[str]): List of tokens in a sentence.
@@ -468,8 +459,7 @@ class BertDataset(Dataset):
         return masked_lm_input_tokens, masked_lm_labels, masked_lm_pred_positions, masked_lm_pred_labels
 
     def preprocess_text_data(self, path: str) -> List[List[str]]:
-        """
-        Preprocesses the text data from the specified file.
+        """Preprocesses the text data from the specified file.
 
         Args:
             path (str): Path to the text file.
@@ -488,8 +478,7 @@ class BertDataset(Dataset):
         return paragraphs
 
     def __len__(self) -> int:
-        """
-        Returns the total number of paragraphs in the dataset.
+        """Returns the total number of paragraphs in the dataset.
 
         Returns:
             int: Number of paragraphs.
@@ -497,8 +486,7 @@ class BertDataset(Dataset):
         return len(self.all_input_ids)
 
     def __getitem__(self, idx: int) -> List[Tuple[List[str], List[int], bool]]:
-        """
-        Retrieves the NSP data for a specific paragraph.
+        """Retrieves the NSP data for a specific paragraph.
 
         Args:
             idx (int): Index of the paragraph.

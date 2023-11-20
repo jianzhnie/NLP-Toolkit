@@ -15,6 +15,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class Highway(nn.Module):
+
     def __init__(self, input_dim, num_layers, activation=F.relu):
         super(Highway, self).__init__()
         self.input_dim = input_dim
@@ -37,6 +38,7 @@ class Highway(nn.Module):
 
 
 class ConvTokenEmbedder(nn.Module):
+
     def __init__(self,
                  vocab_c,
                  char_embedding_dim,
@@ -108,6 +110,7 @@ class ConvTokenEmbedder(nn.Module):
 
 
 class ELMoLstmEncoder(nn.Module):
+
     def __init__(self, input_dim, hidden_dim, num_layers, dropout_prob=0.0):
         super(ELMoLstmEncoder, self).__init__()
 
@@ -193,6 +196,7 @@ class ELMoLstmEncoder(nn.Module):
 
 class BiLM(nn.Module):
     """多层双向语言模型。"""
+
     def __init__(self, configs, vocab_w, vocab_c):
         super(BiLM, self).__init__()
         self.dropout_prob = configs['dropout_prob']

@@ -2,8 +2,7 @@ import os
 
 
 def is_directory_empty(directory_path: str) -> bool:
-    """
-    Check if a directory is empty.
+    """Check if a directory is empty.
 
     Args:
         directory_path (str): The path to the directory to be checked.
@@ -22,9 +21,8 @@ def is_directory_empty(directory_path: str) -> bool:
 
 
 def get_outdir(path: str, *paths: str, inc: bool = False) -> str:
-    """
-    Create an output directory if it is empty and return its path. If inc is True,
-    increment the directory name until a unique name is found.
+    """Create an output directory if it is empty and return its path. If inc is
+    True, increment the directory name until a unique name is found.
 
     Args:
         path (str): The base directory where the output directory will be created.

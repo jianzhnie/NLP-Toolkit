@@ -39,12 +39,13 @@ ACT2FN = {
 
 
 class BertEmbedding(nn.Module):
-    """
-    BERT embedding module that combines word, position, and token type embeddings.
+    """BERT embedding module that combines word, position, and token type
+    embeddings.
 
     Args:
         config (BertConfig): Configuration object containing model parameters.
     """
+
     def __init__(self, config: BertConfig) -> None:
         super().__init__()
         self.word_embedding = nn.Embedding(config.vocab_size,
@@ -65,8 +66,7 @@ class BertEmbedding(nn.Module):
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
     ) -> Tensor:
-        """
-        Forward pass of the BERT embedding module.
+        """Forward pass of the BERT embedding module.
 
         Args:
             input_ids (Optional[Tensor]): Input token indices.
@@ -101,12 +101,12 @@ class BertEmbedding(nn.Module):
 
 
 class BertSelfAttention(nn.Module):
-    """
-    BERT Self Attention module.
+    """BERT Self Attention module.
 
     Args:
         config (BertConfig): Configuration object containing model parameters.
     """
+
     def __init__(self, config: BertConfig):
         super(BertSelfAttention, self).__init__()
         if config.hidden_size % config.num_attention_heads != 0:
@@ -126,8 +126,8 @@ class BertSelfAttention(nn.Module):
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: Tensor) -> Tensor:
-        """
-        Transpose the dimensions of the input tensor for computing attention scores.
+        """Transpose the dimensions of the input tensor for computing attention
+        scores.
 
         Args:
             x (Tensor): Input tensor.
@@ -152,8 +152,7 @@ class BertSelfAttention(nn.Module):
         head_mask: Optional[Tensor] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[Tensor, Optional[Tensor]]:
-        """
-        Forward pass of the BERT self-attention module.
+        """Forward pass of the BERT self-attention module.
 
         Args:
             hidden_states (Tensor): Input hidden states.
@@ -213,14 +212,15 @@ class BertSelfAttention(nn.Module):
 
 
 class BertSelfOutput(nn.Module):
-    """
-    BERT Self Output module. Processes the output from the self-attention layer.
+    """BERT Self Output module. Processes the output from the self-attention
+    layer.
 
     Args:
         hidden_size (int): Dimensionality of the input and output tensors.
         layer_norm_eps (float): Epsilon value for layer normalization.
         hidden_dropout_prob (float): Dropout probability for hidden layers.
     """
+
     def __init__(self, config: BertConfig):
         super(BertSelfOutput, self).__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -229,8 +229,7 @@ class BertSelfOutput(nn.Module):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: Tensor, input_tensor: Tensor) -> Tensor:
-        """
-        Forward pass of the BERT Self Output module.
+        """Forward pass of the BERT Self Output module.
 
         Args:
             hidden_states (Tensor): Input hidden states from the previous layer.
@@ -249,8 +248,8 @@ class BertSelfOutput(nn.Module):
 
 
 class BertAttention(nn.Module):
-    """
-    BERT Attention module. Combines self-attention and output transformations.
+    """BERT Attention module. Combines self-attention and output
+    transformations.
 
     Args:
         hidden_size (int): Dimensionality of the input and output tensors.
@@ -259,6 +258,7 @@ class BertAttention(nn.Module):
         hidden_dropout_prob (float): Dropout probability for hidden layers.
         attention_probs_dropout_prob (float): Dropout probability for attention probabilities.
     """
+
     def __init__(self, config: BertConfig):
         super(BertAttention, self).__init__()
         # Self-attention layer
@@ -273,8 +273,7 @@ class BertAttention(nn.Module):
         head_mask: Optional[Tensor] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[Tensor, Optional[Tensor]]:
-        """
-        Forward pass of the BERT Attention module.
+        """Forward pass of the BERT Attention module.
 
         Args:
             hidden_states (Tensor): Input hidden states from the previous layer.
@@ -299,14 +298,15 @@ class BertAttention(nn.Module):
 
 
 class BertIntermediate(nn.Module):
-    """
-    BERT Intermediate module. Processes the hidden states from the encoder layer.
+    """BERT Intermediate module. Processes the hidden states from the encoder
+    layer.
 
     Args:
         hidden_size (int): Dimensionality of the hidden states.
         intermediate_size (int): Dimensionality of the intermediate states.
         hidden_act (Union[str, nn.Module]): Activation function applied to the intermediate hidden states.
     """
+
     def __init__(self, config: BertConfig):
         super(BertIntermediate, self).__init__()
         # Linear transformation layer
@@ -319,8 +319,7 @@ class BertIntermediate(nn.Module):
             self.intermediate_act_fn = config.hidden_act
 
     def forward(self, hidden_states: Tensor) -> Tensor:
-        """
-        Forward pass of the BERT Intermediate module.
+        """Forward pass of the BERT Intermediate module.
 
         Args:
             hidden_states (Tensor): Input hidden states from the encoder layer.
@@ -336,16 +335,16 @@ class BertIntermediate(nn.Module):
 
 
 class BertOutput(nn.Module):
-    """
-    BERT Output module. Combines linear transformation, dropout, and layer normalization.
+    """BERT Output module. Combines linear transformation, dropout, and layer
+    normalization.
 
     Args:
         hidden_size (int): Dimensionality of the input and output tensors.
         intermediate_size (int): Dimensionality of the intermediate tensors.
         hidden_dropout_prob (float): Dropout probability for hidden layers.
         layer_norm_eps (float): Epsilon value for layer normalization.
-
     """
+
     def __init__(self, config: BertConfig):
         super().__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
@@ -354,8 +353,7 @@ class BertOutput(nn.Module):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: Tensor, input_tensor: Tensor) -> Tensor:
-        """
-        Forward pass of the BERT Output module.
+        """Forward pass of the BERT Output module.
 
         Args:
             hidden_states (Tensor): Input hidden states from the previous layer.
@@ -374,12 +372,13 @@ class BertOutput(nn.Module):
 
 
 class BertLayer(nn.Module):
-    """
-    BERT Layer module. Comprises attention, intermediate, and output sub-layers.
+    """BERT Layer module. Comprises attention, intermediate, and output sub-
+    layers.
 
     Args:
         config (BertConfig): Configuration object containing model parameters.
     """
+
     def __init__(self, config: BertConfig):
         super(BertLayer, self).__init__()
         # Self-attention layer
@@ -396,8 +395,7 @@ class BertLayer(nn.Module):
         head_mask: Optional[Tensor] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[Tensor, ...]:
-        """
-        Forward pass of the BERT Layer module.
+        """Forward pass of the BERT Layer module.
 
         Args:
             hidden_states (Tensor): Input hidden states from the previous layer.
@@ -430,12 +428,12 @@ class BertLayer(nn.Module):
 
 
 class BertEncoder(nn.Module):
-    """
-    BERT Encoder module. Stacks multiple layers of BERT layers.
+    """BERT Encoder module. Stacks multiple layers of BERT layers.
 
     Args:
         config (BertConfig): Configuration object containing model parameters.
     """
+
     def __init__(self, config: BertConfig):
         super(BertEncoder, self).__init__()
         # Stack multiple BERT layers
@@ -453,8 +451,7 @@ class BertEncoder(nn.Module):
         output_hidden_states: Optional[bool] = False,
         return_dict: Optional[bool] = True,
     ) -> Union[Tuple[Tensor], BertEncoderOutput]:
-        """
-        Forward pass of the BERT Encoder module.
+        """Forward pass of the BERT Encoder module.
 
         Args:
             hidden_states (Tensor): Input hidden states from the previous layer.
@@ -487,6 +484,7 @@ class BertEncoder(nn.Module):
             if self.gradient_checkpointing and self.training:
                 # Custom forward function for gradient checkpointing
                 def create_custom_forward(module):
+
                     def custom_forward(*inputs):
                         return module(*inputs, output_attentions)
 
@@ -530,13 +528,12 @@ class BertEncoder(nn.Module):
 
 
 class BertPooler(nn.Module):
-    """
-    Pool the result of BertEncoder by selecting the hidden state of the first token ([CLS] token)
-    and passing it through a linear layer followed by Tanh activation.
-    """
+    """Pool the result of BertEncoder by selecting the hidden state of the
+    first token ([CLS] token) and passing it through a linear layer followed by
+    Tanh activation."""
+
     def __init__(self, config: BertConfig):
-        """
-        Initialize the BertPooler.
+        """Initialize the BertPooler.
 
         Args:
             config (BertConfig): Configuration object containing model parameters.
@@ -546,8 +543,7 @@ class BertPooler(nn.Module):
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states: Tensor) -> Tensor:
-        """
-        Forward pass of the BertPooler.
+        """Forward pass of the BertPooler.
 
         Args:
             hidden_states (Tensor): Hidden states from the BertEncoder.
@@ -564,12 +560,10 @@ class BertPooler(nn.Module):
 
 
 class BertPredictionHeadTransform(nn.Module):
-    """
-    Transformation module for the final prediction head in BERT models.
-    """
+    """Transformation module for the final prediction head in BERT models."""
+
     def __init__(self, config: BertConfig):
-        """
-        Initialize the BertPredictionHeadTransform.
+        """Initialize the BertPredictionHeadTransform.
 
         Args:
             hidden_size (int): Size of the hidden states.
@@ -587,8 +581,7 @@ class BertPredictionHeadTransform(nn.Module):
                                        eps=config.layer_norm_eps)
 
     def forward(self, hidden_states: Tensor) -> Tensor:
-        """
-        Forward pass of the BertPredictionHeadTransform.
+        """Forward pass of the BertPredictionHeadTransform.
 
         Args:
             hidden_states (Tensor): Hidden states to be transformed.
@@ -603,12 +596,10 @@ class BertPredictionHeadTransform(nn.Module):
 
 
 class BertLMPredictionHead(nn.Module):
-    """
-    Prediction head for masked language modeling in BERT models.
-    """
+    """Prediction head for masked language modeling in BERT models."""
+
     def __init__(self, config: BertConfig):
-        """
-        Initialize the BertLMPredictionHead.
+        """Initialize the BertLMPredictionHead.
 
         Args:
             hidden_size (int): Size of the hidden states.
@@ -631,8 +622,7 @@ class BertLMPredictionHead(nn.Module):
         self.decoder.bias = self.bias
 
     def forward(self, hidden_states: Tensor) -> Tensor:
-        """
-        Forward pass of the BertLMPredictionHead.
+        """Forward pass of the BertLMPredictionHead.
 
         Args:
             hidden_states (Tensor): Transformed hidden states.
@@ -648,12 +638,10 @@ class BertLMPredictionHead(nn.Module):
 
 
 class BertOnlyMLMHead(nn.Module):
-    """
-    MLM head for masked language modeling in BERT models.
-    """
+    """MLM head for masked language modeling in BERT models."""
+
     def __init__(self, config: BertConfig):
-        """
-        Initialize the BertOnlyMLMHead.
+        """Initialize the BertOnlyMLMHead.
 
         Args:
             config (BertConfig): Configuration object containing model parameters.
@@ -662,8 +650,7 @@ class BertOnlyMLMHead(nn.Module):
         self.predictions = BertLMPredictionHead(config)
 
     def forward(self, hidden_states: Tensor) -> Tensor:
-        """
-        Forward pass of the BertOnlyMLMHead.
+        """Forward pass of the BertOnlyMLMHead.
 
         Args:
             hidden_states (Tensor): Transformed hidden states.
@@ -678,12 +665,10 @@ class BertOnlyMLMHead(nn.Module):
 
 
 class BertOnlyNSPHead(nn.Module):
-    """
-    NSP (Next Sentence Prediction) head for BERT models.
-    """
+    """NSP (Next Sentence Prediction) head for BERT models."""
+
     def __init__(self, config: BertConfig):
-        """
-        Initialize the BertOnlyNSPHead.
+        """Initialize the BertOnlyNSPHead.
 
         Args:
             config (BertConfig): Configuration object containing model parameters.
@@ -693,8 +678,7 @@ class BertOnlyNSPHead(nn.Module):
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, pooled_output: Tensor) -> Tensor:
-        """
-        Forward pass of the BertOnlyNSPHead.
+        """Forward pass of the BertOnlyNSPHead.
 
         Args:
             pooled_output (Tensor): Pooled output from the BERT model.
@@ -708,12 +692,11 @@ class BertOnlyNSPHead(nn.Module):
 
 
 class BertPreTrainingHeads(nn.Module):
-    """
-    Pre-training heads module for BERT models, including MLM and NSP heads.
-    """
+    """Pre-training heads module for BERT models, including MLM and NSP
+    heads."""
+
     def __init__(self, config: BertConfig):
-        """
-        Initialize the BertPreTrainingHeads.
+        """Initialize the BertPreTrainingHeads.
 
         Args:
             config (BertConfig): Configuration object containing model parameters.
@@ -726,8 +709,7 @@ class BertPreTrainingHeads(nn.Module):
 
     def forward(self, sequence_output: Tensor,
                 pooled_output: Tensor) -> Tuple[Tensor, Tensor]:
-        """
-        Forward pass of the BertPreTrainingHeads.
+        """Forward pass of the BertPreTrainingHeads.
 
         Args:
             sequence_output (Tensor): Output from the BERT encoder for each token.
@@ -744,8 +726,8 @@ class BertPreTrainingHeads(nn.Module):
 
 
 class BertModel(BertPreTrainedModel):
-    """
-    BERT model ("Bidirectional Embedding Representations from a Transformer").
+    """BERT model ("Bidirectional Embedding Representations from a
+    Transformer").
 
     Args:
         config (BertConfig): A BertConfig class instance with the configuration to build a new model.
@@ -784,6 +766,7 @@ class BertModel(BertPreTrainedModel):
     model = BertModel(config=config)
     all_encoder_layers, pooled_output = model(input_ids, token_type_ids, input_mask)
     """
+
     def __init__(self, config: BertConfig, add_pooling_layer: bool = True):
         super().__init__(config)
         self.config = config

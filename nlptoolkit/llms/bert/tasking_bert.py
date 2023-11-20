@@ -16,13 +16,13 @@ from .modeling_output import (BertForPreTrainingOutput, BertModelOutput,
 
 
 class BertForPreTraining(BertPreTrainedModel):
-    """
-    Bert Model with pretraining tasks on top.
+    """Bert Model with pretraining tasks on top.
 
     Args:
         config (BertConfig):
             An instance of BertConfig used to construct BertForPreTraining.
     """
+
     def __init__(self, config: BertConfig):
         super(BertForPreTraining, self).__init__(config)
         self.config = config
@@ -55,8 +55,7 @@ class BertForPreTraining(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], BertForPreTrainingOutput]:
-        """
-        Forward pass for BertForPretraining.
+        """Forward pass for BertForPretraining.
 
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -138,16 +137,16 @@ class BertForPreTraining(BertPreTrainedModel):
 
 
 class BertLMHeadModel(BertPreTrainedModel):
-    """
-    Bert Model with a Causal Language Modeling (CLM) head.
+    """Bert Model with a Causal Language Modeling (CLM) head.
 
     Args:
         config (:class:`BertConfig`):
             An instance of BertConfig used to construct BertLMHeadModel.
     """
+
     def __init__(self, config):
-        """
-        Initializes the BertLMHeadModel.
+        """Initializes the BertLMHeadModel.
+
         Args:
             config (BertConfig): Configuration class for BERT.
         """
@@ -160,16 +159,16 @@ class BertLMHeadModel(BertPreTrainedModel):
         self.post_init()
 
     def get_output_embeddings(self):
-        """
-        Retrieves the output embedding layer.
+        """Retrieves the output embedding layer.
+
         Returns:
             torch.nn.Module: Output embedding layer.
         """
         return self.lm_head.predictions.decoder
 
     def set_output_embeddings(self, new_embeddings):
-        """
-        Sets the output embedding layer to new_embeddings.
+        """Sets the output embedding layer to new_embeddings.
+
         Args:
             new_embeddings (torch.nn.Module): New embedding layer.
         """
@@ -188,8 +187,7 @@ class BertLMHeadModel(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], CausalLMOutput]:
-        """
-        Forward pass for the BertLMHeadModel.
+        """Forward pass for the BertLMHeadModel.
 
         Args:
             input_ids (torch.Tensor, optional):
@@ -288,12 +286,12 @@ class BertLMHeadModel(BertPreTrainedModel):
 
 
 class BertForMaskedLM(BertPreTrainedModel):
-    """
-    BERT model for Masked Language Modeling.
+    """BERT model for Masked Language Modeling.
 
     Args:
         config: BERT configuration object.
     """
+
     def __init__(self, config: BertConfig):
         super(BertForMaskedLM, self).__init__(config)
         self.bert = BertModel(config, add_pooling_layer=False)
@@ -303,8 +301,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         self.post_init()
 
     def get_output_embeddings(self) -> nn.Module:
-        """
-        Get the output embedding layer.
+        """Get the output embedding layer.
 
         Returns:
             nn.Module: Output embedding layer.
@@ -312,8 +309,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         return self.lm_head.predictions.decoder
 
     def set_output_embeddings(self, new_embeddings: nn.Module):
-        """
-        Set the output embedding layer.
+        """Set the output embedding layer.
 
         Args:
             new_embeddings (nn.Module): New embedding layer.
@@ -332,8 +328,7 @@ class BertForMaskedLM(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], MaskedLMOutput]:
-        """
-        Perform forward pass for Masked Language Modeling.
+        """Perform forward pass for Masked Language Modeling.
 
         Args:
             input_ids (torch.Tensor): Input tensor of token IDs.
@@ -392,8 +387,7 @@ class BertForMaskedLM(BertPreTrainedModel):
                                       attention_mask: Optional[
                                           torch.Tensor] = None,
                                       **model_kwargs) -> dict:
-        """
-        Prepare inputs for generation.
+        """Prepare inputs for generation.
 
         Args:
             input_ids (torch.Tensor): Input tensor of token IDs.
@@ -425,6 +419,7 @@ class BertForMaskedLM(BertPreTrainedModel):
 
 
 class BertForNextSentencePrediction(BertPreTrainedModel):
+
     def __init__(self, config):
         super().__init__(config)
 
@@ -521,6 +516,7 @@ class BertForNextSentencePrediction(BertPreTrainedModel):
 
 
 class BertForSequenceClassification(BertPreTrainedModel):
+
     def __init__(self, config: BertConfig):
         super().__init__(config)
         self.num_labels = config.num_labels
@@ -609,6 +605,7 @@ class BertForSequenceClassification(BertPreTrainedModel):
 
 
 class BertForMultipleChoice(BertPreTrainedModel):
+
     def __init__(self, config: BertConfig):
         super().__init__(config)
 
@@ -689,6 +686,7 @@ class BertForMultipleChoice(BertPreTrainedModel):
 
 
 class BertForTokenClassification(BertPreTrainedModel):
+
     def __init__(self, config: BertConfig):
         super().__init__(config)
         self.num_labels = config.num_labels
@@ -755,6 +753,7 @@ class BertForTokenClassification(BertPreTrainedModel):
 
 
 class BertForQuestionAnswering(BertPreTrainedModel):
+
     def __init__(self, config: BertConfig):
         super().__init__(config)
         self.num_labels = config.num_labels

@@ -24,6 +24,7 @@ class BoWEncoder(nn.Module):
         emb_dim(int):
             The dimension of each vector in the input sequence.
     """
+
     def __init__(self, emb_dim):
         super().__init__()
         self.emb_dim = emb_dim
@@ -74,10 +75,13 @@ class BoWModel(nn.Module):
     """This class implements the Bag of Words Classification Network model to
     classify texts.
 
-    At a high level, the model starts by embedding the tokens and running them through a word embedding. Then, we encode these representations with a
-    `BoWEncoder`. Lastly, we take the output of the encoder to create a final representation, which is passed through some feed-forward layers to output a
-    logits (`output_layer`).
+    At a high level, the model starts by embedding the tokens and running them
+    through a word embedding. Then, we encode these representations with a
+    `BoWEncoder`. Lastly, we take the output of the encoder to create a final
+    representation, which is passed through some feed-forward layers to output
+    a logits (`output_layer`).
     """
+
     def __init__(self,
                  vocab_size,
                  num_classes,

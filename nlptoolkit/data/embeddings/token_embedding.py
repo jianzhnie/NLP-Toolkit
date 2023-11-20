@@ -12,12 +12,11 @@ import torch
 
 
 class TokenEmbedding:
-    """
-    TokenEmbedding class for loading and using pre-trained word embeddings like GloVe or fastText.
-    """
+    """TokenEmbedding class for loading and using pre-trained word embeddings
+    like GloVe or fastText."""
+
     def __init__(self, file_name: str):
-        """
-        Initialize the TokenEmbedding instance.
+        """Initialize the TokenEmbedding instance.
 
         Args:
             file_name (str): Path to the pre-trained word embedding model file.
@@ -29,8 +28,7 @@ class TokenEmbedding:
         }
 
     def load_embedding(self, file_name: str) -> Tuple[List[str], torch.Tensor]:
-        """
-        Load the pre-trained word embeddings from a file.
+        """Load the pre-trained word embeddings from a file.
 
         Args:
             file_name (str): Path to the pre-trained word embedding model file.
@@ -56,8 +54,7 @@ class TokenEmbedding:
 
     def get_word_embedding(self, tokens: Union[str,
                                                List[str]]) -> torch.Tensor:
-        """
-        Get word embeddings for one or more tokens.
+        """Get word embeddings for one or more tokens.
 
         Args:
             tokens (str or List[str]): Token(s) for which to retrieve embeddings.
@@ -73,8 +70,7 @@ class TokenEmbedding:
         return vecs
 
     def vocabulary_size(self) -> int:
-        """
-        Get the size of the vocabulary, including the '<unk>' token.
+        """Get the size of the vocabulary, including the '<unk>' token.
 
         Returns:
             int: Size of the vocabulary.
@@ -83,8 +79,7 @@ class TokenEmbedding:
 
     def cosine_similarity(self, embeddings_mat: torch.Tensor,
                           query_vector: torch.Tensor) -> torch.Tensor:
-        """
-        Compute cosine similarity between two tensors.
+        """Compute cosine similarity between two tensors.
 
         Args:
             embeddings_mat (torch.Tensor): Matrix of word embeddings.
@@ -105,8 +100,8 @@ class TokenEmbedding:
     def get_knn_neighbors(self,
                           query_vector: torch.Tensor,
                           top_k: int = 5) -> Tuple[List[str], List[float]]:
-        """
-        Get the K-nearest neighbors based on cosine similarities between word vectors.
+        """Get the K-nearest neighbors based on cosine similarities between
+        word vectors.
 
         Args:
             query_vector (torch.Tensor): Query vector for which to find nearest neighbors.
@@ -129,8 +124,8 @@ class TokenEmbedding:
     def find_k_nearest_neighbors(self,
                                  query_word: str,
                                  top_k: int = 5) -> List[str]:
-        """
-        Find the K-nearest neighbors for a query word based on cosine similarities between word vectors.
+        """Find the K-nearest neighbors for a query word based on cosine
+        similarities between word vectors.
 
         Args:
             query_word (str): The word for which to find nearest neighbors.

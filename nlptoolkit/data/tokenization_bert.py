@@ -286,6 +286,7 @@ class BertTokenizer(PreTrainedTokenizer):
 
 
 class BasicTokenizer(object):
+
     def __init__(self,
                  do_lower_case=True,
                  never_split=None,
@@ -407,6 +408,7 @@ class BasicTokenizer(object):
 
 class WordpieceTokenizer(object):
     """Runs WordPiece tokenization."""
+
     def __init__(self, vocab, unk_token, max_input_chars_per_word=100):
         self.vocab = vocab
         self.unk_token = unk_token

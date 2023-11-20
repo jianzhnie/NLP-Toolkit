@@ -22,15 +22,13 @@ from nlptoolkit.data.embeddings import (PositionalEmbedding,
 
 
 def _get_activation_fn(activation: str):
-    """
-    Get the activation function based on the provided string.
+    """Get the activation function based on the provided string.
 
     Args:
         activation (str): Activation function name, either 'relu' or 'gelu'.
 
     Returns:
         Callable: Activation function.
-
     """
     if activation == 'relu':
         return F.relu
@@ -67,6 +65,7 @@ class TransformerEncoderLayer(Module):
         >>> src = torch.rand(10, 32, 512)
         >>> out = encoder_layer(src)
     """
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -140,6 +139,7 @@ class TransformerDecoderLayer(Module):
         >>> tgt = torch.rand(20, 32, 512)
         >>> out = decoder_layer(tgt, memory)
     """
+
     def __init__(self,
                  d_model,
                  nhead,
@@ -214,10 +214,15 @@ class TransformerEncoderModel(nn.Module):
     """The nn.TransformerEncoder consists of multiple layers of
     nn.TransformerEncoderLayer.
 
-    Along with the input sequence, a square attention mask is required because the self-attention layers in nn.TransformerEncoder are only allowed to attend the
-    earlier positions in the sequence. For the language  modeling task, any tokens on the future positions should be masked. To produce a probability
-    distribution over output words, the output of the nn.TransformerEncoder model is passed through a linear layer followed by a log-softmax function.
+    Along with the input sequence, a square attention mask is required because
+    the self-attention layers in nn.TransformerEncoder are only allowed to
+    attend the earlier positions in the sequence. For the language  modeling
+    task, any tokens on the future positions should be masked. To produce a
+    probability distribution over output words, the output of the
+    nn.TransformerEncoder model is passed through a linear layer followed by a
+    log-softmax function.
     """
+
     def __init__(self,
                  vocab_size: int,
                  d_model: int,
@@ -290,6 +295,7 @@ class TransformerModel(nn.Module):
         eos_id (int, optional):
             The end token id. Defaults to 1.
     """
+
     def __init__(self,
                  src_vocab_size: int = None,
                  tgt_vocab_size: int = None,

@@ -13,8 +13,8 @@ import torch.nn as nn
 
 
 class NaiveRNNTanhCell(nn.Module):
-    """
-    A custom implementation of a simple RNN Cell layer using tanh activation.
+    """A custom implementation of a simple RNN Cell layer using tanh
+    activation.
 
     Args:
         input_size (int): The number of expected features in the input.
@@ -34,6 +34,7 @@ class NaiveRNNTanhCell(nn.Module):
         hidden_state = torch.zeros(32, 128)  # Initial hidden state
         new_hidden_state = rnn_cell(input_data, hidden_state)
     """
+
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
 
@@ -49,8 +50,7 @@ class NaiveRNNTanhCell(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        """
-        Initialize weights and biases with uniform random values.
+        """Initialize weights and biases with uniform random values.
 
         Weight initialization follows the Xavier initialization scheme.
 
@@ -66,8 +66,7 @@ class NaiveRNNTanhCell(nn.Module):
             self,
             input: torch.Tensor,
             hidden: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the RNN layer.
+        """Forward pass of the RNN layer.
 
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, input_size).
@@ -94,13 +93,13 @@ class NaiveRNNTanhCell(nn.Module):
 
 
 class RNNTanhCell(nn.Module):
-    """
-    A simple RNN cell module using tanh activation.
+    """A simple RNN cell module using tanh activation.
 
     Args:
         input_size: The number of expected features in the input x
         hidden_size: The number of features in the hidden state h
     """
+
     def __init__(self, input_size: int, hidden_size: int) -> None:
         super().__init__()
 
@@ -113,8 +112,7 @@ class RNNTanhCell(nn.Module):
 
     def forward(self, input: torch.Tensor,
                 hidden: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the RNN cell.
+        """Forward pass of the RNN cell.
 
         Args:
             input: Input tensor of shape (batch_size, input_size)
@@ -130,8 +128,7 @@ class RNNTanhCell(nn.Module):
 
 
 class RNNLayer(nn.Module):
-    """
-    Custom RNNBase model implemented using RNNTanhCell.
+    """Custom RNNBase model implemented using RNNTanhCell.
 
     Args:
         input_size (int): The size of the input features.
@@ -151,6 +148,7 @@ class RNNLayer(nn.Module):
         # Batch size of 32, sequence length of 10, input size of 64
         output, final_hidden_state = rnn_model(input_data)
     """
+
     def __init__(self, input_size: int, hidden_size: int):
         super(RNNLayer, self).__init__()
         self.input_size = input_size
@@ -163,8 +161,7 @@ class RNNLayer(nn.Module):
             self,
             input: torch.Tensor,
             hidden: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Perform the forward pass of the RNN model.
+        """Perform the forward pass of the RNN model.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).
@@ -196,8 +193,7 @@ class RNNLayer(nn.Module):
 
 
 class MultiLayerRNN(nn.Module):
-    """
-    Multi-layer RNN model implemented using multiple RNNTanhCell layers.
+    """Multi-layer RNN model implemented using multiple RNNTanhCell layers.
 
     Args:
         input_size (int): The size of the input features.
@@ -212,6 +208,7 @@ class MultiLayerRNN(nn.Module):
         output, final_hidden_state = rnn_model(input_data)
     ```
     """
+
     def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1):
         super(MultiLayerRNN, self).__init__()
         self.input_size = input_size
@@ -233,8 +230,7 @@ class MultiLayerRNN(nn.Module):
         input: torch.Tensor,
         hidden: List[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, List[torch.Tensor]]:
-        """
-        Perform the forward pass of the multi-layer RNN model.
+        """Perform the forward pass of the multi-layer RNN model.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch, sequence, input_size).

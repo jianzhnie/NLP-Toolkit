@@ -12,6 +12,7 @@ import torch.nn.functional as F
 
 
 class NGramLanguageModel(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim, context_size, hidden_dim):
         super(NGramLanguageModel, self).__init__()
         # 词嵌入层
@@ -42,6 +43,7 @@ class NGramLanguageModel(nn.Module):
 
 
 class CBOWLanguageModel(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embedding_dim=128,
@@ -75,6 +77,7 @@ class CBOWLanguageModel(nn.Module):
 
 
 class SkipGramModel(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim):
         super(SkipGramModel, self).__init__()
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)
@@ -94,6 +97,7 @@ class SkipGramModel(nn.Module):
 
 
 class SkipGramNegativeSamplingModel(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim):
         super(SkipGramNegativeSamplingModel, self).__init__()
         # 词嵌入
@@ -123,6 +127,7 @@ class SkipGramNegativeSamplingModel(nn.Module):
 
 
 class RNNLM(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embedding_dim,

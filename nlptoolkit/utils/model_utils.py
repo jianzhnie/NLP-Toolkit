@@ -7,8 +7,7 @@ import torch.nn as nn
 
 # Function to count trainable parameters in the model
 def count_parameters(model: nn.Module) -> int:
-    """
-    Count the number of trainable parameters in the model.
+    """Count the number of trainable parameters in the model.
 
     Args:
         model (nn.Module): The model.
@@ -20,8 +19,7 @@ def count_parameters(model: nn.Module) -> int:
 
 
 def save_model_checkpoints(model: nn.Module, epoch: int, save_dir: str = None):
-    """
-    Save a PyTorch model to a file with a filename indicating the epoch.
+    """Save a PyTorch model to a file with a filename indicating the epoch.
 
     Args:
         model (torch.nn.Module): The PyTorch model to be saved.
@@ -43,8 +41,7 @@ def save_model_checkpoints(model: nn.Module, epoch: int, save_dir: str = None):
 
 
 def clip_gradients(model: Union[nn.Module, object], theta: float):
-    """
-    Clip gradients to prevent exploding gradients during training.
+    """Clip gradients to prevent exploding gradients during training.
 
     Args:
         model (nn.Module or object): The neural modelwork model or object containing parameters.

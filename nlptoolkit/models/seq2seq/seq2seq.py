@@ -5,12 +5,11 @@ import torch.nn as nn
 
 sys.path.append('../../')
 from nlptoolkit.data.embeddings import PositionalEncoding
-from nlptoolkit.transformers.vanilla import Transformer
+from nlptoolkit.llms.vanilla import Transformer
 
 
 class Seq2SeqTransformer(nn.Module):
-    """
-    Sequence-to-Sequence Transformer model for machine translation.
+    """Sequence-to-Sequence Transformer model for machine translation.
 
     Args:
         src_vocab_size (int): Size of the source vocabulary.
@@ -21,6 +20,7 @@ class Seq2SeqTransformer(nn.Module):
         dim_feedforward (int): Dimensionality of the hidden layer in the feedforward network.
         dropout (float, optional): Dropout probability. Default is 0.1.
     """
+
     def __init__(self,
                  src_vocab_size: int,
                  tgt_vocab_size: int,
@@ -61,8 +61,7 @@ class Seq2SeqTransformer(nn.Module):
         tgt_padding_mask: torch.Tensor,
         memory_key_padding_mask: torch.Tensor,
     ) -> torch.Tensor:
-        """
-        Forward pass of the Seq2SeqTransformer.
+        """Forward pass of the Seq2SeqTransformer.
 
         Args:
             src (torch.Tensor): Source input tensor.

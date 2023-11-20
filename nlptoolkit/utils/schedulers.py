@@ -6,8 +6,9 @@ from torch.optim.optimizer import Optimizer
 
 
 class LRScheduler(_LRScheduler):
-    """Code from `https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/LanguageModeling/BERT`
-    """
+    """Code from `https://github.com/NVIDIA/DeepLearningExamples/tree/master/Py
+    Torch/LanguageModeling/BERT`"""
+
     def __init__(self, optimizer, last_epoch=-1):
         # Check if using mixed precision training
         self.mixed_training = False
@@ -39,14 +40,14 @@ class LRScheduler(_LRScheduler):
 
 
 class ConstantLR(LRScheduler):
+
     def get_lr(self):
         return self.base_lrs
 
 
 class CosineWarmUpScheduler(LRScheduler):
-    """
-    Applies a warm up period to the learning rate.
-    """
+    """Applies a warm up period to the learning rate."""
+
     def __init__(self, optimizer, warmup, total_steps, last_epoch=-1):
         self.warmup = warmup
         self.total_steps = total_steps
@@ -66,9 +67,8 @@ class CosineWarmUpScheduler(LRScheduler):
 
 
 class ConstantWarmUpScheduler(LRScheduler):
-    """
-    Applies a warm up period to the learning rate.
-    """
+    """Applies a warm up period to the learning rate."""
+
     def __init__(self, optimizer, warmup, total_steps, last_epoch=-1):
         self.warmup = warmup
         self.total_steps = total_steps
@@ -85,9 +85,8 @@ class ConstantWarmUpScheduler(LRScheduler):
 
 
 class LinearWarmUpScheduler(LRScheduler):
-    """
-    Applies a warm up period to the learning rate.
-    """
+    """Applies a warm up period to the learning rate."""
+
     def __init__(self, optimizer, warmup, total_steps, last_epoch=-1):
         self.warmup = warmup
         self.total_steps = total_steps
@@ -107,9 +106,8 @@ class LinearWarmUpScheduler(LRScheduler):
 
 
 class PolyWarmUpScheduler(LRScheduler):
-    """
-    Applies a warm up period to the learning rate.
-    """
+    """Applies a warm up period to the learning rate."""
+
     def __init__(self,
                  optimizer,
                  warmup,

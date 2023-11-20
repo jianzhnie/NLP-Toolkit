@@ -8,8 +8,7 @@ import torch.nn.functional as F
 
 
 def clones(module: nn.Module, N: int):
-    """
-    Create N identical copies of the given module.
+    """Create N identical copies of the given module.
 
     Args:
         module (nn.Module): Module to be copied.
@@ -17,22 +16,20 @@ def clones(module: nn.Module, N: int):
 
     Returns:
         nn.ModuleList: List of copied modules.
-
     """
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
 class ScaledDotProductAttention(nn.Module):
-    """
-    Compute 'Scaled Dot Product Attention'.
+    """Compute 'Scaled Dot Product Attention'.
 
     Args:
         dropout (float): Dropout probability.
 
     Attributes:
         dropout (nn.Dropout): Dropout layer (if dropout > 0).
-
     """
+
     def __init__(self, dropout: float):
         super(ScaledDotProductAttention, self).__init__()
         self.dropout = nn.Dropout(dropout) if dropout > 0 else None
@@ -42,8 +39,7 @@ class ScaledDotProductAttention(nn.Module):
                 key: torch.Tensor,
                 value: torch.Tensor,
                 mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Forward pass of the Scaled Dot Product Attention.
+        """Forward pass of the Scaled Dot Product Attention.
 
         Args:
             query (torch.Tensor): Query tensor.
@@ -53,7 +49,6 @@ class ScaledDotProductAttention(nn.Module):
 
         Returns:
             torch.Tensor: Output of the attention.
-
         """
         d_k = query.size(-1)
         scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
@@ -71,8 +66,7 @@ class ScaledDotProductAttention(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    """
-    Multi-Head Attention Layer.
+    """Multi-Head Attention Layer.
 
     In multi-head attention we split the embedding vector into N heads,
         so they will have the dimensions: Batch * Seq_len * nhead * (d_model/nhead).
@@ -87,6 +81,7 @@ class MultiHeadAttention(nn.Module):
         nhead (int): Number of attention heads.
         dropout (float): Dropout probability.
     """
+
     def __init__(self, d_model: int, nhead: int, dropout: float = 0.1):
         super(MultiHeadAttention, self).__init__()
         assert d_model % nhead == 0
@@ -113,8 +108,7 @@ class MultiHeadAttention(nn.Module):
                 key: torch.Tensor,
                 value: torch.Tensor,
                 mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Forward pass of the Multi-Head Attention.
+        """Forward pass of the Multi-Head Attention.
 
         Args:
             query (torch.Tensor): Query tensor. (batch_size, seq_len, d_model)
@@ -124,7 +118,6 @@ class MultiHeadAttention(nn.Module):
 
         Returns:
             torch.Tensor: Output of the attention.
-
         """
         # Same mask applied to all h heads.
         if mask is not None:

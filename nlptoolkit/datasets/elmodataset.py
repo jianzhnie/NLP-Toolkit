@@ -72,6 +72,7 @@ def load_corpus(path, max_tok_len=None, max_seq_len=None):
 
 # Dataset
 class BiLMDataset(Dataset):
+
     def __init__(self, corpus_w, corpus_c, vocab_w, vocab_c):
         super(BiLMDataset, self).__init__()
         self.pad_w = vocab_w[PAD_TOKEN]

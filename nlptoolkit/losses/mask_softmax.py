@@ -14,8 +14,7 @@ import torch.nn as nn
 
 
 class MaskedSoftmaxCELoss(nn.Module):
-    """
-    The softmax cross-entropy loss with masks.
+    """The softmax cross-entropy loss with masks.
 
     This loss is suitable for sequence-to-sequence models where sequences have varying lengths.
     It applies a mask to ignore padding elements when computing the loss.
@@ -26,16 +25,15 @@ class MaskedSoftmaxCELoss(nn.Module):
     Attributes:
         ignore_index (int): Index to ignore when computing the loss.
         criterion (nn.CrossEntropyLoss): Cross-entropy loss criterion with predefined settings.
-
     """
+
     def __init__(self):
         super(MaskedSoftmaxCELoss, self).__init__()
         self.criterion = nn.CrossEntropyLoss(reduction='none')
 
     def forward(self, pred: torch.Tensor, label: torch.Tensor,
                 valid_len: torch.Tensor) -> torch.Tensor:
-        """
-        Compute the masked softmax cross-entropy loss.
+        """Compute the masked softmax cross-entropy loss.
 
         Args:
             pred (torch.Tensor): Predicted scores (logits) of shape (batch_size, seq_len, vocab_size).
@@ -44,7 +42,6 @@ class MaskedSoftmaxCELoss(nn.Module):
 
         Returns:
             weighted_loss (torch.Tensor): Weighted loss of shape (batch_size,).
-
         """
         mask = self.generate_mask(label, valid_len)
         loss = self.criterion(pred.permute(0, 2, 1), label)
@@ -54,8 +51,7 @@ class MaskedSoftmaxCELoss(nn.Module):
     def generate_mask(
             self, inputs: torch.Tensor,
             valid_len: Union[List[int], torch.Tensor]) -> torch.Tensor:
-        """
-        Generate a mask to ignore padding elements.
+        """Generate a mask to ignore padding elements.
 
         Args:
             inputs (torch.Tensor): Ground truth inputs of shape (batch_size, seq_len).
@@ -63,7 +59,6 @@ class MaskedSoftmaxCELoss(nn.Module):
 
         Returns:
             mask (torch.Tensor): Mask of shape (batch_size, seq_len) where padding elements are set to 0.
-
         """
         batch_size, seq_len = inputs.size()
         mask = torch.arange(seq_len,
@@ -75,8 +70,8 @@ class MaskedSoftmaxCELoss(nn.Module):
 def sequence_mask(inputs: torch.Tensor,
                   valid_len: Union[List[int], torch.Tensor],
                   value: float = 0.0) -> torch.Tensor:
-    """
-    Apply a sequence mask to the input tensor to mask out elements beyond the valid lengths of each sequence.
+    """Apply a sequence mask to the input tensor to mask out elements beyond
+    the valid lengths of each sequence.
 
     Args:
         inputs (torch.Tensor): Input tensor of shape (batch_size, sequence_length, ...).
@@ -109,8 +104,8 @@ def sequence_mask(inputs: torch.Tensor,
 
 def masked_softmax(inputs: torch.Tensor,
                    valid_lens: torch.Tensor = None) -> torch.Tensor:
-    """
-    Perform softmax operation on the last axis of the input tensor while considering valid sequence lengths.
+    """Perform softmax operation on the last axis of the input tensor while
+    considering valid sequence lengths.
 
     Args:
         inputs (torch.Tensor): The input tensor of shape (batch_size, sequence_length, num_classes).

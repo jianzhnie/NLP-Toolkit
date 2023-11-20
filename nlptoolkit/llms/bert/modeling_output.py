@@ -7,8 +7,8 @@ from transformers.modeling_utils import ModelOutput
 
 @dataclass
 class BertEncoderOutput(ModelOutput):
-    """
-    Base class for model's outputs that may also contain a past key/values (to speed up sequential decoding).
+    """Base class for model's outputs that may also contain a past key/values
+    (to speed up sequential decoding).
 
     Args:
         last_hidden_state (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
@@ -36,8 +36,8 @@ class BertEncoderOutput(ModelOutput):
 
 @dataclass
 class BertModelOutput(ModelOutput):
-    """
-    Base class for model's outputs that also contains a pooling of the last hidden states.
+    """Base class for model's outputs that also contains a pooling of the last
+    hidden states.
 
     Args:
         last_hidden_state (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
@@ -78,8 +78,7 @@ class BertModelOutput(ModelOutput):
 
 @dataclass
 class BertForPreTrainingOutput(ModelOutput):
-    """
-    Output type of [`BertForPreTraining`].
+    """Output type of [`BertForPreTraining`].
 
     Args:
         loss (*optional*, returned when `labels` is provided, `torch.FloatTensor` of shape `(1,)`):
@@ -114,8 +113,7 @@ class BertForPreTrainingOutput(ModelOutput):
 
 @dataclass
 class CausalLMOutput(ModelOutput):
-    """
-    Base class for causal language model (or autoregressive) outputs.
+    """Base class for causal language model (or autoregressive) outputs.
 
     Args:
         loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
@@ -157,8 +155,7 @@ class CausalLMOutput(ModelOutput):
 
 @dataclass
 class MaskedLMOutput(ModelOutput):
-    """
-    Base class for masked language models outputs.
+    """Base class for masked language models outputs.
 
     Args:
         loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
@@ -186,8 +183,8 @@ class MaskedLMOutput(ModelOutput):
 
 @dataclass
 class NextSentencePredictorOutput(ModelOutput):
-    """
-    Base class for outputs of models predicting if two sentences are consecutive or not.
+    """Base class for outputs of models predicting if two sentences are
+    consecutive or not.
 
     Args:
         loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `next_sentence_label` is provided):
@@ -216,8 +213,7 @@ class NextSentencePredictorOutput(ModelOutput):
 
 @dataclass
 class SequenceClassifierOutput(ModelOutput):
-    """
-    Base class for outputs of sentence classification models.
+    """Base class for outputs of sentence classification models.
 
     Args:
         loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
@@ -245,8 +241,7 @@ class SequenceClassifierOutput(ModelOutput):
 
 @dataclass
 class MultipleChoiceModelOutput(ModelOutput):
-    """
-    Base class for outputs of multiple choice models.
+    """Base class for outputs of multiple choice models.
 
     Args:
         loss (`torch.FloatTensor` of shape *(1,)*, *optional*, returned when `labels` is provided):
@@ -276,8 +271,7 @@ class MultipleChoiceModelOutput(ModelOutput):
 
 @dataclass
 class TokenClassifierOutput(ModelOutput):
-    """
-    Base class for outputs of token classification models.
+    """Base class for outputs of token classification models.
 
     Args:
         loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided) :
@@ -305,8 +299,7 @@ class TokenClassifierOutput(ModelOutput):
 
 @dataclass
 class QuestionAnsweringModelOutput(ModelOutput):
-    """
-    Base class for outputs of question answering models.
+    """Base class for outputs of question answering models.
 
     Args:
         loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided):

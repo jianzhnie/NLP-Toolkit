@@ -72,6 +72,7 @@ class NaiveLSTMCell(nn.Module):
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
     """
+
     def __init__(self, input_size: int, hidden_size: int):
         super().__init__()
         self.input_size = input_size
@@ -101,8 +102,7 @@ class NaiveLSTMCell(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        """
-        Initialize weights and biases with uniform random values.
+        """Initialize weights and biases with uniform random values.
 
         Weight initialization follows the Xavier initialization scheme.
 
@@ -118,8 +118,7 @@ class NaiveLSTMCell(nn.Module):
         input: torch.Tensor,
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass of the LSTM cell.
+        """Forward pass of the LSTM cell.
 
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, input_size).
@@ -168,8 +167,7 @@ class NaiveLSTMCell(nn.Module):
 
 
 class LSTMLayer(nn.Module):
-    """
-    A custom implementation of an LSTM layer.
+    """A custom implementation of an LSTM layer.
 
     Args:
         input_size (int): The number of expected features in the input.
@@ -178,6 +176,7 @@ class LSTMLayer(nn.Module):
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
     """
+
     def __init__(self, input_size: int, hidden_size: int):
         super(LSTMLayer, self).__init__()
         self.input_size = input_size
@@ -191,8 +190,7 @@ class LSTMLayer(nn.Module):
         input: torch.Tensor,
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        """
-        Forward pass of the LSTM layer.
+        """Forward pass of the LSTM layer.
 
         Args:
             input (torch.Tensor): The input tensor of shape (batch_size, sequence_size, input_size).
@@ -232,8 +230,7 @@ class LSTMLayer(nn.Module):
 
 
 class MultiLayerLSTM(nn.Module):
-    """
-    A custom implementation of a multi-layer LSTM model.
+    """A custom implementation of a multi-layer LSTM model.
 
     Args:
         input_size (int): The number of input features.
@@ -243,6 +240,7 @@ class MultiLayerLSTM(nn.Module):
     Reference:
         https://github.com/piEsposito/pytorch-lstm-by-hand
     """
+
     def __init__(self, input_size: int, hidden_size: int, num_layers: int = 1):
         super(MultiLayerLSTM, self).__init__()
         self.input_size = input_size
@@ -265,8 +263,7 @@ class MultiLayerLSTM(nn.Module):
         input: torch.Tensor,
         hidden: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        """
-        Forward pass of the multi-layer LSTM.
+        """Forward pass of the multi-layer LSTM.
 
         Args:
             input (torch.Tensor): Input tensor of shape (batch_size, sequence_size, input_size).
@@ -316,6 +313,7 @@ class MultiLayerLSTM(nn.Module):
 
 
 class BiLSTM_CRF(nn.Module):
+
     def __init__(self, vocab_size, tag_to_ix, embedding_dim, hidden_dim):
         super(BiLSTM_CRF, self).__init__()
         self.embedding_dim = embedding_dim
@@ -460,6 +458,7 @@ class BiLSTM_CRF(nn.Module):
 
 
 class LSTMPostag(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim, hidden_dim, num_class):
         super(LSTMPostag, self).__init__()
         self.embeddings = nn.Embedding(vocab_size, embedding_dim)

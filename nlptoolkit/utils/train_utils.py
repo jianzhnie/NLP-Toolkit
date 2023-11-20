@@ -3,8 +3,7 @@ from typing import Tuple
 
 # Function to calculate elapsed time
 def epoch_time(start_time: int, end_time: int) -> Tuple[int, int]:
-    """
-    Calculate elapsed time in minutes and seconds.
+    """Calculate elapsed time in minutes and seconds.
 
     Args:
         start_time (int): Start time in seconds.

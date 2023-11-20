@@ -4,6 +4,7 @@ import numpy as np
 
 class ScheduledOptim():
     """A simple wrapper class for learning rate scheduling."""
+
     def __init__(self, optimizer, d_model, n_warmup_steps):
         self._optimizer = optimizer
         self.n_warmup_steps = n_warmup_steps

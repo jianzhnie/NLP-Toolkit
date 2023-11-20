@@ -25,8 +25,7 @@ UNK_TOKEN = '<unk>'
 
 
 def minEditDistance(source: str, target: str) -> int:
-    """
-    计算两个字符串的最小编辑距离
+    """计算两个字符串的最小编辑距离.
 
     参数:
       source: 源字符串
@@ -61,9 +60,7 @@ def minEditDistance(source: str, target: str) -> int:
 def truncate_pad(inputs: List[int],
                  max_seq_len: int,
                  padding_token_id: int = 0) -> List[int]:
-    """
-    Truncate and pad sequence to max sequence length.
-    """
+    """Truncate and pad sequence to max sequence length."""
     if len(inputs) > max_seq_len:
         inputs = inputs[:max_seq_len]
     else:

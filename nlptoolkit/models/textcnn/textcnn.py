@@ -13,6 +13,7 @@ from torch import nn
 
 
 class CNN(nn.Module):
+
     def __init__(self, vocab_size, embedding_dim, filter_size, num_filter,
                  num_class):
         super(CNN, self).__init__()
@@ -42,6 +43,7 @@ class CNN(nn.Module):
 
 
 class TextCNN(nn.Module):
+
     def __init__(self, vocab_size, embed_size, kernel_sizes, num_channels,
                  **kwargs):
         super(TextCNN, self).__init__(**kwargs)
@@ -77,6 +79,7 @@ class TextCNN(nn.Module):
 
 
 class CNNEncoder(nn.Module):
+
     def __init__(self,
                  vocab_size,
                  embedding_dim,

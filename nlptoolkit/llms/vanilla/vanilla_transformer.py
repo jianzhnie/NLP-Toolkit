@@ -17,8 +17,8 @@ from torch import Tensor
 
 
 class Transformer(nn.Module):
-    """
-    A transformer model based on the paper "Attention Is All You Need" by Vaswani et al. (2017).
+    """A transformer model based on the paper "Attention Is All You Need" by
+    Vaswani et al. (2017).
 
     Args:
         d_model (int): The number of expected features in the encoder/decoder inputs (default=512).
@@ -40,6 +40,7 @@ class Transformer(nn.Module):
     Note: A full example to apply nn.Transformer module for the word language model is available in
     https://github.com/pytorch/examples/tree/master/word_language_model
     """
+
     def __init__(self,
                  d_model: int = 512,
                  nhead: int = 8,
@@ -89,8 +90,7 @@ class Transformer(nn.Module):
                 src_key_padding_mask: Optional[Tensor] = None,
                 tgt_key_padding_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
-        """
-        Perform a forward pass through the Transformer model.
+        """Perform a forward pass through the Transformer model.
 
         Args:
             src (Tensor): The sequence to the encoder (required).
@@ -144,8 +144,7 @@ class Transformer(nn.Module):
         return output
 
     def generate_square_subsequent_mask(self, sz: int) -> Tensor:
-        """
-        Generate a square mask for the sequence.
+        """Generate a square mask for the sequence.
 
         Args:
             sz (int): The size of the square mask.
@@ -162,17 +161,15 @@ class Transformer(nn.Module):
         return mask
 
     def _reset_parameters(self):
-        """
-        Initialize parameters in the transformer model using Xavier initialization.
-        """
+        """Initialize parameters in the transformer model using Xavier
+        initialization."""
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
 
 class TransformerEncoder(nn.Module):
-    """
-    A stack of N encoder layers in a Transformer.
+    """A stack of N encoder layers in a Transformer.
 
     Args:
         encoder_layer (nn.Module): An instance of the TransformerEncoderLayer class (required).
@@ -185,6 +182,7 @@ class TransformerEncoder(nn.Module):
         >>> src = torch.rand(10, 32, 512)
         >>> out = transformer_encoder(src)
     """
+
     def __init__(self,
                  encoder_layer: nn.Module,
                  num_layers: int,
@@ -198,8 +196,7 @@ class TransformerEncoder(nn.Module):
                 src: Tensor,
                 mask: Optional[Tensor] = None,
                 src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
-        """
-        Pass the input through the encoder layers in turn.
+        """Pass the input through the encoder layers in turn.
 
         Args:
             src (Tensor): The sequence to the encoder (required).
@@ -217,7 +214,6 @@ class TransformerEncoder(nn.Module):
 
             Output:
                 - Output tensor with the same shape as input src.
-
         """
         output = src
 
@@ -233,8 +229,7 @@ class TransformerEncoder(nn.Module):
 
 
 class TransformerDecoder(nn.Module):
-    """
-    A stack of N decoder layers in a Transformer.
+    """A stack of N decoder layers in a Transformer.
 
     Args:
         decoder_layer (nn.Module): An instance of the TransformerDecoderLayer class (required).
@@ -248,6 +243,7 @@ class TransformerDecoder(nn.Module):
         >>> tgt = torch.rand(20, 32, 512)
         >>> out = transformer_decoder(tgt, memory)
     """
+
     def __init__(self,
                  decoder_layer: nn.Module,
                  num_layers: int,
@@ -266,8 +262,7 @@ class TransformerDecoder(nn.Module):
                 memory_mask: Optional[Tensor] = None,
                 tgt_key_padding_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
-        """
-        Pass the inputs (and mask) through the decoder layers in turn.
+        """Pass the inputs (and mask) through the decoder layers in turn.
 
         Args:
             tgt (Tensor): The sequence to the decoder (required).
@@ -291,7 +286,6 @@ class TransformerDecoder(nn.Module):
 
             Output:
                 - Output tensor with the same shape as input tgt.
-
         """
         output = tgt
 
@@ -309,8 +303,7 @@ class TransformerDecoder(nn.Module):
         return output
 
     def _get_clones(self, module, N):
-        """
-        Create N identical copies of the given module.
+        """Create N identical copies of the given module.
 
         Args:
             module (nn.Module): Module to be copied.
@@ -318,14 +311,12 @@ class TransformerDecoder(nn.Module):
 
         Returns:
             nn.ModuleList: List of copied modules.
-
         """
         return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
 class TransformerEncoderLayer(nn.Module):
-    """
-    A single layer of the Transformer encoder.
+    """A single layer of the Transformer encoder.
 
     TransformerEncoderLayer is made up of self-attn and feedforward network.
     This standard encoder layer is based on the paper "Attention Is All You Need".
@@ -346,6 +337,7 @@ class TransformerEncoderLayer(nn.Module):
         >>> src = torch.rand(10, 32, 512)
         >>> out = encoder_layer(src)
     """
+
     def __init__(self,
                  d_model: int,
                  nhead: int,
@@ -373,8 +365,7 @@ class TransformerEncoderLayer(nn.Module):
                 src: Tensor,
                 src_mask: Optional[Tensor] = None,
                 src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
-        """
-        Pass the input through the encoder layer.
+        """Pass the input through the encoder layer.
 
         Args:
             src (Tensor): The sequence to the encoder layer (required).
@@ -392,7 +383,6 @@ class TransformerEncoderLayer(nn.Module):
 
             Output:
                 - Output tensor with the same shape as input src.
-
         """
         # Self-attention for the src sequence
         src_y = self.self_attn(src,
@@ -410,8 +400,7 @@ class TransformerEncoderLayer(nn.Module):
 
 
 class TransformerDecoderLayer(nn.Module):
-    """
-    A single layer of the Transformer decoder.
+    """A single layer of the Transformer decoder.
 
     Args:
         d_model (int): The number of expected features in the input (required).
@@ -426,6 +415,7 @@ class TransformerDecoderLayer(nn.Module):
         >>> tgt = torch.rand(20, 32, 512)
         >>> out = decoder_layer(tgt, memory)
     """
+
     def __init__(self,
                  d_model: int,
                  nhead: int,
@@ -461,8 +451,7 @@ class TransformerDecoderLayer(nn.Module):
                 memory_mask: Optional[Tensor] = None,
                 tgt_key_padding_mask: Optional[Tensor] = None,
                 memory_key_padding_mask: Optional[Tensor] = None) -> Tensor:
-        """
-        Pass the inputs (and mask) through the decoder layer.
+        """Pass the inputs (and mask) through the decoder layer.
 
         Args:
             tgt (Tensor): The sequence to the decoder layer (required).
@@ -486,7 +475,6 @@ class TransformerDecoderLayer(nn.Module):
 
             Output:
                 - Output tensor with the same shape as input tgt.
-
         """
         # Self-attention for the target sequence
         tgt2 = self.self_attn(tgt,
@@ -513,8 +501,7 @@ class TransformerDecoderLayer(nn.Module):
 
 
 class AddNorm(nn.Module):
-    """
-    Residual connection followed by layer normalization.
+    """Residual connection followed by layer normalization.
 
     Args:
         d_model (int or list): The expected size of the input features.
@@ -523,8 +510,8 @@ class AddNorm(nn.Module):
     Attributes:
         dropout (nn.Dropout): Dropout layer.
         ln (nn.LayerNorm): Layer normalization layer.
-
     """
+
     def __init__(self, d_model, dropout, **kwargs):
         super(AddNorm, self).__init__(**kwargs)
         self.dropout = nn.Dropout(dropout)
@@ -532,8 +519,7 @@ class AddNorm(nn.Module):
 
     def forward(self, src_x: torch.Tensor,
                 src_y: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the AddNorm layer.
+        """Forward pass of the AddNorm layer.
 
         Args:
             src_x (torch.Tensor): Input tensor.
@@ -541,7 +527,6 @@ class AddNorm(nn.Module):
 
         Returns:
             torch.Tensor: Output of the AddNorm layer.
-
         """
         # Apply dropout to the output tensor src_y, add it to the input tensor src_x, and normalize the result.
         src = self.dropout(src_y)
@@ -549,16 +534,15 @@ class AddNorm(nn.Module):
 
 
 class PositionWiseFFN(nn.Module):
-    """
-    Position-wise Feedforward Neural Network (FFN) layer.
+    """Position-wise Feedforward Neural Network (FFN) layer.
 
     Args:
         ffn_num_input (int): Number of input features.
         ffn_num_hiddens (int): Number of hidden units in the FFN.
         ffn_num_outputs (int): Number of output features.
         activation: the activation function of intermediate layer, relu or gelu (default=relu).
-
     """
+
     def __init__(self,
                  ffn_num_input: int,
                  ffn_num_hiddens: int,
@@ -572,15 +556,13 @@ class PositionWiseFFN(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass of the PositionWiseFFN layer.
+        """Forward pass of the PositionWiseFFN layer.
 
         Args:
             inputs (torch.Tensor): Input tensor.
 
         Returns:
             torch.Tensor: Output tensor after applying the FFN layer.
-
         """
         # Apply the feedforward neural network: Linear -> ReLU -> Linear
         outputs = self.dense1(inputs)
@@ -591,8 +573,7 @@ class PositionWiseFFN(nn.Module):
 
 
 def _get_clones(module, N):
-    """
-    Create N identical copies of the given module.
+    """Create N identical copies of the given module.
 
     Args:
         module (nn.Module): Module to be copied.
@@ -600,21 +581,18 @@ def _get_clones(module, N):
 
     Returns:
         nn.ModuleList: List of copied modules.
-
     """
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
 def _get_activation_fn(activation: str):
-    """
-    Get the activation function based on the provided string.
+    """Get the activation function based on the provided string.
 
     Args:
         activation (str): Activation function name, either 'relu' or 'gelu'.
 
     Returns:
         Callable: Activation function.
-
     """
     if activation == 'relu':
         return F.relu
