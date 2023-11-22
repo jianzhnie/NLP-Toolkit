@@ -6,9 +6,7 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 from transformers import GPT2PreTrainedModel
 from transformers.activations import ACT2FN
-from transformers.modeling_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions)
+from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
 from transformers.pytorch_utils import Conv1D
 
 from .config_gpt2 import GPT2Config
@@ -30,7 +28,6 @@ class CausalSelfAttention(nn.Module):
 
         self.embed_dim = config.n_embd
         self.num_heads = config.n_head
-
         self.head_dim = self.embed_dim // self.num_heads
         if self.head_dim * self.num_heads != self.embed_dim:
             raise ValueError(
@@ -38,29 +35,27 @@ class CausalSelfAttention(nn.Module):
                 f' {self.num_heads}).')
 
         # key, query, value projections for all heads, but in a batch
-        self.c_attn = nn.Linear(self.embed_dim, 3 * self.embed_dim)
-        # output projection
-        self.c_proj = nn.Linear(self.embed_dim, self.embed_dim)
+        self.c_attn = Conv1D(3 * self.embed_dim, self.embed_dim)
+        self.c_proj = Conv1D(self.embed_dim, self.embed_dim)
         # regularization
         self.attn_pdrop = config.attn_pdrop
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
     def _split_heads(self, x: torch.Tensor, num_heads: int,
-                     attn_head_size: int) -> torch.Tensor:
-        """Splits hidden_size dim into attn_head_size and num_heads."""
+                     head_dim: int) -> torch.Tensor:
+        """Splits hidden_size dim into head_dim and num_heads."""
         # x: (batch_size, seq_len, d_model) ->  (batch_size, seq_len, self.nhead, self.d_k)
-        new_x_shape = x.size()[:-1] + (num_heads, attn_head_size)
+        new_x_shape = x.size()[:-1] + (num_heads, head_dim)
         x = x.view(new_x_shape)
         # (batch_size, self.nhead, seq_len, self.d_k)
         return x.permute(0, 2, 1, 3)
 
     def _merge_heads(self, tensor: torch.Tensor, num_heads: int,
-                     attn_head_size: int) -> torch.Tensor:
-        """Merges attn_head_size dim and num_attn_heads dim into
-        hidden_size."""
+                     head_dim: int) -> torch.Tensor:
+        """Merges head_dim dim and num_attn_heads dim into hidden_size."""
         tensor = tensor.permute(0, 2, 1, 3).contiguous()
-        new_shape = tensor.size()[:-2] + (num_heads * attn_head_size, )
+        new_shape = tensor.size()[:-2] + (num_heads * head_dim, )
         return tensor.view(new_shape)
 
     def scale_dotproductt_attn(
@@ -69,14 +64,14 @@ class CausalSelfAttention(nn.Module):
         key: torch.Tensor,
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         """Forward pass of the Scaled Dot Product Attention.
 
         Args:
             query (torch.Tensor): Query tensor.
             key (torch.Tensor): Key tensor.
             value (torch.Tensor): Value tensor.
-            mask (torch.Tensor, optional): Mask tensor for attention masking.
+            attention_mask (torch.Tensor, optional): Mask tensor for attention masking.
 
         Returns:
             torch.Tensor: Output of the attention.
@@ -126,11 +121,8 @@ class CausalSelfAttention(nn.Module):
         attn_output = self.scale_dotproductt_attn(query, key, value,
                                                   attention_mask)
 
-        attn_output = self._merge_heads(
-            attn_output,
-            self.num_heads,
-            self.head_dim,
-        )
+        attn_output = self._merge_heads(attn_output, self.num_heads,
+                                        self.head_dim)
         attn_output = self.c_proj(attn_output)
         attn_output = self.resid_dropout(attn_output)
         return attn_output
@@ -175,10 +167,7 @@ class GPT2Block(nn.Module):
     ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]], ...]:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
-
-        attn_outputs = self.attn(hidden_states, attention_mask=attention_mask)
-        attn_output = attn_outputs
-
+        attn_output = self.attn(hidden_states, attention_mask=attention_mask)
         # residual connection
         hidden_states = attn_output + residual
 
@@ -205,11 +194,6 @@ class GPT2Model(GPT2PreTrainedModel):
             [GPT2Block(config) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_epsilon)
 
-        # Model parallel
-        self.model_parallel = False
-        self.device_map = None
-        self.gradient_checkpointing = False
-
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -219,7 +203,8 @@ class GPT2Model(GPT2PreTrainedModel):
         attention_mask: Optional[torch.FloatTensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-    ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
+    ) -> torch.FloatTensor:
+
         self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
 
         input_shape = input_ids.size()
@@ -256,7 +241,9 @@ class GPT2Model(GPT2PreTrainedModel):
             attention_mask = (1.0 - attention_mask) * torch.finfo(
                 self.dtype).min
 
+        # token embeddings of shape (b, t, n_embd)
         inputs_embeds = self.wte(input_ids)
+        # position embeddings of shape (t, n_embd)
         position_embeds = self.wpe(position_ids)
         hidden_states = inputs_embeds + position_embeds
 
