@@ -58,12 +58,50 @@ class CausalSelfAttention(nn.Module):
         new_shape = tensor.size()[:-2] + (num_heads * head_dim, )
         return tensor.view(new_shape)
 
+    def caculate_attn_weight(self, query: torch.Tensor,
+                             key: torch.Tensor) -> torch.FloatTensor:
+        """
+        causal_mask:
+            [True, False, False,
+             True, True,  False,
+             True, True,  True]
+
+
+        Args:
+            query (torch.Tensor): _description_
+            key (torch.Tensor): _description_
+
+        Returns:
+            torch.FloatTensor: _description_
+        """
+        d_k = query.size(-1)
+        attn_weights = torch.matmul(query, key.transpose(-2,
+                                                         -1)) / math.sqrt(d_k)
+
+        # if only "normal" attention layer implements causal mask
+        query_length, key_length = query.size(-2), key.size(-2)
+
+        causal_mask = self.bias[:, :, key_length -
+                                query_length:key_length, :key_length]
+        print('causal_mask:', causal_mask)
+        mask_value = torch.finfo(attn_weights.dtype).min
+        print('mask_value', mask_value)
+        # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
+        # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
+        mask_value = torch.full([], mask_value, dtype=attn_weights.dtype).to(
+            attn_weights.device)
+        print('mask_value:', mask_value)
+        attn_weights = torch.where(causal_mask,
+                                   attn_weights.to(attn_weights.dtype),
+                                   mask_value)
+        print('attn_weights:', attn_weights)
+        return attn_weights
+
     def scale_dotproductt_attn(
         self,
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """Forward pass of the Scaled Dot Product Attention.
 
@@ -71,7 +109,6 @@ class CausalSelfAttention(nn.Module):
             query (torch.Tensor): Query tensor.
             key (torch.Tensor): Key tensor.
             value (torch.Tensor): Value tensor.
-            attention_mask (torch.Tensor, optional): Mask tensor for attention masking.
 
         Returns:
             torch.Tensor: Output of the attention.
@@ -82,20 +119,22 @@ class CausalSelfAttention(nn.Module):
 
         # if only "normal" attention layer implements causal mask
         query_length, key_length = query.size(-2), key.size(-2)
+        # casual_mask is a upper matrix:
+        #   [True, False, False,
+        #    True, True,  False,
+        #    True, True,  True]
         causal_mask = self.bias[:, :, key_length -
                                 query_length:key_length, :key_length]
+        # mask_value: -inf
         mask_value = torch.finfo(attn_weights.dtype).min
         # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
         # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
         mask_value = torch.full([], mask_value, dtype=attn_weights.dtype).to(
             attn_weights.device)
+        # If value in causal_mask is True, fill attn_weights, else fill mask_value
         attn_weights = torch.where(causal_mask,
                                    attn_weights.to(attn_weights.dtype),
                                    mask_value)
-
-        if attention_mask is not None:
-            # Apply the attention mask
-            attn_weights = attn_weights + attention_mask
 
         attn_weights = nn.functional.softmax(attn_weights, dim=-1)
         # Downcast (if necessary) back to V's dtype (if in mixed-precision) -- No-Op otherwise
@@ -105,11 +144,8 @@ class CausalSelfAttention(nn.Module):
         attn_output = torch.matmul(attn_weights, value)
         return attn_output
 
-    def forward(
-        self,
-        hidden_states: Optional[torch.FloatTensor],
-        attention_mask: Optional[torch.FloatTensor] = None,
-    ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]], ...]:
+    def forward(self,
+                hidden_states: Optional[torch.FloatTensor]) -> torch.Tensor:
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         query, key, value = self.c_attn(hidden_states).split(self.embed_dim,
                                                              dim=2)
@@ -118,8 +154,7 @@ class CausalSelfAttention(nn.Module):
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
 
-        attn_output = self.scale_dotproductt_attn(query, key, value,
-                                                  attention_mask)
+        attn_output = self.scale_dotproductt_attn(query, key, value)
 
         attn_output = self._merge_heads(attn_output, self.num_heads,
                                         self.head_dim)
@@ -161,13 +196,11 @@ class GPT2Block(nn.Module):
         self.mlp = GPT2MLP(config)
 
     def forward(
-        self,
-        hidden_states: Optional[Tuple[torch.FloatTensor]],
-        attention_mask: Optional[torch.FloatTensor] = None,
-    ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]], ...]:
+            self,
+            hidden_states: Optional[Tuple[torch.FloatTensor]]) -> torch.Tensor:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
-        attn_output = self.attn(hidden_states, attention_mask=attention_mask)
+        attn_output = self.attn(hidden_states)
         # residual connection
         hidden_states = attn_output + residual
 
@@ -197,49 +230,32 @@ class GPT2Model(GPT2PreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.wte
+
+    def set_input_embeddings(self, new_embeddings) -> None:
+        self.wte = new_embeddings
+
     def forward(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.FloatTensor] = None,
+        input_ids: torch.LongTensor = None,
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
     ) -> torch.FloatTensor:
 
-        self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
-
         input_shape = input_ids.size()
-        batch_size = input_ids.shape[0]
+        input_ids = input_ids.view(-1, input_shape[-1])
         device = input_ids.device
 
-        position_ids = torch.arange(
-            0,
-            input_shape[-1],
-            dtype=torch.long,
-            device=device,
-        )
-        position_ids = position_ids.unsqueeze(0)
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.view(-1, input_shape[-1])
 
-        # GPT2Attention mask.
-        if attention_mask is not None:
-            if batch_size <= 0:
-                raise ValueError('batch_size has to be defined and > 0')
-            attention_mask = attention_mask.view(batch_size, -1)
-            # We create a 3D attention mask from a 2D tensor mask.
-            # Sizes are [batch_size, 1, 1, to_seq_length]
-            # So we can broadcast to [batch_size, num_heads, from_seq_length, to_seq_length]
-            # this attention mask is more simple than the triangular masking of causal attention
-            # used in OpenAI GPT, we just need to prepare the broadcast dimension here.
-            attention_mask = attention_mask[:, None, None, :]
-
-            # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-            # masked positions, this operation will create a tensor which is 0.0 for
-            # positions we want to attend and the dtype's smallest value for masked positions.
-            # Since we are adding it to the raw scores before the softmax, this is
-            # effectively the same as removing these entirely.
-            attention_mask = attention_mask.to(
-                dtype=self.dtype)  # fp16 compatibility
-            attention_mask = (1.0 - attention_mask) * torch.finfo(
-                self.dtype).min
+        if position_ids is None:
+            position_ids = torch.arange(0,
+                                        input_shape[-1],
+                                        dtype=torch.long,
+                                        device=device)
+            position_ids = position_ids.unsqueeze(0)
 
         # token embeddings of shape (b, t, n_embd)
         inputs_embeds = self.wte(input_ids)
@@ -254,10 +270,7 @@ class GPT2Model(GPT2PreTrainedModel):
         hidden_states = self.drop(hidden_states)
 
         for block in self.blocks:
-            hidden_states = block(
-                hidden_states,
-                attention_mask=attention_mask,
-            )
+            hidden_states = block(hidden_states)
 
         hidden_states = self.ln_f(hidden_states)
 
@@ -277,8 +290,8 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.FloatTensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
         labels: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
         r"""
@@ -287,12 +300,11 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
             `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
             are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
         """
-        transformer_outputs = self.transformer(
+        hidden_states = self.transformer(
             input_ids,
-            attention_mask=attention_mask,
             token_type_ids=token_type_ids,
+            position_ids=position_ids,
         )
-        hidden_states = transformer_outputs
         lm_logits = self.lm_head(hidden_states)
         loss = None
         if labels is not None:
@@ -309,3 +321,24 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         return CausalLMOutputWithCrossAttentions(loss=loss,
                                                  logits=lm_logits,
                                                  hidden_states=hidden_states)
+
+
+if __name__ == '__main__':
+    import torch
+    from transformers import GPT2Tokenizer
+
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    tokenizer.add_special_tokens({'pad_token': '<PAD>'})
+    config = GPT2Config()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = GPT2Model(config=config).to(device)
+    text = 'Hello, my dog is cute!, How are you doing?'
+    max_length = 1024
+    inputs = tokenizer(text,
+                       return_tensors='pt',
+                       max_length=max_length,
+                       truncation=True)
+    print(inputs)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    outputs = model(inputs['input_ids'])
+    print(outputs)
