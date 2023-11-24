@@ -75,10 +75,12 @@ class CausalSelfAttention(nn.Module):
             torch.Tensor: Output of the attention.
         """
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
-        attn_weights = attn_weights / torch.full([],
-                                                 value.size(-1)**0.5,
-                                                 dtype=attn_weights.dtype,
-                                                 device=attn_weights.device)
+        attn_weights = attn_weights / torch.full(
+            [],
+            value.size(-1)**0.5,
+            dtype=attn_weights.dtype,
+            device=attn_weights.device,
+        )
 
         # if only "normal" attention layer implements causal mask
         query_length, key_length = query.size(-2), key.size(-2)
@@ -215,7 +217,6 @@ class GPT2Model(GPT2PreTrainedModel):
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
     ) -> torch.FloatTensor:
-
         self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
 
         input_shape = input_ids.size()
@@ -322,6 +323,45 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
                                                  logits=lm_logits,
                                                  hidden_states=hidden_states)
 
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        max_new_tokens: Optional[int] = None,
+        temperature: Optional[float] = 1.0,
+        top_k: Optional[int] = 5,
+    ) -> torch.LongTensor:
+        """Take a conditioning sequence of indices idx (LongTensor of shape
+        (b,t)) and complete the sequence max_new_tokens times, feeding the
+        predictions back into the model each time.
+
+        Most likely you'll want to make sure to be in model.eval() mode of
+        operation for this.
+        """
+        assert max_new_tokens > 0, 'max_new_tokens must > 0'
+        for _ in range(max_new_tokens):
+            # if the sequence context is growing too long we must crop it at block_size
+            input_idx_crop = (input_ids
+                              if input_ids.size(1) <= self.config.n_positions
+                              else input_ids[:, -self.config.n_positions:])
+            # forward the model to get the logits for the index in the sequence
+            outputs = self.forward(input_idx_crop)
+            logits = outputs.logits
+            # pluck the logits at the final step and scale by desired temperature
+            logits = logits[:, -1, :] / temperature
+            # optionally crop the logits to only the top k options
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+            # apply softmax to convert logits to (normalized) probabilities
+            probs = nn.functional.softmax(logits, dim=-1)
+            # sample from the distribution
+            input_ids_next = torch.multinomial(probs, num_samples=1)
+            # append sampled index to the running sequence and continue
+            input_ids = torch.cat((input_ids, input_ids_next), dim=1)
+
+        return input_ids
+
 
 if __name__ == '__main__':
     import torch
@@ -331,7 +371,7 @@ if __name__ == '__main__':
     tokenizer.add_special_tokens({'pad_token': '<PAD>'})
     config = GPT2Config()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = GPT2Model(config=config).to(device)
+    model = GPT2LMHeadModel(config=config).to(device)
     text = 'How are you?'
     inputs = tokenizer(text, return_tensors='pt')
     print(inputs)
@@ -340,3 +380,5 @@ if __name__ == '__main__':
     inputs = {k: v.to(device) for k, v in inputs.items()}
     outputs = model(**inputs)
     print(outputs)
+    new_ids = model.generate(input_ids=inputs['input_ids'], max_new_tokens=10)
+    print(new_ids)
