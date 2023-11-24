@@ -3,12 +3,10 @@ from typing import Any, Dict, Optional, Tuple, Union
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
-from transformers import OpenAIGPTPreTrainedModel
+from transformers import OpenAIGPTConfig, OpenAIGPTPreTrainedModel
 from transformers.activations import ACT2FN
 from transformers.modeling_outputs import CausalLMOutput
 from transformers.pytorch_utils import Conv1D
-
-from .config_openai import OpenAIGPTConfig
 
 
 class Attention(nn.Module):
@@ -16,13 +14,16 @@ class Attention(nn.Module):
     def __init__(self, config: OpenAIGPTConfig) -> None:
         super().__init__()
 
-        self.n_positions = config.n_positions
+        max_positions = config.n_positions
         self.register_buffer(
             'bias',
-            torch.tril(torch.ones(self.n_positions, self.n_positions)).view(
-                1, 1, self.n_positions, self.n_positions),
+            torch.tril(
+                torch.ones((max_positions, max_positions),
+                           dtype=torch.bool)).view(1, 1, max_positions,
+                                                   max_positions),
             persistent=False,
         )
+
         self.n_embd = config.n_embd
         self.n_head = config.n_head
         self.head_dim = self.n_embd // self.n_head
@@ -44,18 +45,28 @@ class Attention(nn.Module):
     ) -> torch.Tensor:
 
         attn_weights = torch.matmul(query, key.transpose(-1, -2))
-        attn_weights = attn_weights / torch.full(
-            [],
-            value.size(-1)**0.5,
-            dtype=attn_weights.dtype,
-            device=attn_weights.device,
-        )
-        # w = w * self.bias + -1e9 * (1 - self.bias)  # TF implementation method: mask_attn_weights
-        # XD: self.b may be larger than w, so we need to crop it
+        attn_weights = attn_weights / torch.full([],
+                                                 value.size(-1)**0.5,
+                                                 dtype=attn_weights.dtype,
+                                                 device=attn_weights.device)
+        # if only "normal" attention layer implements causal mask
         query_length, key_length = query.size(-2), key.size(-2)
-
-        casual_mask = self.bias[:, :, :query_length, :key_length]
-        attn_weights = attn_weights * casual_mask + -1e4 * (1 - casual_mask)
+        # casual_mask is a upper matrix:
+        #   [True, False, False,
+        #    True, True,  False,
+        #    True, True,  True]
+        causal_mask = self.bias[:, :, key_length -
+                                query_length:key_length, :key_length]
+        # mask_value: -inf
+        mask_value = torch.finfo(attn_weights.dtype).min
+        # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
+        # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
+        mask_value = torch.full([], mask_value, dtype=attn_weights.dtype).to(
+            attn_weights.device)
+        # If value in causal_mask is True, fill attn_weights, else fill mask_value
+        attn_weights = torch.where(causal_mask,
+                                   attn_weights.to(attn_weights.dtype),
+                                   mask_value)
 
         if attention_mask is not None:
             # Apply the attention mask
@@ -68,6 +79,7 @@ class Attention(nn.Module):
         return attn_output
 
     def merge_heads(self, tensor: torch.Tensor) -> torch.Tensor:
+        # (batch_size, self.nhead, seq_len, self.head_dim)
         tensor = tensor.permute(0, 2, 1, 3).contiguous()
         new_shape = tensor.size()[:-2] + (tensor.size(-2) * tensor.size(-1), )
         return tensor.view(*new_shape)
@@ -76,7 +88,7 @@ class Attention(nn.Module):
         """Splits hidden_size dim into head_dim and num_heads."""
         # (batch_size, seq_len, n_emded) ->  (batch_size, seq_len, n_head, head_dim)
         new_shape = tensor.size()[:-1] + (self.n_head, self.head_dim)
-        tensor = tensor.view(new_shape)
+        tensor = tensor.view(*new_shape)
         # (batch_size, self.nhead, seq_len, self.head_dim)
         return tensor.permute(0, 2, 1, 3)
 
@@ -104,7 +116,7 @@ class MLP(nn.Module):
     def __init__(self, config: OpenAIGPTConfig) -> None:
         super().__init__()
         self.c_fc = Conv1D(4 * config.n_embd, config.n_embd)
-        self.c_proj = Conv1D(config.n_embd, config.n_embd)
+        self.c_proj = Conv1D(config.n_embd, 4 * config.n_embd)
         self.act = ACT2FN[config.afn]
         self.dropout = nn.Dropout(config.resid_pdrop)
 
@@ -269,3 +281,27 @@ class OpenAIGPTLMHeadModel(OpenAIGPTPreTrainedModel):
     def prepare_inputs_for_generation(self, input_ids: torch.LongTensor,
                                       **kwargs) -> Dict[str, Any]:
         return {'input_ids': input_ids}
+
+
+if __name__ == '__main__':
+    import torch
+    from transformers import GPT2Tokenizer, OpenAIGPTConfig
+
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    tokenizer.add_special_tokens({'pad_token': '<PAD>'})
+    config = OpenAIGPTConfig()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = OpenAIGPTLMHeadModel(config=config).to(device)
+    text = 'How are you?'
+    inputs = tokenizer(text, return_tensors='pt')
+    print(inputs)
+    inputs['attention_mask'] = torch.tensor([[1, 1, 0, 0]])
+    print(inputs)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    outputs = model(**inputs)
+    print(outputs)
+    from transformers import OpenAIGPTLMHeadModel
+    model2 = OpenAIGPTLMHeadModel(config)
+    model.load_state_dict(model2.state_dict())
+    outputs = model(**inputs)
+    print(outputs)

@@ -3,12 +3,10 @@ from typing import Optional, Tuple, Union
 import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss
-from transformers import GPT2PreTrainedModel
+from transformers import GPT2Config, GPT2PreTrainedModel
 from transformers.activations import ACT2FN
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions
 from transformers.pytorch_utils import Conv1D
-
-from .config_gpt2 import GPT2Config
 
 
 class CausalSelfAttention(nn.Module):
