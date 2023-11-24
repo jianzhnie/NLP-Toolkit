@@ -148,9 +148,7 @@ class GPT2MLP(nn.Module):
         self.act = ACT2FN[config.activation_function]
         self.dropout = nn.Dropout(config.resid_pdrop)
 
-    def forward(
-        self, hidden_states: Optional[Tuple[torch.FloatTensor]]
-    ) -> torch.FloatTensor:
+    def forward(self, hidden_states: torch.FloatTensor) -> torch.FloatTensor:
         hidden_states = self.c_fc(hidden_states)
         hidden_states = self.act(hidden_states)
         hidden_states = self.c_proj(hidden_states)
@@ -170,7 +168,7 @@ class GPT2Block(nn.Module):
 
     def forward(
         self,
-        hidden_states: Optional[Tuple[torch.FloatTensor]],
+        hidden_states: torch.FloatTensor,
         attention_mask: Optional[torch.FloatTensor] = None,
     ) -> torch.Tensor:
         residual = hidden_states

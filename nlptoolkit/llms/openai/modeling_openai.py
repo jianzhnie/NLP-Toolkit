@@ -1,4 +1,3 @@
-import math
 from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
@@ -14,15 +13,9 @@ from .config_openai import OpenAIGPTConfig
 
 class Attention(nn.Module):
 
-    def __init__(self, config: OpenAIGPTConfig, scale=False):
+    def __init__(self, config: OpenAIGPTConfig) -> None:
         super().__init__()
 
-        self.n_embd = config.n_embd
-        self.n_head = config.n_head
-        if self.n_embd % self.n_head != 0:
-            raise ValueError(
-                f'Attention n_embed shape: {self.n_embd} must be divisible by config.n_head {self.n_head}'
-            )
         self.n_positions = config.n_positions
         self.register_buffer(
             'bias',
@@ -30,7 +23,13 @@ class Attention(nn.Module):
                 1, 1, self.n_positions, self.n_positions),
             persistent=False,
         )
-        self.scale = scale
+        self.n_embd = config.n_embd
+        self.n_head = config.n_head
+        self.head_dim = self.n_embd // self.n_head
+        if self.n_embd % self.n_head != 0:
+            raise ValueError(
+                f'Attention n_embed shape: {self.n_embd} must be divisible by n_head {self.n_head}'
+            )
         self.c_attn = Conv1D(self.n_embd * 3, self.n_embd)
         self.c_proj = Conv1D(self.n_embd, self.n_embd)
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
@@ -41,61 +40,63 @@ class Attention(nn.Module):
         query: torch.Tensor,
         key: torch.Tensor,
         value: torch.Tensor,
-        attention_mask: torch.Tensor = None,
-    ) -> list[torch.Tensor]:
-        attention_weight = torch.matmul(query, key)
-        if self.scale:
-            attention_weight = attention_weight / math.sqrt(value.size(-1))
+        attention_mask: Optional[torch.FloatTensor] = None,
+    ) -> torch.Tensor:
+
+        attn_weights = torch.matmul(query, key.transpose(-1, -2))
+        attn_weights = attn_weights / torch.full(
+            [],
+            value.size(-1)**0.5,
+            dtype=attn_weights.dtype,
+            device=attn_weights.device,
+        )
         # w = w * self.bias + -1e9 * (1 - self.bias)  # TF implementation method: mask_attn_weights
         # XD: self.b may be larger than w, so we need to crop it
-        casual_mask = self.bias[:, :, :attention_weight.
-                                size(-2), :attention_weight.size(-1)]
-        attention_weight = attention_weight * casual_mask + -1e4 * (
-            1 - casual_mask)
+        query_length, key_length = query.size(-2), key.size(-2)
+
+        casual_mask = self.bias[:, :, :query_length, :key_length]
+        attn_weights = attn_weights * casual_mask + -1e4 * (1 - casual_mask)
 
         if attention_mask is not None:
             # Apply the attention mask
-            attention_weight = attention_weight + attention_mask
+            attn_weights = attn_weights + attention_mask
 
-        attention_weight = nn.functional.softmax(attention_weight, dim=-1)
-        attention_weight = self.attn_dropout(attention_weight)
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1)
+        attn_weights = self.attn_dropout(attn_weights)
 
-        hiddent_states = torch.matmul(attention_weight, value)
-        return hiddent_states
+        attn_output = torch.matmul(attn_weights, value)
+        return attn_output
 
     def merge_heads(self, tensor: torch.Tensor) -> torch.Tensor:
         tensor = tensor.permute(0, 2, 1, 3).contiguous()
         new_shape = tensor.size()[:-2] + (tensor.size(-2) * tensor.size(-1), )
-
         return tensor.view(*new_shape)
 
-    def split_heads(self, tensor: torch.Tensor, k=False) -> torch.Tensor:
-        new_shape = tensor.size()[:-1] + (self.n_head,
-                                          tensor.size(-1) // self.n_head)
-        tensor = tensor.view(
-            *new_shape)  # in Tensorflow implementation: fct split_states
-        if k:
-            return tensor.permute(0, 2, 3, 1)
-        else:
-            return tensor.permute(0, 2, 1, 3)
+    def split_heads(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Splits hidden_size dim into head_dim and num_heads."""
+        # (batch_size, seq_len, n_emded) ->  (batch_size, seq_len, n_head, head_dim)
+        new_shape = tensor.size()[:-1] + (self.n_head, self.head_dim)
+        tensor = tensor.view(new_shape)
+        # (batch_size, self.nhead, seq_len, self.head_dim)
+        return tensor.permute(0, 2, 1, 3)
 
     def forward(
         self,
-        hidden_state: torch.Tensor,
-        attention_mask: torch.Tensor = None,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
     ) -> torch.Tensor:
-        x = self.c_attn(hidden_state)
-        query, key, value = x.split(self.n_embd, dim=2)
+        query, key, value = self.c_attn(hidden_states).split(self.n_embd,
+                                                             dim=2)
         query = self.split_heads(query)
-        key = self.split_heads(key, k=True)
+        key = self.split_heads(key)
         value = self.split_heads(value)
 
-        output = self._attn(query, key, value, attention_mask)
+        attn_output = self._attn(query, key, value, attention_mask)
 
-        a = self.merge_heads(output)
-        a = self.c_proj(a)
-        a = self.resid_dropout(a)
-        return a
+        attn_output = self.merge_heads(attn_output)
+        attn_output = self.c_proj(attn_output)
+        attn_output = self.resid_dropout(attn_output)
+        return attn_output
 
 
 class MLP(nn.Module):
@@ -107,30 +108,38 @@ class MLP(nn.Module):
         self.act = ACT2FN[config.afn]
         self.dropout = nn.Dropout(config.resid_pdrop)
 
-    def forward(self, hidden_state: torch.Tensor):
-        h = self.act(self.c_fc(hidden_state))
-        h2 = self.c_proj(h)
-        return self.dropout(h2)
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        hidden_states = self.c_fc(hidden_states)
+        hidden_states = self.act(hidden_states)
+        hidden_states = self.c_proj(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        return hidden_states
 
 
 class Block(nn.Module):
 
-    def __init__(self, config: OpenAIGPTConfig, scale=False) -> None:
+    def __init__(self, config: OpenAIGPTConfig) -> None:
         super().__init__()
-        self.attn = Attention(config, scale)
+        self.attn = Attention(config)
         self.ln_1 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
         self.mlp = MLP(config)
         self.ln_2 = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
 
-    def forward(self, hidden_state, attention_mask=None):
-        residual = hidden_state
+    def forward(
+        self,
+        hidden_states: torch.FloatTensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+    ) -> torch.Tensor:
+        residual = hidden_states
+        attn_outputs = self.attn(hidden_states, attention_mask=attention_mask)
+        hidden_states = residual + attn_outputs
+        hidden_states = self.ln_1(hidden_states)
 
-        attn_outputs = self.attn(hidden_state, attention_mask=attention_mask)
-
-        n = self.ln_1(residual + attn_outputs)
-        m = self.mlp(n)
-        h = self.ln_2(n + m)
-        return h
+        residual = hidden_states
+        mlp_output = self.mlp(hidden_states)
+        hidden_states = residual + mlp_output
+        hidden_states = self.ln_2(hidden_states)
+        return hidden_states
 
 
 class OpenAIGPTModel(OpenAIGPTPreTrainedModel):
@@ -162,6 +171,7 @@ class OpenAIGPTModel(OpenAIGPTPreTrainedModel):
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
     ) -> torch.Tensor:
+
         self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
         input_shape = input_ids.size()
         input_ids = input_ids.view(-1, input_shape[-1])
