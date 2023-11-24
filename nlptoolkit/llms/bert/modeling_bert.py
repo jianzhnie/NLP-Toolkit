@@ -15,8 +15,8 @@ import torch
 from torch import Tensor, nn
 from transformers import BertPreTrainedModel
 
+from ..modeling_outputs import BertEncoderOutput, BertModelOutput
 from .config_bert import BertConfig
-from .modeling_output import BertEncoderOutput, BertModelOutput
 
 logger = logging.getLogger(__name__)
 

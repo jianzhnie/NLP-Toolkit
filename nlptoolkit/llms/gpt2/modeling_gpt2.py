@@ -23,6 +23,7 @@ class CausalSelfAttention(nn.Module):
                 torch.ones((max_positions, max_positions),
                            dtype=torch.bool)).view(1, 1, max_positions,
                                                    max_positions),
+            persistent=False,
         )
 
         self.embed_dim = config.n_embd
@@ -197,7 +198,7 @@ class GPT2Model(GPT2PreTrainedModel):
         self.wpe = nn.Embedding(config.n_positions, self.embed_dim)
 
         self.drop = nn.Dropout(config.embd_pdrop)
-        self.blocks = nn.ModuleList(
+        self.h = nn.ModuleList(
             [GPT2Block(config) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_epsilon)
 
@@ -268,7 +269,7 @@ class GPT2Model(GPT2PreTrainedModel):
 
         hidden_states = self.drop(hidden_states)
 
-        for block in self.blocks:
+        for block in self.h:
             hidden_states = block(hidden_states, attention_mask=attention_mask)
 
         hidden_states = self.ln_f(hidden_states)
@@ -380,5 +381,10 @@ if __name__ == '__main__':
     inputs = {k: v.to(device) for k, v in inputs.items()}
     outputs = model(**inputs)
     print(outputs)
+    new_ids = model.generate(input_ids=inputs['input_ids'], max_new_tokens=10)
+    print(new_ids)
+    from transformers import GPT2LMHeadModel
+    model2 = GPT2LMHeadModel(config)
+    model.load_state_dict(model2.state_dict())
     new_ids = model.generate(input_ids=inputs['input_ids'], max_new_tokens=10)
     print(new_ids)
