@@ -288,6 +288,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         labels: Optional[torch.LongTensor] = None,
@@ -300,6 +301,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         """
         hidden_states = self.transformer(
             input_ids,
+            attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
         )
