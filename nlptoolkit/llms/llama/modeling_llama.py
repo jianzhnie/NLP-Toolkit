@@ -1,12 +1,14 @@
 import math
 import warnings
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
-import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import nn
+from transformers.activations import ACT2FN
+from transformers.modeling_outputs import BaseModelOutputWithPast
 from transformers.models.llama import LlamaConfig
+from transformers.models.llama.modeling_llama import LlamaPreTrainedModel
 
 
 class LlamaRMSNorm(nn.Module):
@@ -59,9 +61,16 @@ class LlamaRotaryEmbedding(nn.Module):
         inv_freq = 1.0 / (base**(torch.arange(
             0, self.dim, 2, dtype=dtype, device=device) / self.dim))
         t = torch.arange(seq_len, dtype=dtype, device=device)
+        # 计算两个矩阵的外积，结果维度[seq_len, dim // 2]
+        # freqs = [[0, 0, 0,..., 0],
+        #          [1/10000.0^(0/128), 1/10000.0^(2/128), 1/10000.0^(4/128), ..., 1/10000.0^(126/128)],
+        #          [2/10000.0^(0/128), 2/10000.0^(2/128), 2/10000.0^(4/128), ..., 2/10000.0^(126/128)],
+        #          ...,
+        #          [4095/10000.0^(0/128), 4095/10000.0^(2/128), 4095/10000.0^(4/128), ..., 4095/10000.0^(126/128)]]
         freqs = torch.einsum('i,j->ij', t, inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = torch.cat((freqs, freqs), dim=-1)
+        # emb.shape = [seq_len, dim]
         cos_cached = emb.cos().to(dtype)
         sin_cached = emb.sin().to(dtype)
         self.register_buffer('inv_freq', inv_freq, persistent=False)
@@ -72,6 +81,7 @@ class LlamaRotaryEmbedding(nn.Module):
                 x: torch.Tensor,
                 seq_len: int = None) -> tuple[torch.Tensor, torch.Tensor]:
         # x: [bs, num_attention_heads, seq_len, head_size]
+        # 超过预设的 max_seq_len 则重新计算更大的Rope缓存，否则直接在缓存上切片
         if seq_len > self.max_seq_len:
             self._build_cache(seq_len=seq_len, device=x.device, dtype=x.dtype)
 
@@ -109,6 +119,7 @@ class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
             0, self.dim, 2, dtype=dtype, device=device) / self.dim))
         t = torch.arange(seq_len, dtype=dtype, device=device)
         t = t / self.scaling_factor
+        # 线性内插相当于将位置序号等比例缩小
 
         freqs = torch.einsum('i,j->ij', t, inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
@@ -145,7 +156,7 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         dtype: torch.dtype = torch.float32,
     ) -> None:
         self.max_seq_len_cached = seq_len
-
+        # NTK扩展方式直接对base进行缩放
         if seq_len > self.max_seq_len:
             base = base * ((self.scaling_factor * seq_len / self.max_seq_len) -
                            (self.scaling_factor - 1))**(self.dim /
@@ -251,12 +262,16 @@ class LlamaAttention(nn.Module):
         self.q_proj = nn.Linear(self.hidden_size,
                                 self.num_heads * self.head_dim,
                                 bias=config.attention_bias)
-        self.k_proj = nn.Linear(self.hidden_size,
-                                self.num_key_value_heads * self.head_dim,
-                                bias=config.attention_bias)
-        self.v_proj = nn.Linear(self.hidden_size,
-                                self.num_key_value_heads * self.head_dim,
-                                bias=config.attention_bias)
+        self.k_proj = nn.Linear(
+            self.hidden_size,
+            self.num_key_value_heads * self.head_dim,
+            bias=config.attention_bias,
+        )
+        self.v_proj = nn.Linear(
+            self.hidden_size,
+            self.num_key_value_heads * self.head_dim,
+            bias=config.attention_bias,
+        )
         self.o_proj = nn.Linear(self.num_heads * self.head_dim,
                                 self.hidden_size,
                                 bias=config.attention_bias)
@@ -290,17 +305,30 @@ class LlamaAttention(nn.Module):
                 raise ValueError(f'Unknown RoPE scaling type {scaling_type}')
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
-        return tensor.view(bsz, seq_len, self.num_heads,
-                           self.head_dim).transpose(1, 2).contiguous()
+        return (tensor.view(bsz, seq_len, self.num_heads,
+                            self.head_dim).transpose(1, 2).contiguous())
+
+    def _split_heads(self, x: torch.Tensor, num_heads: int,
+                     head_dim: int) -> torch.Tensor:
+        """Splits hidden_size dim into head_dim and num_heads."""
+        # x: (batch_size, seq_len, d_model) ->  (batch_size, seq_len, self.nhead, self.d_k)
+        new_x_shape = x.size()[:-1] + (num_heads, head_dim)
+        x = x.view(new_x_shape)
+        # (batch_size, self.nhead, seq_len, self.d_k)
+        return x.permute(0, 2, 1, 3)
+
+    def _merge_heads(self, x: torch.Tensor, num_heads: int,
+                     head_dim: int) -> torch.Tensor:
+        """Merges head_dim dim and num_attn_heads dim into hidden_size."""
+        x = x.permute(0, 2, 1, 3).contiguous()
+        new_shape = x.size()[:-2] + (num_heads * head_dim, )
+        return x.view(new_shape)
 
     def forward(
         self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        output_attentions: bool = False,
-        use_cache: bool = False,
         **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor],
                Optional[Tuple[torch.Tensor]]]:
@@ -311,58 +339,22 @@ class LlamaAttention(nn.Module):
 
         bsz, q_len, _ = hidden_states.size()
 
-        if self.config.pretraining_tp > 1:
-            key_value_slicing = (self.num_key_value_heads *
-                                 self.head_dim) // self.config.pretraining_tp
-            query_slices = self.q_proj.weight.split(
-                (self.num_heads * self.head_dim) // self.config.pretraining_tp,
-                dim=0)
-            key_slices = self.k_proj.weight.split(key_value_slicing, dim=0)
-            value_slices = self.v_proj.weight.split(key_value_slicing, dim=0)
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
 
-            query_states = [
-                F.linear(hidden_states, query_slices[i])
-                for i in range(self.config.pretraining_tp)
-            ]
-            query_states = torch.cat(query_states, dim=-1)
-
-            key_states = [
-                F.linear(hidden_states, key_slices[i])
-                for i in range(self.config.pretraining_tp)
-            ]
-            key_states = torch.cat(key_states, dim=-1)
-
-            value_states = [
-                F.linear(hidden_states, value_slices[i])
-                for i in range(self.config.pretraining_tp)
-            ]
-            value_states = torch.cat(value_states, dim=-1)
-
-        else:
-            query_states = self.q_proj(hidden_states)
-            key_states = self.k_proj(hidden_states)
-            value_states = self.v_proj(hidden_states)
-
-        query_states = query_states.view(bsz, q_len, self.num_heads,
-                                         self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, q_len, self.num_key_value_heads,
-                                     self.head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, q_len, self.num_key_value_heads,
-                                         self.head_dim).transpose(1, 2)
+        query_states = self._split_heads(query_states, self.num_heads,
+                                         self.head_dim)
+        key_states = self._split_heads(key_states, self.num_key_value_heads,
+                                       self.head_dim)
+        value_states = self._split_heads(value_states,
+                                         self.num_key_value_heads,
+                                         self.head_dim)
 
         kv_seq_len = key_states.shape[-2]
-        if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-2]
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         query_states, key_states = apply_rotary_pos_emb(
             query_states, key_states, cos, sin, position_ids)
-
-        if past_key_value is not None:
-            # reuse k, v, self_attention
-            key_states = torch.cat([past_key_value[0], key_states], dim=2)
-            value_states = torch.cat([past_key_value[1], value_states], dim=2)
-
-        past_key_value = (key_states, value_states) if use_cache else None
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
@@ -397,24 +389,154 @@ class LlamaAttention(nn.Module):
                 f'`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is'
                 f' {attn_output.size()}')
 
-        attn_output = attn_output.transpose(1, 2).contiguous()
+        attn_output = self._merge_heads(attn_output, self.num_heads,
+                                        self.head_dim)
+        attn_output = self.o_proj(attn_output)
+        return attn_output
 
-        attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
 
-        if self.config.pretraining_tp > 1:
-            attn_output = attn_output.split(self.hidden_size //
-                                            self.config.pretraining_tp,
-                                            dim=2)
-            o_proj_slices = self.o_proj.weight.split(
-                self.hidden_size // self.config.pretraining_tp, dim=1)
-            attn_output = sum([
-                F.linear(attn_output[i], o_proj_slices[i])
-                for i in range(self.config.pretraining_tp)
-            ])
-        else:
-            attn_output = self.o_proj(attn_output)
+class LlamaMLP(nn.Module):
 
-        if not output_attentions:
-            attn_weights = None
+    def __init__(self, config: LlamaConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+        self.gate_proj = nn.Linear(self.hidden_size,
+                                   self.intermediate_size,
+                                   bias=False)
+        self.up_proj = nn.Linear(self.hidden_size,
+                                 self.intermediate_size,
+                                 bias=False)
+        self.down_proj = nn.Linear(self.intermediate_size,
+                                   self.hidden_size,
+                                   bias=False)
+        self.act_fn = ACT2FN[config.hidden_act]
 
-        return attn_output, attn_weights, past_key_value
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        down_proj = self.down_proj(
+            self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        return down_proj
+
+
+class LlamaDecoderLayer(nn.Module):
+
+    def __init__(self, config: LlamaConfig) -> None:
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.self_attn = LlamaAttention(config=config)
+        self.mlp = LlamaMLP(config)
+        self.input_layernorm = LlamaRMSNorm(config.hidden_size,
+                                            eps=config.rms_norm_eps)
+        self.post_attention_layernorm = LlamaRMSNorm(config.hidden_size,
+                                                     eps=config.rms_norm_eps)
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        **kwargs,
+    ) -> Tuple[torch.FloatTensor, Tuple[torch.FloatTensor]]:
+        """
+        Args:
+            hidden_states (`torch.FloatTensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
+            attention_mask (`torch.FloatTensor`, *optional*):
+                attention mask of size `(batch_size, sequence_length)` if flash attention is used or `(batch_size, 1,
+                query_sequence_length, key_sequence_length)` if default attention is used.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under
+                returned tensors for more detail.
+            use_cache (`bool`, *optional*):
+                If set to `True`, `past_key_values` key value states are returned and can be used to speed up decoding
+                (see `past_key_values`).
+            past_key_value (`Tuple(torch.FloatTensor)`, *optional*): cached past key and value projection states
+        """
+        residual = hidden_states
+        hidden_states = self.input_layernorm(hidden_states)
+
+        # Self Attention
+        hidden_states = self.self_attn(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            **kwargs,
+        )
+        hidden_states = residual + hidden_states
+
+        # Fully Connected
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
+        return hidden_states
+
+
+class LlamaModel(LlamaPreTrainedModel):
+    """Transformer decoder consisting of *config.num_hidden_layers* layers.
+    Each layer is a [`LlamaDecoderLayer`]
+
+    Args:
+        config: LlamaConfig
+    """
+
+    def __init__(self, config: LlamaConfig) -> None:
+        super().__init__(config)
+        self.padding_idx = config.pad_token_id
+        self.vocab_size = config.vocab_size
+
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size,
+                                         self.padding_idx)
+        self.layers = nn.ModuleList([
+            LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)
+        ])
+        self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+
+        self.gradient_checkpointing = False
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def forward(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPast]:
+        # retrieve input_ids and inputs_embeds
+        batch_size, seq_length = input_ids.shape[:2]
+        if position_ids is None:
+            device = input_ids.device
+            position_ids = torch.arange(0,
+                                        seq_length,
+                                        dtype=torch.long,
+                                        device=device)
+            position_ids = position_ids.unsqueeze(0)
+
+        inputs_embeds = self.embed_tokens(input_ids)
+        # 2d mask is passed through the layers
+        attention_mask = attention_mask if (attention_mask is not None
+                                            and 0 in attention_mask) else None
+        # embed positions
+        hidden_states = inputs_embeds
+        # decoder layers
+        for decoder_layer in self.layers:
+            hidden_states = decoder_layer(
+                hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+            )
+
+        hidden_states = self.norm(hidden_states)
+        return hidden_states
+
+
+if __name__ == '__main__':
+    x = torch.randn(1, 8, 4, 2)
+    rope = LlamaRotaryEmbedding(dim=8, base=10, max_seq_len=8)
+    rope2 = LlamaLinearScalingRotaryEmbedding(dim=8,
+                                              base=10,
+                                              max_seq_len=8,
+                                              scaling_factor=2)
+    cos, sin = rope2.forward(x, seq_len=4)
+    print(cos.shape)
+    print(cos)
