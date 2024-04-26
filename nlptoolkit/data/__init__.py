@@ -7,7 +7,7 @@ Description:
 
 '''
 
-from .tokenizer import JiebaTokenizer
-from .vocab import Vocab
+from nlptoolkit.data.tokenizers import BertTokenizer, JiebaTokenizer, Tokenizer
+from nlptoolkit.data.vocab import Vocab
 
-__all__ = ['JiebaTokenizer', 'Vocab']
+__all__ = ['JiebaTokenizer', 'Vocab', 'Tokenizer', 'BertTokenizer']

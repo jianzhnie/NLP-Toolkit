@@ -4,15 +4,16 @@ from typing import Optional, Tuple, Union
 import torch
 import torch.nn as nn
 
-from .config_bert import BertConfig
-from .modeling_bert import (BertModel, BertOnlyMLMHead, BertOnlyNSPHead,
-                            BertPreTrainedModel, BertPreTrainingHeads)
-from .modeling_output import (BertForPreTrainingOutput, BertModelOutput,
-                              CausalLMOutput, MaskedLMOutput,
-                              MultipleChoiceModelOutput,
-                              NextSentencePredictorOutput,
-                              QuestionAnsweringModelOutput,
-                              SequenceClassifierOutput, TokenClassifierOutput)
+from nlptoolkit.llms.bert.config_bert import BertConfig
+from nlptoolkit.llms.bert.modeling_bert import (BertModel, BertOnlyMLMHead,
+                                                BertOnlyNSPHead,
+                                                BertPreTrainedModel,
+                                                BertPreTrainingHeads)
+from nlptoolkit.llms.modeling_outputs import (
+    BertForPreTrainingOutput, BertModelOutput, CausalLMOutput, MaskedLMOutput,
+    MultipleChoiceModelOutput, NextSentencePredictorOutput,
+    QuestionAnsweringModelOutput, SequenceClassifierOutput,
+    TokenClassifierOutput)
 
 
 class BertForPreTraining(BertPreTrainedModel):

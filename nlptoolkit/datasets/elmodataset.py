@@ -14,9 +14,8 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
-from nlptoolkit.data.utils.utils import (BOS_TOKEN, BOW_TOKEN, EOS_TOKEN,
-                                         EOW_TOKEN, PAD_TOKEN)
-from nlptoolkit.data.vocab import Vocab
+from nlptoolkit.data.vocab import (BOS_TOKEN, BOW_TOKEN, EOS_TOKEN, EOW_TOKEN,
+                                   PAD_TOKEN, Vocab)
 
 
 def load_corpus(path, max_tok_len=None, max_seq_len=None):

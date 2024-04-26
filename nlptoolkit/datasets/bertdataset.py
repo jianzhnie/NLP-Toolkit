@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
-from nlptoolkit.data.tokenizer import Tokenizer
+from nlptoolkit.data.tokenizers import Tokenizer
 from nlptoolkit.data.vocab import Vocab
 from nlptoolkit.utils.data_utils import truncate_pad
 

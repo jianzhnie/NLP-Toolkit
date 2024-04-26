@@ -20,6 +20,8 @@ CLS_TOKEN = '<CLS>'
 MASK_TOKEN = '<MASK>'
 BOS_TOKEN = '<BOS>'
 EOS_TOKEN = '<EOS>'
+BOW_TOKEN = '<BOW>'
+EOW_TOKEN = '<EOW>'
 
 
 def tokenize(lines, token='word'):

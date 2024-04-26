@@ -39,7 +39,7 @@ from typing import List, Union
 
 import jieba
 
-from .vocab import Vocab
+from nlptoolkit.data.vocab import Vocab
 
 
 class BaseTokenizer(object):

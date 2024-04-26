@@ -7,8 +7,7 @@ from typing import List, Tuple
 
 from torch.utils.data import Dataset
 
-from nlptoolkit.data.tokenizer import Tokenizer
-from nlptoolkit.data.vocab import Vocab
+from nlptoolkit.data import Tokenizer, Vocab
 
 
 class NMTDataset(Dataset):

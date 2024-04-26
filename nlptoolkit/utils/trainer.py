@@ -8,8 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 sys.path.append('../../')
-from nlptoolkit.data.tokenizer import Tokenizer
-from nlptoolkit.data.vocab import Vocab
+from nlptoolkit.data import Tokenizer, Vocab
 from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
 from nlptoolkit.utils.data_utils import truncate_pad
 from nlptoolkit.utils.model_utils import save_model_checkpoints
