@@ -16,7 +16,7 @@ from typing import List, Optional, Tuple
 from transformers.tokenization_utils import (PreTrainedTokenizer, _is_control,
                                              _is_punctuation, _is_whitespace)
 
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 VOCAB_FILES_NAMES = {'vocab_file': 'vocab.txt'}
 
