@@ -1,4 +1,9 @@
-"""在自然语言处理（NLP）和文本处理领域，有许多不同的词元化方法，常用的包括以下几种：
+"""Text tokenization module for NLP tasks.
+
+This module provides base and concrete implementations of tokenizers
+that can process text into tokens at both word and character levels.
+
+在自然语言处理（NLP）和文本处理领域，有许多不同的词元化方法，常用的包括以下几种：
 
 1.空格分词（Whitespace Tokenization）：
 
@@ -35,6 +40,7 @@
 """
 
 import re
+from abc import ABC, abstractmethod
 from typing import List, Union
 
 import jieba
@@ -42,81 +48,193 @@ import jieba
 from nlptoolkit.data.vocab import Vocab
 
 
-class BaseTokenizer(object):
+class BaseTokenizer(ABC):
+    """Abstract base class for tokenizers.
 
-    def __init__(self, vocab: Vocab):
-        self.vocab = vocab
-
-    def cut(self, sentence):
-        pass
-
-    def encode(self, sentence):
-        pass
-
-
-class Tokenizer:
-    """Tokenizes text lines into word or character tokens.
-
-    Args:
-        lang (str, optional): Language identifier. Default is 'en'.
+    This class defines the interface that all tokenizer implementations
+    must follow, providing basic tokenization and encoding/decoding functionality.
 
     Attributes:
-        lang (str): Language identifier.
-
-    Usage:
-    ```
-    tokenizer = Tokenizer()
-    tokens = tokenizer.tokenize("Hello, World!", token='word')
-    ```
-
-    Defined in :numref:`sec_utils`
+        vocab (Vocab): Vocabulary object for token-to-index mapping
     """
 
-    def __init__(self, lang: str = 'en'):
-        self.lang = lang
-
-    def tokenize(self,
-                 sentence: str,
-                 token: str = 'word') -> Union[List[str], List[List[str]]]:
-        """Tokenize the input sentence into word or character tokens.
+    def __init__(self, vocab: Vocab) -> None:
+        """Initialize the tokenizer with a vocabulary.
 
         Args:
-            sentence (str): The input sentence to tokenize.
-            token (str, optional): Token type. Either 'word' or 'char'. Default is 'word'.
+            vocab: Vocabulary object for token/index conversion
+        """
+        self.vocab = vocab
+
+    @abstractmethod
+    def cut(self, sentence: str) -> List[str]:
+        """Cut a sentence into tokens.
+
+        Args:
+            sentence: Input text to tokenize
 
         Returns:
-            Union[List[str], List[List[str]]]: A list of tokens.
+            List of tokens
+        """
+        pass
 
-        Raises:
-            ValueError: If an unknown token type is provided.
+    @abstractmethod
+    def encode(self, sentence: str) -> List[int]:
+        """Convert a sentence into token indices.
 
-        Usage:
-        ```
-        tokens = tokenizer.tokenize("Hello, World!", token='word')
-        ```
+        Args:
+            sentence: Input text to encode
+
+        Returns:
+            List of token indices
+        """
+        pass
+
+    @abstractmethod
+    def decode(self, ids: List[int]) -> str:
+        """Convert token indices back into text.
+
+        Args:
+            ids: List of token indices
+
+        Returns:
+            Reconstructed text
+        """
+        pass
+
+
+class Tokenizer(BaseTokenizer):
+    """Concrete tokenizer implementation supporting word and character-level
+    tokenization.
+
+    This tokenizer handles text preprocessing, including:
+    - Special character removal
+    - Whitespace normalization
+    - Case normalization
+    - Punctuation normalization
+    - Word/character-level tokenization
+
+    Attributes:
+        vocab (Vocab): Vocabulary object for token-to-index mapping
+        _special_chars_pattern: Regex pattern for special characters
+        _whitespace_pattern: Regex pattern for whitespace normalization
+        _punctuation_patterns: Dict of patterns for punctuation normalization
+    """
+
+    # Class-level regex patterns for better performance
+    _special_chars_pattern = re.compile(r"[\*\""
+                                        "\n\\…\+\-\/\=\(\)'•:\|'\!;]")
+    _whitespace_pattern = re.compile(r'[ ]+')
+    _punctuation_patterns = {
+        'exclamation': re.compile(r'\!+'),
+        'comma': re.compile(r'\,+'),
+        'question': re.compile(r'\?+'),
+        'non_alpha': re.compile(r'[^A-Za-z]+'),
+    }
+
+    def __init__(self, vocab: Vocab) -> None:
+        """Initialize the tokenizer.
+
+        Args:
+            vocab: Vocabulary object for token/index conversion
+        """
+        super().__init__(vocab)
+
+    def preprocess_text(self, text: str) -> str:
+        """Preprocess text by normalizing characters, whitespace, and case.
+
+        Args:
+            text: Input text to preprocess
+
+        Returns:
+            Preprocessed text
         """
         # 将句子中的特殊字符（如星号、引号、换行符、反斜杠、加号、减号、斜杠、等号、括号、单引号、冒号、方括号、竖线、感叹号和分号）
         # 替换为一个空格。
+        # Replace special characters with space
+        text = self._special_chars_pattern.sub(' ', str(text))
 
-        sentence = re.sub(r"[\*\"“”\n\\…\+\-\/\=\(\)‘•:\[\]\|’\!;]", ' ',
-                          str(sentence))
+        # Normalize whitespace
         # 将连续多个空格替换为一个空格。这有助于将多个连续空格合并成一个。
-        sentence = re.sub(r'[ ]+', ' ', sentence)
-        # 将连续多个感叹号替换为一个感叹号，类似地，后面的行也分别用于处理连续的逗号和问号。
-        sentence = re.sub(r'\!+', '!', sentence)
-        sentence = re.sub(r'\,+', ',', sentence)
-        sentence = re.sub(r'\?+', '?', sentence)
-        # 替换非字母字符（包括数字、符号和空格）为一个空格。这将确保句子中只包含字母字符。
-        sentence = re.sub(r'[^A-Za-z]+', ' ', sentence)
-        # 将整个句子转换为小写字母，以确保文本的一致性，因为在自然语言处理任务中通常不区分大小写。
-        sentence = sentence.lower()
-        # 接下来，根据指定的token类型，函数将句子分割成单词或字符，并返回结果：
-        if token == 'word':
-            return sentence.split()
-        elif token == 'char':
-            return [list(word) for word in sentence.split()]
+        text = self._whitespace_pattern.sub(' ', text)
+
+        # Normalize punctuation
+        text = self._punctuation_patterns['exclamation'].sub('!', text)
+        text = self._punctuation_patterns['comma'].sub(',', text)
+        text = self._punctuation_patterns['question'].sub('?', text)
+
+        # Replace non-alphabetic characters with space
+        text = self._punctuation_patterns['non_alpha'].sub(' ', text)
+
+        # Convert to lowercase
+        return text.lower().strip()
+
+    def tokenize(
+            self,
+            sentence: str,
+            token_type: str = 'word') -> Union[List[str], List[List[str]]]:
+        """Tokenize text into word or character tokens.
+
+        Args:
+            sentence: Input text to tokenize
+            token_type: Tokenization type ('word' or 'char')
+
+        Returns:
+            For token_type='word': List of word tokens
+            For token_type='char': List of character token lists
+
+        Raises:
+            ValueError: If token_type is not 'word' or 'char'
+        """
+        if not isinstance(sentence, str):
+            raise TypeError(f'Expected string input, got {type(sentence)}')
+
+        # Preprocess the text
+        processed_text = self.preprocess_text(sentence)
+
+        # Tokenize based on specified type
+        if token_type == 'word':
+            return processed_text.split()
+        elif token_type == 'char':
+            return [list(word) for word in processed_text.split()]
         else:
-            raise ValueError('Unknown token type: ' + token)
+            raise ValueError(
+                f"Unknown token type: {token_type}. Expected 'word' or 'char'")
+
+    def cut(self, sentence: str) -> List[str]:
+        """Cut text into word tokens.
+
+        Args:
+            sentence: Input text to tokenize
+
+        Returns:
+            List of word tokens
+        """
+        return self.tokenize(sentence, token_type='word')
+
+    def encode(self, sentence: str) -> List[int]:
+        """Convert text into token indices.
+
+        Args:
+            sentence: Input text to encode
+
+        Returns:
+            List of token indices
+        """
+        tokens = self.cut(sentence)
+        return self.vocab.to_index(tokens)
+
+    def decode(self, ids: List[int]) -> str:
+        """Convert token indices back into text.
+
+        Args:
+            ids: List of token indices
+
+        Returns:
+            Reconstructed text
+        """
+        tokens = self.vocab.to_tokens(ids)
+        return ' '.join(tokens)
 
 
 class JiebaTokenizer(BaseTokenizer):
@@ -215,14 +333,19 @@ class JiebaTokenizer(BaseTokenizer):
                 print(ids)
                 # [1170578, 575565]
         """
-        words = self.cut(sentence, cut_all, use_hmm)
+        tokens = self.cut(sentence, cut_all, use_hmm)
+        return self.vocab.to_index(tokens)
 
-        return [
-            self.get_idx_from_word(word, self.vocab.token_to_idx,
-                                   self.vocab.unk_token) for word in words
-        ]
+    def decode(self, ids: List[int]) -> str:
+        """Convert token indices back into text.
 
-    def get_idx_from_word(self, word, word_to_idx, unk_word):
-        if word in word_to_idx:
-            return word_to_idx[word]
-        return word_to_idx[unk_word]
+        Args:
+            ids: List of token indices
+
+        Returns:
+            Reconstructed text
+        """
+        if not ids:
+            raise ValueError('Token IDs list cannot be empty')
+        tokens = self.vocab.to_tokens(ids)
+        return ' '.join(tokens)
