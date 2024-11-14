@@ -22,7 +22,7 @@ BOW_TOKEN = '<BOW>'
 EOW_TOKEN = '<EOW>'
 
 
-def tokenize(lines: List[str], token: str = "word") -> List[List[str]]:
+def tokenize(lines: List[str], token: str = 'word') -> List[List[str]]:
     """Split text lines into word or character tokens.
 
     Args:
@@ -35,7 +35,7 @@ def tokenize(lines: List[str], token: str = "word") -> List[List[str]]:
     Raises:
         AssertionError: If token type is invalid
     """
-    assert token in ("word", "char"), f"Unknown token type: {token}"
+    assert token in ('word', 'char'), f'Unknown token type: {token}'
     return [line.split() if token == 'word' else list(line) for line in lines]
 
 
@@ -118,12 +118,11 @@ class Vocab(object):
         self.special_token_dict = OrderedDict()
         for token_name, special_token in special_token_dict.items():
             # Test if kwarg specifies a special token
-            if not token_name.endswith("_token"):
+            if not token_name.endswith('_token'):
                 raise ValueError(
-                    f"{token_name} is invalid. Only keyword arguments "
+                    f'{token_name} is invalid. Only keyword arguments '
                     "that end in '_token' are supported "
-                    "to declare special tokens."
-                )
+                    'to declare special tokens.')
 
             if special_token is not None and special_token not in special_tokens:
                 special_tokens.append(special_token)
@@ -131,24 +130,27 @@ class Vocab(object):
 
         # Map tokens to indices and indices to tokens
         if counter is None:
-            assert (
-                token_to_idx is not None
-            ), "token_to_idx must be provided if counter is None"
+            assert (token_to_idx is not None
+                    ), 'token_to_idx must be provided if counter is None'
             self.token_to_idx: Dict[str, int] = token_to_idx
             self.idx_to_token: Dict[int, str] = {
-                idx: token for token, idx in token_to_idx.items()
+                idx: token
+                for token, idx in token_to_idx.items()
             }
             self.add_tokens(special_tokens)
 
         else:
             # Map special tokens to index
-            self.idx_to_token = {idx: token for idx, token in enumerate(special_tokens)}
+            self.idx_to_token = {
+                idx: token
+                for idx, token in enumerate(special_tokens)
+            }
             self.token_to_idx = OrderedDict()
             self.token_to_idx.update(
-                (token, idx) for idx, token in self.idx_to_token.items()
-            )
+                (token, idx) for idx, token in self.idx_to_token.items())
 
-            self._index_counter_keys(counter, special_tokens, max_size, min_freq)
+            self._index_counter_keys(counter, special_tokens, max_size,
+                                     min_freq)
 
     def _index_counter_keys(
         self,
@@ -167,7 +169,9 @@ class Vocab(object):
             min_freq: Minimum frequency threshold
         """
         # Sort by frequency, then alphabetically
-        self.token_freqs = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+        self.token_freqs = sorted(counter.items(),
+                                  key=lambda x: x[1],
+                                  reverse=True)
         self.word_counter = {key: val for key, val in self.token_freqs}
         # Frequencies of special tokens are not counted when building vocabulary
         # in frequency order
@@ -208,7 +212,7 @@ class Vocab(object):
             will return a str. If `indices` is a list/tuple of integers, it will
             return a list of str.
         """
-        if hasattr(indices, "__len__") and len(indices) > 1:
+        if hasattr(indices, '__len__') and len(indices) > 1:
             return [self.idx_to_token[int(index)] for index in indices]
         return self.idx_to_token[indices]
 
@@ -234,7 +238,8 @@ class Vocab(object):
 
     def __getitem__(self, tokens):
         if not isinstance(tokens, (list, tuple)):
-            return self.token_to_idx.get(tokens, self.token_to_idx.get(self.unk_token))
+            return self.token_to_idx.get(tokens,
+                                         self.token_to_idx.get(self.unk_token))
         return [self.__getitem__(token) for token in tokens]
 
     def __contains__(self, token: str) -> bool:
@@ -242,27 +247,18 @@ class Vocab(object):
 
     def get_bos_token_id(self) -> Optional[int]:
         """Get the index of the beginning-of-sequence token."""
-        return (
-            self.token_to_idx.get(self.bos_token)
-            if self.bos_token is not None
-            else None
-        )
+        return (self.token_to_idx.get(self.bos_token)
+                if self.bos_token is not None else None)
 
     def get_eos_token_id(self) -> Optional[int]:
         """Get the index of the end-of-sequence token."""
-        return (
-            self.token_to_idx.get(self.eos_token)
-            if self.eos_token is not None
-            else None
-        )
+        return (self.token_to_idx.get(self.eos_token)
+                if self.eos_token is not None else None)
 
     def get_pad_token_id(self) -> Optional[int]:
         """Get the index of the padding token."""
-        return (
-            self.token_to_idx.get(self.pad_token)
-            if self.pad_token is not None
-            else None
-        )
+        return (self.token_to_idx.get(self.pad_token)
+                if self.pad_token is not None else None)
 
     def get_token_freq(self):
         return self.word_counter
@@ -282,13 +278,13 @@ class Vocab(object):
             str: The JSON string including information of vocab.
         """
         vocab_dict = {}
-        vocab_dict["idx_to_token"] = dict(self.idx_to_token)
-        vocab_dict["token_to_idx"] = dict(self.token_to_idx)
-        vocab_dict["special_token"] = self.special_token_dict
-        vocab_dict["token_freqs"] = self.token_freqs
+        vocab_dict['idx_to_token'] = dict(self.idx_to_token)
+        vocab_dict['token_to_idx'] = dict(self.token_to_idx)
+        vocab_dict['special_token'] = self.special_token_dict
+        vocab_dict['token_freqs'] = self.token_freqs
         json_str = json.dumps(vocab_dict, indent=2, ensure_ascii=False)
         if path:
-            with io.open(path, "w", encoding="utf-8") as f:
+            with io.open(path, 'w', encoding='utf-8') as f:
                 f.write(json_str)
         return json_str
 
@@ -304,12 +300,12 @@ class Vocab(object):
             Vocab: An instance of `Vocab` generated from the information contained in the JSON string.
         """
         if os.path.isfile(json_str):
-            with io.open(json_str, "r", encoding="utf-8") as f:
+            with io.open(json_str, 'r', encoding='utf-8') as f:
                 vocab_dict = json.load(f)
         else:
             vocab_dict = json.loads(json_str)
-        token_to_idx = vocab_dict.get("token_to_idx")
-        special_tokens = vocab_dict.get("special_token", dict())
+        token_to_idx = vocab_dict.get('token_to_idx')
+        special_tokens = vocab_dict.get('special_token', dict())
         vocab = cls(counter=None, token_to_idx=token_to_idx, **special_tokens)
         return vocab
 
@@ -408,9 +404,9 @@ class Vocab(object):
 
     def save_vocabulary(self, path: str):
         """Save the vocabulary to a file."""
-        with open(path, "w") as writer:
+        with open(path, 'w') as writer:
             for idx in range(len(self.idx_to_token)):
-                writer.write(self.idx_to_token[idx] + "\n")
+                writer.write(self.idx_to_token[idx] + '\n')
 
     @classmethod
     def load_vocabulary(
@@ -445,10 +441,10 @@ class Vocab(object):
 
         token_lst = []
         vocab = collections.OrderedDict()
-        with open(vocab_file, "r", encoding="utf-8") as reader:
+        with open(vocab_file, 'r', encoding='utf-8') as reader:
             tokens = reader.readlines()
             for index, token in enumerate(tokens):
-                token = token.rstrip("\n").split("\t")[0]
+                token = token.rstrip('\n').split('\t')[0]
                 vocab[token] = index
         token_lst = list(vocab.keys())
         token_to_idx = {token: idx for idx, token in enumerate(token_lst)}
