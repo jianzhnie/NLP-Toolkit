@@ -1,5 +1,4 @@
 import math
-import sys
 import time
 
 import torch
@@ -7,10 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from nlptoolkit.datasets.nmtdataset import NMTDatasets
+from nlptoolkit.datasets.nmtdataset import NMTDataset
 from nlptoolkit.models.seq2seq.cnn_attn import CNNSeq2Seq
-
-sys.path.append('../../')
 
 
 def train(model: nn.Module, iterator: torch.utils.data.DataLoader,
@@ -79,7 +76,7 @@ if __name__ == '__main__':
 
     root = '/home/robin/jianzh/nlp-toolkit/data'
     root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
-    nmtdataset = NMTDatasets(root=root)
+    nmtdataset = NMTDataset(root=root)
     src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
     )
 
