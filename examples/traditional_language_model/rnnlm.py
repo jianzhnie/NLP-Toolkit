@@ -16,8 +16,8 @@ from tqdm.auto import tqdm
 
 from nlptoolkit.data.utils.utils import (get_loader, load_reuters,
                                          save_pretrained)
-from nlptoolkit.datasets.nlmdataset import RNNlmDataset
-from nlptoolkit.models.lm.word2vec import RNNLM
+from llmtoolkit.datasets.nlmdataset import RNNlmDataset
+from llmtoolkit.models.lm.word2vec import RNNLM
 
 sys.path.append('../../')
 

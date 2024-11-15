@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 
 sys.path.append('../../')
 from nlptoolkit.data.tokenizer import JiebaTokenizer
-from nlptoolkit.data.vocab import Vocab
+from llmtoolkit.data.vocab import Vocab
 
 
 class BoWClassifier(nn.Module):

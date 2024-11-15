@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader
 sys.path.append('../../')
 from torch.utils.data.dataset import random_split
 
-from nlptoolkit.datasets.nmtdataset import NMTDataset
-from nlptoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
-from nlptoolkit.utils.logger_utils import get_outdir
-from nlptoolkit.utils.trainer import predict_seq2seq
+from llmtoolkit.datasets.nmtdataset import NMTDataset
+from llmtoolkit.models.seq2seq.rnn_mt import RNNSeq2Seq
+from llmtoolkit.utils.logger_utils import get_outdir
+from llmtoolkit.utils.trainer import predict_seq2seq
 
 if __name__ == '__main__':
     # Check for available GPU, and set the device

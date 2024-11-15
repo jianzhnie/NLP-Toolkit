@@ -14,10 +14,9 @@ import torch.optim as optim
 from tqdm.auto import tqdm
 
 sys.path.append('../../')
-from nlptoolkit.datasets.nlmdataset import CbowDataset
-from nlptoolkit.models.lm import CBOWLanguageModel
-from nlptoolkit.utils.data_utils import (get_loader, load_reuters,
-                                         save_pretrained)
+from llmtoolkit.datasets.nlmdataset import CbowDataset
+from llmtoolkit.models.lm import CBOWLanguageModel
+from llmtoolkit.utils.data_utils import get_loader, load_reuters, save_pretrained
 
 if __name__ == '__main__':
     embedding_dim = 64

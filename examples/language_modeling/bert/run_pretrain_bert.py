@@ -8,10 +8,10 @@ from mmengine.model import BaseModel
 from mmengine.runner import Runner
 from torch.utils.data import DataLoader
 
-from nlptoolkit.datasets.bertdataset import BertDataset
-from nlptoolkit.llms.bert.config_bert import BertConfig
-from nlptoolkit.llms.bert.tasking_bert import BertForPreTraining
-from nlptoolkit.llms.modeling_outputs import BertForPreTrainingOutput
+from llmtoolkit.datasets.bertdataset import BertDataset
+from llmtoolkit.llms.bert.config_bert import BertConfig
+from llmtoolkit.llms.bert.tasking_bert import BertForPreTraining
+from llmtoolkit.llms.modeling_outputs import BertForPreTrainingOutput
 
 
 class MMBertForClassify(BaseModel):

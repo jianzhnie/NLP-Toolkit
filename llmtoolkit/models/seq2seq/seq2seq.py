@@ -3,9 +3,9 @@ import sys
 import torch
 import torch.nn as nn
 
-sys.path.append('../../')
-from nlptoolkit.data.embeddings import PositionalEncoding
-from nlptoolkit.llms.vanilla import Transformer
+sys.path.append("../../")
+from llmtoolkit.data.embeddings import PositionalEncoding
+from llmtoolkit.llms.vanilla import Transformer
 
 
 class Seq2SeqTransformer(nn.Module):
@@ -21,14 +21,16 @@ class Seq2SeqTransformer(nn.Module):
         dropout (float, optional): Dropout probability. Default is 0.1.
     """
 
-    def __init__(self,
-                 src_vocab_size: int,
-                 tgt_vocab_size: int,
-                 d_model: int,
-                 num_heads: int,
-                 num_layers: int,
-                 dim_feedforward: int,
-                 dropout: float = 0.1):
+    def __init__(
+        self,
+        src_vocab_size: int,
+        tgt_vocab_size: int,
+        d_model: int,
+        num_heads: int,
+        num_layers: int,
+        dim_feedforward: int,
+        dropout: float = 0.1,
+    ):
         super(Seq2SeqTransformer, self).__init__()
 
         # Source word embedding and positional encoding
@@ -46,7 +48,8 @@ class Seq2SeqTransformer(nn.Module):
             num_encoder_layers=num_layers,
             num_decoder_layers=num_layers,
             dim_feedforward=dim_feedforward,
-            dropout=dropout)
+            dropout=dropout,
+        )
 
         # Fully connected layer for output
         self.fc = nn.Linear(d_model, tgt_vocab_size)

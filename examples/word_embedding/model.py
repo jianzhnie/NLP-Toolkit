@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 sys.path.append('../../')
-from nlptoolkit.data.embeddings import PositionalEncoding
+from llmtoolkit.data.embeddings import PositionalEncoding
 
 
 class RNNModel(nn.Module):

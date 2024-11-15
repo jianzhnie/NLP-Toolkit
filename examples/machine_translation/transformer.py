@@ -4,9 +4,9 @@ from timeit import default_timer as timer
 import torch
 from torch.utils.data import DataLoader
 
-from nlptoolkit.datasets.nmtdataset import NMTDataset
-from nlptoolkit.llms.vanilla.vanilla_transformer import Transformer
-from nlptoolkit.utils.data_utils import truncate_pad
+from llmtoolkit.datasets.nmtdataset import NMTDataset
+from llmtoolkit.llms.vanilla.vanilla_transformer import Transformer
+from llmtoolkit.utils.data_utils import truncate_pad
 
 sys.path.append('../../')
 

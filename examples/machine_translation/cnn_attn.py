@@ -6,8 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from nlptoolkit.datasets.nmtdataset import NMTDataset
-from nlptoolkit.models.seq2seq.cnn_attn import CNNSeq2Seq
+from llmtoolkit.datasets.nmtdataset import NMTDataset
+from llmtoolkit.models.seq2seq.cnn_attn import CNNSeq2Seq
 
 
 def train(model: nn.Module, iterator: torch.utils.data.DataLoader,

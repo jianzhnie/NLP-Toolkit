@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 from transformers.models.bert.tokenization_bert import BertTokenizer
 
-from nlptoolkit.llms.bert.tokenization_bert import convert_to_unicode
+from llmtoolkit.llms.bert.tokenization_bert import convert_to_unicode
 
 
 # Define a named tuple called MaskedLmInstance

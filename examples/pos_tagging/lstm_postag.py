@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm.auto import tqdm
 
 from nlptoolkit.data.utils.utils import load_treebank
-from nlptoolkit.models.rnn.lstm import LSTMPostag
+from llmtoolkit.models.rnn.lstm import LSTMPostag
 
 sys.path.append('../../')
 

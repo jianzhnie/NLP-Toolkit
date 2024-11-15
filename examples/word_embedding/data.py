@@ -9,7 +9,7 @@ from typing import List
 import torch
 
 from nlptoolkit.data.tokenizer import Tokenizer
-from nlptoolkit.data.vocab import Vocab
+from llmtoolkit.data.vocab import Vocab
 
 
 class WikiTextDataset(Dataset):

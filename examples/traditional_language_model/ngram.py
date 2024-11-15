@@ -14,10 +14,13 @@ import torch.optim as optim
 from tqdm.auto import tqdm
 
 sys.path.append('../../')
-from nlptoolkit.datasets.nlmdataset import NGramDataset, Word2VecDataset
-from nlptoolkit.models.lm.word2vec import NGramLanguageModel
-from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
-                                         save_pretrained_vector)
+from llmtoolkit.datasets.nlmdataset import NGramDataset, Word2VecDataset
+from llmtoolkit.models.lm.word2vec import NGramLanguageModel
+from llmtoolkit.utils.data_utils import (
+    get_loader,
+    load_ptb_data,
+    save_pretrained_vector,
+)
 
 if __name__ == '__main__':
     embedding_dim = 64

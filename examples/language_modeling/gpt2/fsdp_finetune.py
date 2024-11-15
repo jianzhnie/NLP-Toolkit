@@ -20,7 +20,7 @@ from transformers.models.gpt2.modeling_gpt2 import GPT2Block
 sys.path.append('../../../')
 from transformers import GPT2Tokenizer
 
-from nlptoolkit.llms.gpt2 import GPT2Config, GPT2LMHeadModel
+from llmtoolkit.llms.gpt2 import GPT2Config, GPT2LMHeadModel
 
 ORI_BATCH_SIZE = 4
 PROMPT_DICT = {

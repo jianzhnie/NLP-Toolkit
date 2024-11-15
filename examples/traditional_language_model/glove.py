@@ -14,10 +14,13 @@ import torch.optim as optim
 from tqdm.auto import tqdm
 
 sys.path.append('../../')
-from nlptoolkit.datasets.nlmdataset import GloveDataset, Word2VecDataset
-from nlptoolkit.models.lm.glove import GloveModel
-from nlptoolkit.utils.data_utils import (get_loader, load_ptb_data,
-                                         save_pretrained_vector)
+from llmtoolkit.datasets.nlmdataset import GloveDataset, Word2VecDataset
+from llmtoolkit.models.lm.glove import GloveModel
+from llmtoolkit.utils.data_utils import (
+    get_loader,
+    load_ptb_data,
+    save_pretrained_vector,
+)
 
 if __name__ == '__main__':
 
