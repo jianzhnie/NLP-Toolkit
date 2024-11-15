@@ -8,13 +8,11 @@ Description:
 '''
 import os
 import re
-import sys
 from typing import List
 
 import torch
 from torch.utils.data import DataLoader
 
-sys.path.append('../../')
 from nlptoolkit.data.vocab import Vocab
 
 # Constants
