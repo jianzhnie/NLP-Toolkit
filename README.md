@@ -1,10 +1,10 @@
-# NLPToolkit
+# LLMToolkit
 
 <img src="docs/imgs/PLMfamily.jpg" alt="PLMfamily" style="zoom:200%;" />
 
 ## Introduction
 
-**`nlptoolkit`** is a toolkit for NLP(Natural Language Processing) and LLM(Large Language Models) using **Pytorch**.  **`nlptoolkit`**  has implemented many language models and data preprocessing methods. More importantly, it provides a lot of examples that can run end-to-end.
+**`llmtoolkit`** is a toolkit for NLP(Natural Language Processing) and LLM(Large Language Models) using **Pytorch**.  **`llmtoolkit`**  has implemented many language models and data preprocessing methods. More importantly, it provides a lot of examples that can run end-to-end.
 
 ## Tokenizer
 
@@ -41,7 +41,7 @@ Supported Transformer Models:
 
 ## Dependencies
 
-- Python 3.5+
+- Python 3.7+
 - Pytorch 1.5.0+
 
 ## Reference:
@@ -58,19 +58,19 @@ Supported Transformer Models:
 
 ## License
 
-`NLPToolkit` is released under the Apache 2.0 license.
+`llmtoolkit` is released under the Apache 2.0 license.
 
 ## Citation
 
 Please cite the repo if you use the data or code in this repo.
 
 ```bibtex
-@misc{NLPToolkit,
+@misc{llmtoolkit,
   author = {jianzhnie},
-  title = {NLPToolkit: NLPToolkit is a toolkit for NLP and LLMs using Pytorch},
+  title = {llmtoolkit: llmtoolkit is a toolkit for NLP and LLMs using Pytorch},
   year = {2023},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/jianzhnie/NLP-Toolkit}},
+  howpublished = {\url{https://github.com/jianzhnie/LLMToolkit}},
 }
 ```
