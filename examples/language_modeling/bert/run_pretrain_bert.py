@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
-import sys
 from typing import Optional
 
 import torch
@@ -9,12 +8,10 @@ from mmengine.model import BaseModel
 from mmengine.runner import Runner
 from torch.utils.data import DataLoader
 
-sys.path.append('../../')
-sys.path.append('llm/nlp-toolkit/nlptoolkit')
 from nlptoolkit.datasets.bertdataset import BertDataset
 from nlptoolkit.llms.bert.config_bert import BertConfig
-from nlptoolkit.llms.bert.modeling_output import BertForPreTrainingOutput
 from nlptoolkit.llms.bert.tasking_bert import BertForPreTraining
+from nlptoolkit.llms.modeling_outputs import BertForPreTrainingOutput
 
 
 class MMBertForClassify(BaseModel):
