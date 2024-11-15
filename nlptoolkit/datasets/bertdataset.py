@@ -1,13 +1,11 @@
 import os
 import random
-import sys
 from typing import List, Tuple
 
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
 from nlptoolkit.data.tokenizers import Tokenizer
 from nlptoolkit.data.vocab import Vocab
 from nlptoolkit.utils.data_utils import truncate_pad
@@ -36,7 +34,7 @@ class TrainingInstance:
         masked_lm_labels: List[str],
         masked_lm_pred_positions: List[int],
         masked_lm_pred_labels: List[str],
-    ):
+    ) -> None:
         self.tokens = tokens
         self.segment_ids = segment_ids
         self.is_next_sentence = is_next_sentence
