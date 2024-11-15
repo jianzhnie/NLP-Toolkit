@@ -2,18 +2,15 @@ import argparse
 import collections
 import os
 import random
-import sys
 from typing import List, NamedTuple, Tuple
 
 import h5py
 import numpy as np
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
-
-sys.path.append('/home/robin/work_dir/llm/nlp-toolkit')
 from transformers.models.bert.tokenization_bert import BertTokenizer
 
-from nlptoolkit.llms.bert.bert_tokenizer import convert_to_unicode
+from nlptoolkit.llms.bert.tokenization_bert import convert_to_unicode
 
 
 # Define a named tuple called MaskedLmInstance
