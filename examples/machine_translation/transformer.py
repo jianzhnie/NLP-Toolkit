@@ -4,9 +4,9 @@ from timeit import default_timer as timer
 import torch
 from torch.utils.data import DataLoader
 
-from nlptoolkit.data.vocab import truncate_pad
-from nlptoolkit.datasets.nmtdataset import NMTDatasets
-from nlptoolkit.llms.vanilla.vanilla_transformer import Seq2SeqTransformer
+from nlptoolkit.datasets.nmtdataset import NMTDataset
+from nlptoolkit.llms.vanilla.vanilla_transformer import Transformer
+from nlptoolkit.utils.data_utils import truncate_pad
 
 sys.path.append('../../')
 
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
-    nmtdataset = NMTDatasets(root=root)
+    nmtdataset = NMTDataset(root=root)
     src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
     )
 
@@ -168,13 +168,15 @@ if __name__ == '__main__':
                                             data_val,
                                             batch_size=128)
 
-    transformer = Seq2SeqTransformer(src_vocab_size=len(src_vocab),
-                                     tgt_vocab_size=len(tgt_vocab),
-                                     num_encoder_layers=1,
-                                     num_decoder_layers=1,
-                                     emb_size=64,
-                                     nhead=1,
-                                     dim_feedforward=32)
+    transformer = Transformer(
+        src_vocab_size=len(src_vocab),
+        tgt_vocab_size=len(tgt_vocab),
+        num_encoder_layers=1,
+        num_decoder_layers=1,
+        emb_size=64,
+        nhead=1,
+        dim_feedforward=32,
+    )
 
     transformer = transformer.to(device)
 
