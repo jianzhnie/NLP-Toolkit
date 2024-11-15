@@ -1,5 +1,4 @@
 import math
-import sys
 import time
 
 import torch
@@ -7,10 +6,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from nlptoolkit.datasets.nmtdataset import NMTDatasets
-from nlptoolkit.models.seq2seq.rnn_attn import RNNSeq2SeqAttnModel
-
-sys.path.append('../../')
+from nlptoolkit.datasets.nmtdataset import NMTDataset
+from nlptoolkit.models.seq2seq.rnn_attn import RNNeq2SeqModel
 
 
 def train(model: nn.Module, iterator: torch.utils.data.DataLoader,
@@ -79,7 +76,7 @@ if __name__ == '__main__':
 
     root = '/home/robin/jianzh/nlp-toolkit/data'
     root = '/Users/jianzhengnie/work_dir/code_gallery/nlp-toolkit/examples/data'
-    nmtdataset = NMTDatasets(root=root)
+    nmtdataset = NMTDataset(root=root)
     src_tokens, tgt_tokens, src_vocab, tgt_vocab = nmtdataset.get_dataset_tokens(
     )
 
@@ -102,15 +99,17 @@ if __name__ == '__main__':
                                             data_val,
                                             batch_size=64)
 
-    model = RNNSeq2SeqAttnModel(src_vocab_size=len(src_vocab),
-                                trg_vocab_size=len(tgt_vocab),
-                                embed_dim=32,
-                                enc_hidden_size=32,
-                                dec_hidden_size=32,
-                                attm_dim=8,
-                                num_layers=1,
-                                dropout=0.5,
-                                device=device)
+    model = RNNeq2SeqModel(
+        src_vocab_size=len(src_vocab),
+        trg_vocab_size=len(tgt_vocab),
+        embed_dim=32,
+        enc_hidden_size=32,
+        dec_hidden_size=32,
+        attm_dim=8,
+        num_layers=1,
+        dropout=0.5,
+        device=device,
+    )
 
     optimizer = torch.optim.Adam(model.parameters())
 
