@@ -7,17 +7,10 @@ Description:
 
 """
 
-import sys
-
 import torch
 import torch.nn as nn
-
-sys.path.append("../../../../")
 import math
 from typing import Optional
-
-from torch import Tensor
-
 from llmtoolkit.losses.mask_softmax import masked_softmax
 
 
@@ -98,8 +91,8 @@ class AdditiveAttention(nn.Module):
         queries: torch.Tensor,
         keys: torch.Tensor,
         values: torch.Tensor,
-        valid_lens: Optional[Tensor],
-    ) -> Tensor:
+        valid_lens: Optional[torch.Tensor],
+    ) -> torch.Tensor:
         """Compute additive attention.
 
         Args:
